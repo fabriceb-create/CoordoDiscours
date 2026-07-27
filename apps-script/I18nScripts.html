@@ -1,0 +1,66 @@
+<script>
+  let interfaceLanguage = 'fr';
+  let interfaceTranslations = {};
+
+  async function initializeTranslations() {
+    try {
+      const pack = await runServer('getLanguagePack');
+      interfaceLanguage = pack.code || 'fr';
+      interfaceTranslations = pack.translations || {};
+      document.documentElement.lang = interfaceLanguage === 'gcf' ? 'gcf' : 'fr';
+      applyTranslations(document.body);
+      observeTranslatedContent();
+    } catch (error) {
+      console.warn('Traductions indisponibles :', error);
+    }
+  }
+
+  function translateText(value) {
+    const text = String(value ?? '');
+    const trimmed = text.trim();
+    if (!trimmed) return text;
+    const translated = interfaceTranslations[trimmed];
+    if (!translated) return text;
+    return text.replace(trimmed, translated);
+  }
+
+  function applyTranslations(root) {
+    if (!root || interfaceLanguage === 'fr') return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || ['SCRIPT','STYLE','TEXTAREA','OPTION'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => { node.nodeValue = translateText(node.nodeValue); });
+
+    root.querySelectorAll?.('[placeholder]').forEach(element => {
+      element.placeholder = translateText(element.placeholder);
+    });
+    root.querySelectorAll?.('option').forEach(option => {
+      option.textContent = translateText(option.textContent);
+    });
+    root.querySelectorAll?.('[title]').forEach(element => {
+      element.title = translateText(element.title);
+    });
+  }
+
+  function observeTranslatedContent() {
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) applyTranslations(node);
+          if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+            node.nodeValue = translateText(node.nodeValue);
+          }
+        });
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', initializeTranslations);
+</script>
