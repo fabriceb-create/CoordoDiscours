@@ -12,7 +12,7 @@ function listPlannings(query, includeCancelled) {
     return map;
   }, {});
 
-  const normalizedQuery = normalizeSearch_(query);
+  const normalizedQuery = normalizeText_(query);
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues()
     .map(row => {
       const speaker = speakers[String(row[3])] || {};
@@ -34,7 +34,7 @@ function listPlannings(query, includeCancelled) {
       };
     })
     .filter(item => includeCancelled || item.status !== 'ANNULE')
-    .filter(item => !normalizedQuery || normalizeSearch_([
+    .filter(item => !normalizedQuery || normalizeText_([
       item.displayDate, item.speakerName, item.talkNumber, item.talkTitle, item.status, item.notes
     ].join(' ')).includes(normalizedQuery))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)));
@@ -50,7 +50,6 @@ function getPlanningOptions() {
 
 function validatePlanning(payload) {
   const data = normalizePlanningPayload_(payload);
-  const ss = getDatabase_();
   const warnings = [];
   const errors = [];
 
@@ -114,7 +113,7 @@ function savePlanning(payload, confirmWarnings) {
     data.notes || ''
   ];
 
-  const rowIndex = findRowByValue_(sheet, 1, id);
+  const rowIndex = findRowById_(sheet, id);
   if (rowIndex) {
     sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
     logAction_('MODIFICATION', 'PROGRAMMATION', id, data);
@@ -137,7 +136,7 @@ function restorePlanning(id) {
 function setPlanningStatus_(id, status) {
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.events);
-  const rowIndex = findRowByValue_(sheet, 1, id);
+  const rowIndex = findRowById_(sheet, id);
   if (!rowIndex) throw new Error('Programmation introuvable.');
   sheet.getRange(rowIndex, 6).setValue(status);
   logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, { status: status });
@@ -151,7 +150,7 @@ function getSpeakerTalkNumbers_(speakerId) {
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues()
     .filter(row => String(row[0]) === String(speakerId))
     .map(row => Number(row[1]))
-    .filter(Number.isFinite);
+    .filter(number => Number.isFinite(number));
 }
 
 function normalizePlanningPayload_(payload) {
