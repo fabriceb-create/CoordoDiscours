@@ -19,6 +19,9 @@ const concurrency = read('Concurrency.gs');
 const planningUi = read('PlanningScripts.html');
 const scriptsUi = read('Scripts.html');
 const communicationUi = read('CommunicationScripts.html');
+const settingsUi = read('SettingsScripts.html');
+const accessUi = read('AccessScripts.html');
+const speakerTalkUi = read('SpeakerTalkUI.html');
 assertContains(concurrency, /function\s+assertEntityVersion_\s*\(/, 'Concurrence : le contrôle de version est absent.');
 assertContains(concurrency, /CONFLIT_VERSION/, 'Concurrence : le code de conflit explicite est absent.');
 assertContains(concurrency, /function\s+advanceEntityVersion_\s*\(/, 'Concurrence : le renouvellement de version est absent.');
@@ -33,17 +36,31 @@ assertContains(planningUi, /data-version=/, 'Interface : les changements de stat
   ['Speakers.gs', 'ORATEUR'],
   ['Congregations.gs', 'ASSEMBLEE'],
   ['HospitalityInvitations.gs', 'HOSPITALITE'],
-  ['HospitalityInvitations.gs', 'INVITATION']
+  ['HospitalityInvitations.gs', 'INVITATION'],
+  ['Talks.gs', 'DISCOURS'],
+  ['Settings.gs', 'PARAMETRES'],
+  ['Access.gs', 'UTILISATEUR'],
+  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS']
 ].forEach(([file, entity]) => {
   const source = read(file);
   assertContains(source, new RegExp(`assertEntityVersion_\\(['"]${entity}['"]`), `Concurrence : ${entity} ne vérifie pas la version attendue.`);
   assertContains(source, new RegExp(`advanceEntityVersion_\\(['"]${entity}['"]`), `Concurrence : ${entity} ne renouvelle pas sa version.`);
   assertContains(source, /LockService\.getScriptLock\(\)/, `Concurrence : ${file} n’utilise pas de verrou pendant l’écriture.`);
 });
-assertContains(scriptsUi, /ensureVersionField_/, 'Interface : les formulaires orateur et assemblée ne transmettent pas la version.');
-assertContains(scriptsUi, /data-version=/, 'Interface : les actions rapides du répertoire ne transmettent pas la version.');
+assertContains(scriptsUi, /ensureVersionField_/, 'Interface : les formulaires du répertoire ne transmettent pas la version.');
+assertContains(scriptsUi, /data-toggle-talk=[\s\S]*data-version=/, 'Interface : les actions rapides des discours ne transmettent pas la version.');
+assertContains(scriptsUi, /setTalkActive[\s\S]*dataset\.version/, 'Interface : la version du discours n’est pas envoyée au serveur.');
 assertContains(communicationUi, /data-version=/, 'Interface : les actions rapides de communication ne transmettent pas la version.');
 assertContains(communicationUi, /CONFLIT_VERSION\|/, 'Interface : les conflits de communication ne déclenchent pas le rechargement.');
+assertContains(settingsUi, /name="version"[\s\S]*settingsVersion/, 'Interface : les paramètres ne conservent pas leur version.');
+assertContains(settingsUi, /resetApplicationSettings[\s\S]*expectedVersion/, 'Interface : la réinitialisation des paramètres ne transmet pas la version.');
+assertContains(settingsUi, /CONFLIT_VERSION\|[\s\S]*loadSettings/, 'Interface : les conflits de paramètres ne déclenchent pas le rechargement.');
+assertContains(accessUi, /data-access-toggle=[\s\S]*data-version=/, 'Interface : les actions utilisateur ne transmettent pas la version.');
+assertContains(accessUi, /setAccessUserActive[\s\S]*dataset\.version/, 'Interface : la version utilisateur n’est pas envoyée au serveur.');
+assertContains(accessUi, /CONFLIT_VERSION\|[\s\S]*renderAccessManagement_/, 'Interface : les conflits utilisateur ne déclenchent pas le rechargement.');
+assertContains(speakerTalkUi, /name="version"/, 'Interface : la sélection des discours ne conserve pas sa version.');
+assertContains(speakerTalkUi, /saveSpeakerTalkSelection[\s\S]*elements\.version\.value/, 'Interface : la version de la sélection des discours n’est pas envoyée.');
+assertContains(speakerTalkUi, /CONFLIT_VERSION\|[\s\S]*openSpeakerTalks/, 'Interface : les conflits de sélection des discours ne déclenchent pas le rechargement.');
 
 const recommendations = read('RecommendationEngine.gs');
 assertContains(recommendations, /function\s+getSpeakerRecommendations\s*\(/, 'Recommandations : le point d’entrée est absent.');
@@ -74,7 +91,8 @@ assertContains(historyUi, /history-change-head/, 'Audit : le tableau avant/aprè
 [
   ['Planning.gs', 'PROGRAMMATION'], ['Speakers.gs', 'ORATEUR'], ['Congregations.gs', 'ASSEMBLEE'],
   ['Talks.gs', 'DISCOURS'], ['HospitalityInvitations.gs', 'HOSPITALITE'],
-  ['HospitalityInvitations.gs', 'INVITATION'], ['Settings.gs', 'PARAMETRES'], ['Access.gs', 'UTILISATEUR']
+  ['HospitalityInvitations.gs', 'INVITATION'], ['Settings.gs', 'PARAMETRES'], ['Access.gs', 'UTILISATEUR'],
+  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS']
 ].forEach(([file, entity]) => {
   const source = read(file);
   assertContains(source, /buildAuditDetails_\(/, `Audit : ${file} n’utilise pas le format avant-après.`);
@@ -92,6 +110,7 @@ assertContains(integrity, /assertAccess_\(\s*['"]ADMIN['"]/, 'Intégrité : le r
 
 const talks = read('Talks.gs');
 assertContains(talks, /APP_CONFIG\.inactiveTalks\.includes\(Number\(number\)\)/, 'Discours : la réactivation d’un discours inactif n’est pas bloquée.');
+assertContains(talks, /version:\s*existing\s*\?\s*existing\.version/, 'Discours : l’import ne transmet pas la version des discours existants.');
 const backup = read('Backup.gs');
 assertContains(backup, /LockService\.getScriptLock\(\)/, 'Sauvegarde : le verrou est absent.');
 assertContains(backup, /createDriveSafetyBackup_\(\)/, 'Sauvegarde : la copie de sécurité est absente.');

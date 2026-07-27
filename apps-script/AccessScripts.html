@@ -45,6 +45,7 @@
         <div class="access-head"><div><p class="eyebrow">Sécurité</p><h2>Utilisateurs et droits d’accès</h2></div><span class="version-badge">${users.length} utilisateur${users.length > 1 ? 's' : ''}</span></div>
         <p class="access-banner">Administrateur : tous les droits. Coordinateur : modification des données métier. Consultation seule : lecture et impression.</p>
         <form id="access-form" class="access-grid">
+          <input type="hidden" name="version">
           <label>Adresse e-mail<input name="email" type="email" required></label>
           <label>Nom<input name="name"></label>
           <label>Rôle<select name="role"><option value="ADMIN">Administrateur</option><option value="COORDINATEUR">Coordinateur</option><option value="CONSULTATION">Consultation seule</option></select></label>
@@ -56,7 +57,7 @@
             <div><span class="access-role">${escapeHtml(user.roleLabel)}</span><small>${user.active ? 'Accès actif' : 'Accès désactivé'}</small></div>
             <div class="record-actions">
               <button class="secondary-button" type="button" data-access-edit="${escapeHtml(user.email)}">Modifier</button>
-              <button class="${user.active ? 'danger-button' : 'secondary-button'}" type="button" data-access-toggle="${escapeHtml(user.email)}" data-active="${user.active}">${user.active ? 'Désactiver' : 'Réactiver'}</button>
+              <button class="${user.active ? 'danger-button' : 'secondary-button'}" type="button" data-access-toggle="${escapeHtml(user.email)}" data-version="${escapeHtml(user.version)}" data-active="${user.active}">${user.active ? 'Désactiver' : 'Réactiver'}</button>
             </div>
           </article>`).join('')}</div>`;
       panel._users = users;
@@ -72,8 +73,11 @@
     try {
       await runServer('saveAccessUser', Object.fromEntries(new FormData(event.currentTarget).entries()));
       toast('Utilisateur enregistré.');
-      renderAccessManagement_();
-    } catch (error) { showError(error); }
+      await renderAccessManagement_();
+    } catch (error) {
+      showError(error);
+      if (String(error.message || error).includes('CONFLIT_VERSION|')) await renderAccessManagement_();
+    }
   }
 
   document.addEventListener('click', async event => {
@@ -84,18 +88,25 @@
       const form = document.getElementById('access-form');
       if (user && form) {
         form.elements.email.value = user.email;
+        form.elements.email.readOnly = true;
         form.elements.name.value = user.name || '';
         form.elements.role.value = user.role;
+        form.elements.version.value = user.version || '';
+        const submit = form.querySelector('[type="submit"]');
+        if (submit) submit.textContent = 'Enregistrer';
         form.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
     const toggle = event.target.closest('[data-access-toggle]');
     if (toggle) {
       try {
-        await runServer('setAccessUserActive', toggle.dataset.accessToggle, toggle.dataset.active !== 'true');
+        await runServer('setAccessUserActive', toggle.dataset.accessToggle, toggle.dataset.active !== 'true', toggle.dataset.version);
         toast('Accès utilisateur mis à jour.');
-        renderAccessManagement_();
-      } catch (error) { showError(error); }
+        await renderAccessManagement_();
+      } catch (error) {
+        showError(error);
+        if (String(error.message || error).includes('CONFLIT_VERSION|')) await renderAccessManagement_();
+      }
     }
   });
 

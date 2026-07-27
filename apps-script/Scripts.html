@@ -127,7 +127,7 @@
   function renderTalks() {
     const container = document.getElementById('talk-list');
     if (!state.talks.length) { container.innerHTML = '<div class="empty-state">Aucun discours trouvé.</div>'; return; }
-    container.innerHTML = state.talks.map(item => `<article class="record-card ${item.active ? '' : 'archived'}"><div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div><div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div></article>`).join('');
+    container.innerHTML = state.talks.map(item => `<article class="record-card ${item.active ? '' : 'archived'}"><div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div><div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div></article>`).join('');
   }
 
   function openSpeaker(item) { const form = document.getElementById('speaker-form'); fillForm(form, item); document.getElementById('speaker-dialog').showModal(); }
@@ -153,7 +153,16 @@
       catch (error) { showError(error); await loadCongregations(); }
     }
     const toggleTalk = event.target.closest('[data-toggle-talk]');
-    if (toggleTalk) { try { await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true'); toast('Statut du discours mis à jour.'); loadTalks(); } catch (error) { showError(error); } }
+    if (toggleTalk) {
+      try {
+        await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true', toggleTalk.dataset.version);
+        toast('Statut du discours mis à jour.');
+        await loadTalks();
+      } catch (error) {
+        showError(error);
+        if (String(error.message || error).includes('CONFLIT_VERSION|')) await loadTalks();
+      }
+    }
   });
 
   document.getElementById('speaker-form').addEventListener('submit', async event => {
@@ -166,7 +175,21 @@
     try { await runServer('saveCongregation', formToObject(event.target)); document.getElementById('congregation-dialog').close(); toast('Assemblée enregistrée.'); await loadCongregations(); }
     catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('congregation-dialog').close(); await loadCongregations(); } }
   });
-  document.getElementById('talk-form').addEventListener('submit', async event => { event.preventDefault(); try { await runServer('saveTalk', formToObject(event.target)); document.getElementById('talk-dialog').close(); toast('Discours enregistré.'); loadTalks(); } catch (error) { showError(error); } });
+  document.getElementById('talk-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await runServer('saveTalk', formToObject(event.target));
+      document.getElementById('talk-dialog').close();
+      toast('Discours enregistré.');
+      await loadTalks();
+    } catch (error) {
+      showError(error);
+      if (String(error.message || error).includes('CONFLIT_VERSION|')) {
+        document.getElementById('talk-dialog').close();
+        await loadTalks();
+      }
+    }
+  });
 
   function debounce(elementId, callback) { let timer; document.getElementById(elementId).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); }); }
   debounce('speaker-search', loadSpeakers); debounce('congregation-search', loadCongregations); debounce('talk-search', loadTalks);
