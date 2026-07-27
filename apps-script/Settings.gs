@@ -5,6 +5,11 @@ const SETTINGS_DEFINITIONS = Object.freeze([
   { key: 'HEURE_REUNION_DEFAUT', label: 'Heure de réunion par défaut', type: 'time', defaultValue: '09:30', description: 'Heure proposée lors de la création d’une programmation.' },
   { key: 'DUREE_IMPRESSION_MOIS', label: 'Période d’impression par défaut', type: 'select', options: ['3', '6'], defaultValue: '3', suffix: 'mois', description: 'Nombre de mois proposé dans le planning imprimable.' },
   { key: 'HORIZON_ACTIONS_JOURS', label: 'Horizon des actions', type: 'number', min: 1, max: 90, defaultValue: '14', suffix: 'jours', description: 'Période examinée par le tableau de bord pour les invitations et hospitalités manquantes.' },
+  { key: 'RECO_POIDS_DISCOURS', label: 'Recommandation — discours autorisé', type: 'number', min: 0, max: 100, defaultValue: '40', suffix: 'points', description: 'Importance accordée à la capacité de l’orateur à présenter le discours sélectionné.' },
+  { key: 'RECO_POIDS_ANCIENNETE', label: 'Recommandation — ancienneté du dernier passage', type: 'number', min: 0, max: 100, defaultValue: '30', suffix: 'points', description: 'Importance accordée au temps écoulé depuis le dernier passage de l’orateur.' },
+  { key: 'RECO_POIDS_MOIS', label: 'Recommandation — disponibilité dans le mois', type: 'number', min: 0, max: 100, defaultValue: '15', suffix: 'points', description: 'Importance accordée à l’absence d’une autre programmation durant le même mois.' },
+  { key: 'RECO_POIDS_LOCAL', label: 'Recommandation — proximité', type: 'number', min: 0, max: 100, defaultValue: '10', suffix: 'points', description: 'Importance accordée aux orateurs locaux afin de limiter déplacements et accueil.' },
+  { key: 'RECO_POIDS_EQUILIBRE', label: 'Recommandation — équilibre des affectations', type: 'number', min: 0, max: 100, defaultValue: '5', suffix: 'points', description: 'Importance accordée aux orateurs les moins sollicités dans le planning.' },
   { key: 'ASSISTANT_LECTURE_SEULE', label: 'Assistant en lecture seule', type: 'boolean', defaultValue: 'OUI', description: 'Conserve les fonctions d’assistance sans autoriser de modification automatique.' }
 ]);
 
@@ -52,8 +57,16 @@ function saveApplicationSettings(payload) {
     upsertSetting_(sheet, definition.key, value, definition.description);
     saved[definition.key] = value;
   });
+  validateRecommendationWeights_(saved);
   logAction_('MODIFICATION', 'PARAMETRES', 'APPLICATION', saved);
   return getApplicationSettings();
+}
+
+function validateRecommendationWeights_(settings) {
+  const keys = ['RECO_POIDS_DISCOURS', 'RECO_POIDS_ANCIENNETE', 'RECO_POIDS_MOIS', 'RECO_POIDS_LOCAL', 'RECO_POIDS_EQUILIBRE'];
+  const total = keys.reduce(function (sum, key) { return sum + Number(settings[key] || 0); }, 0);
+  if (total <= 0) throw new Error('Au moins une pondération de recommandation doit être supérieure à zéro.');
+  return total;
 }
 
 function resetApplicationSettings() {
