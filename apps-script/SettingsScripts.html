@@ -8,7 +8,7 @@
     return currentTranslations[String(text || '')] || String(text || '');
   }
 
-  async function setInterfaceLanguage(language, persist) {
+  async function setInterfaceLanguage(language) {
     try {
       const pack = await runServer('getLanguagePack', language || '');
       currentLanguage = pack.code || 'fr';
@@ -16,7 +16,6 @@
       document.documentElement.lang = currentLanguage === 'gcf' ? 'gcf' : 'fr';
       applyTranslations(document.body);
       startTranslationObserver_();
-      if (persist) toast(t('Paramètres enregistrés.'));
       return pack;
     } catch (error) {
       showError(error);
@@ -127,8 +126,13 @@
     event.preventDefault();
     try {
       const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+      const previousLanguage = currentLanguage;
       const data = await runServer('saveApplicationSettings', payload);
-      await setInterfaceLanguage(payload.LANGUE_INTERFACE || 'fr', false);
+      const nextLanguage = payload.LANGUE_INTERFACE || 'fr';
+      if (nextLanguage !== previousLanguage) {
+        window.location.reload();
+        return;
+      }
       renderSettings(data);
       document.getElementById('congregation').textContent = payload.ASSEMBLEE || 'Basse-Terre';
       toast(t('Paramètres enregistrés.'));
@@ -139,8 +143,12 @@
   async function resetSettings_() {
     if (!confirm(t('Rétablir toutes les valeurs par défaut ?'))) return;
     try {
+      const previousLanguage = currentLanguage;
       const data = await runServer('resetApplicationSettings');
-      await setInterfaceLanguage(data.language || 'fr', false);
+      if ((data.language || 'fr') !== previousLanguage) {
+        window.location.reload();
+        return;
+      }
       renderSettings(data);
       toast(t('Valeurs par défaut restaurées.'));
     } catch (error) { showError(error); }
@@ -152,6 +160,6 @@
   });
 
   document.addEventListener('DOMContentLoaded', async () => {
-    await setInterfaceLanguage('', false);
+    await setInterfaceLanguage('');
   });
 </script>
