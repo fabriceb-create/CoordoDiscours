@@ -1,17 +1,43 @@
 <script>
+  const state = { speakers: [], congregations: [] };
+
+  function runServer(functionName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)[functionName](...args);
+    });
+  }
+
+  function toast(message) {
+    const el = document.getElementById('toast');
+    el.textContent = message;
+    el.hidden = false;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.hidden = true; }, 2800);
+  }
+
   function showError(error) {
-    document.getElementById('status').textContent =
-      'Erreur : ' + (error && error.message ? error.message : error);
+    const message = error && error.message ? error.message : String(error);
+    toast('Erreur : ' + message);
+    document.getElementById('status').textContent = 'Erreur détectée';
+  }
+
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
+    document.querySelectorAll('.nav-button').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active-view');
+    const nav = document.querySelector('.nav-button[data-view="' + name + '"]');
+    if (nav) nav.classList.add('active');
+    if (name === 'speakers') loadSpeakers();
+    if (name === 'congregations') loadCongregations();
   }
 
   function renderApp(data) {
     document.getElementById('app-title').textContent = data.appName;
     document.getElementById('version').textContent = data.version;
     document.getElementById('congregation').textContent = data.congregation;
-    document.getElementById('status').textContent = data.installed
-      ? 'Installation détectée. Le socle de l’application est prêt.'
-      : 'Installation non terminée.';
-
+    document.getElementById('status').textContent = data.installed ? 'Application prête' : 'Installation incomplète';
     const link = document.getElementById('database-link');
     if (data.spreadsheetUrl) {
       link.href = data.spreadsheetUrl;
@@ -19,10 +45,184 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    google.script.run
-      .withSuccessHandler(renderApp)
-      .withFailureHandler(showError)
-      .getAppBootstrap();
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>'"]/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[char]);
+  }
+
+  async function loadCongregations() {
+    try {
+      const query = document.getElementById('congregation-search').value;
+      const archived = document.getElementById('congregation-archived').checked;
+      state.congregations = await runServer('listCongregations', query, archived);
+      renderCongregations();
+      fillCongregationOptions();
+    } catch (error) { showError(error); }
+  }
+
+  function renderCongregations() {
+    const container = document.getElementById('congregation-list');
+    if (!state.congregations.length) {
+      container.innerHTML = '<div class="empty-state">Aucune assemblée trouvée.</div>';
+      return;
+    }
+    container.innerHTML = state.congregations.map(item => `
+      <article class="record-card ${item.active ? '' : 'archived'}">
+        <div><h3>${escapeHtml(item.name)}</h3><div class="record-meta">
+          ${item.coordinator ? 'Coordinateur : ' + escapeHtml(item.coordinator) + '<br>' : ''}
+          ${item.phone ? escapeHtml(item.phone) + '<br>' : ''}
+          ${item.email ? escapeHtml(item.email) + '<br>' : ''}
+          ${item.address ? escapeHtml(item.address) + '<br>' : ''}
+          ${item.meetingDay || item.meetingTime ? 'Réunion : ' + escapeHtml([item.meetingDay, item.meetingTime].filter(Boolean).join(' à ')) : ''}
+        </div></div>
+        <div class="record-actions">
+          <button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button>
+          <button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button>
+        </div>
+      </article>`).join('');
+  }
+
+  function fillCongregationOptions() {
+    const select = document.querySelector('#speaker-form [name="congregationId"]');
+    const current = select.value;
+    const active = state.congregations.filter(item => item.active);
+    select.innerHTML = '<option value="">Aucune</option>' + active.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    select.value = current;
+  }
+
+  async function loadSpeakers() {
+    try {
+      if (!state.congregations.length) {
+        state.congregations = await runServer('listCongregations', '', true);
+        fillCongregationOptions();
+      }
+      const query = document.getElementById('speaker-search').value;
+      const archived = document.getElementById('speaker-archived').checked;
+      state.speakers = await runServer('listSpeakers', query, archived);
+      renderSpeakers();
+    } catch (error) { showError(error); }
+  }
+
+  function renderSpeakers() {
+    const container = document.getElementById('speaker-list');
+    if (!state.speakers.length) {
+      container.innerHTML = '<div class="empty-state">Aucun orateur trouvé.</div>';
+      return;
+    }
+    container.innerHTML = state.speakers.map(item => `
+      <article class="record-card ${item.active ? '' : 'archived'}">
+        <div><h3>${escapeHtml(item.fullName || item.lastName)}</h3><div class="record-meta">
+          ${item.type === 'EXTERIEUR' ? 'Orateur extérieur' : 'Orateur local'}
+          ${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}<br>
+          ${item.phone ? escapeHtml(item.phone) + '<br>' : ''}
+          ${item.email ? escapeHtml(item.email) : ''}
+        </div></div>
+        <div class="record-actions">
+          <button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button>
+          <button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button>
+        </div>
+      </article>`).join('');
+  }
+
+  function formToObject(form) {
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.active = form.elements.active.checked;
+    return data;
+  }
+
+  function openSpeaker(item) {
+    const form = document.getElementById('speaker-form');
+    form.reset();
+    form.elements.active.checked = true;
+    if (item) Object.keys(item).forEach(key => {
+      if (form.elements[key]) {
+        if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
+        else form.elements[key].value = item[key] ?? '';
+      }
+    });
+    document.getElementById('speaker-dialog').showModal();
+  }
+
+  function openCongregation(item) {
+    const form = document.getElementById('congregation-form');
+    form.reset();
+    form.elements.active.checked = true;
+    if (item) Object.keys(item).forEach(key => {
+      if (form.elements[key]) {
+        if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
+        else form.elements[key].value = item[key] ?? '';
+      }
+    });
+    document.getElementById('congregation-dialog').showModal();
+  }
+
+  document.addEventListener('click', async event => {
+    const nav = event.target.closest('[data-view], [data-open]');
+    if (nav) showView(nav.dataset.view || nav.dataset.open);
+    if (event.target.matches('[data-close]')) document.getElementById(event.target.dataset.close).close();
+    if (event.target.id === 'new-speaker') openSpeaker();
+    if (event.target.id === 'new-congregation') openCongregation();
+
+    const editSpeaker = event.target.closest('[data-edit-speaker]');
+    if (editSpeaker) openSpeaker(state.speakers.find(item => item.id === editSpeaker.dataset.editSpeaker));
+    const editCongregation = event.target.closest('[data-edit-congregation]');
+    if (editCongregation) openCongregation(state.congregations.find(item => item.id === editCongregation.dataset.editCongregation));
+
+    const toggleSpeaker = event.target.closest('[data-toggle-speaker]');
+    if (toggleSpeaker) {
+      try {
+        await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker);
+        toast('Fiche orateur mise à jour.');
+        loadSpeakers();
+      } catch (error) { showError(error); }
+    }
+    const toggleCongregation = event.target.closest('[data-toggle-congregation]');
+    if (toggleCongregation) {
+      try {
+        await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation);
+        toast('Fiche assemblée mise à jour.');
+        loadCongregations();
+      } catch (error) { showError(error); }
+    }
+  });
+
+  document.getElementById('speaker-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await runServer('saveSpeaker', formToObject(event.target));
+      document.getElementById('speaker-dialog').close();
+      toast('Orateur enregistré.');
+      loadSpeakers();
+    } catch (error) { showError(error); }
+  });
+
+  document.getElementById('congregation-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await runServer('saveCongregation', formToObject(event.target));
+      document.getElementById('congregation-dialog').close();
+      toast('Assemblée enregistrée.');
+      await loadCongregations();
+    } catch (error) { showError(error); }
+  });
+
+  let speakerTimer;
+  document.getElementById('speaker-search').addEventListener('input', () => {
+    clearTimeout(speakerTimer); speakerTimer = setTimeout(loadSpeakers, 250);
+  });
+  document.getElementById('speaker-archived').addEventListener('change', loadSpeakers);
+  let congregationTimer;
+  document.getElementById('congregation-search').addEventListener('input', () => {
+    clearTimeout(congregationTimer); congregationTimer = setTimeout(loadCongregations, 250);
+  });
+  document.getElementById('congregation-archived').addEventListener('change', loadCongregations);
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      renderApp(await runServer('getAppBootstrap'));
+      state.congregations = await runServer('listCongregations', '', true);
+      fillCongregationOptions();
+    } catch (error) { showError(error); }
   });
 </script>
