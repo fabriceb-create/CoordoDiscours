@@ -17,6 +17,8 @@ assertContains(rules, /RULE_SEVERITY[\s\S]*ERROR[\s\S]*WARNING[\s\S]*INFO/, 'Rè
 
 const concurrency = read('Concurrency.gs');
 const planningUi = read('PlanningScripts.html');
+const scriptsUi = read('Scripts.html');
+const communicationUi = read('CommunicationScripts.html');
 assertContains(concurrency, /function\s+assertEntityVersion_\s*\(/, 'Concurrence : le contrôle de version est absent.');
 assertContains(concurrency, /CONFLIT_VERSION/, 'Concurrence : le code de conflit explicite est absent.');
 assertContains(concurrency, /function\s+advanceEntityVersion_\s*\(/, 'Concurrence : le renouvellement de version est absent.');
@@ -26,6 +28,22 @@ assertContains(planning, /version:\s*String\(data\.version/, 'Planning : la vers
 assertContains(planningUi, /ensurePlanningVersionField_/, 'Interface : le champ de version de la programmation est absent.');
 assertContains(planningUi, /handlePlanningVersionConflict_/, 'Interface : aucun traitement du conflit de version n’est prévu.');
 assertContains(planningUi, /data-version=/, 'Interface : les changements de statut ne transmettent pas la version.');
+
+[
+  ['Speakers.gs', 'ORATEUR'],
+  ['Congregations.gs', 'ASSEMBLEE'],
+  ['HospitalityInvitations.gs', 'HOSPITALITE'],
+  ['HospitalityInvitations.gs', 'INVITATION']
+].forEach(([file, entity]) => {
+  const source = read(file);
+  assertContains(source, new RegExp(`assertEntityVersion_\\(['"]${entity}['"]`), `Concurrence : ${entity} ne vérifie pas la version attendue.`);
+  assertContains(source, new RegExp(`advanceEntityVersion_\\(['"]${entity}['"]`), `Concurrence : ${entity} ne renouvelle pas sa version.`);
+  assertContains(source, /LockService\.getScriptLock\(\)/, `Concurrence : ${file} n’utilise pas de verrou pendant l’écriture.`);
+});
+assertContains(scriptsUi, /ensureVersionField_/, 'Interface : les formulaires orateur et assemblée ne transmettent pas la version.');
+assertContains(scriptsUi, /data-version=/, 'Interface : les actions rapides du répertoire ne transmettent pas la version.');
+assertContains(communicationUi, /data-version=/, 'Interface : les actions rapides de communication ne transmettent pas la version.');
+assertContains(communicationUi, /CONFLIT_VERSION\|/, 'Interface : les conflits de communication ne déclenchent pas le rechargement.');
 
 const recommendations = read('RecommendationEngine.gs');
 assertContains(recommendations, /function\s+getSpeakerRecommendations\s*\(/, 'Recommandations : le point d’entrée est absent.');
@@ -66,7 +84,7 @@ assertContains(historyUi, /history-change-head/, 'Audit : le tableau avant/aprè
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
 assertContains(communication, /Une invitation existe déjà pour cette programmation/, 'Invitations : le contrôle des doublons est absent.');
-assertContains(communication, /status\s*===\s*['"]ENVOYEE['"][\s\S]*setValue\(new Date\(\)\)/, 'Invitations : la date d’envoi automatique est absente.');
+assertContains(communication, /status\s*===\s*['"]ENVOYEE['"][\s\S]*sentDate/, 'Invitations : la date d’envoi automatique est absente.');
 
 const integrity = read('Integrity.gs');
 ['ORATEUR_ASSEMBLEE_INTRouvable','PROGRAMMATION_ORATEUR_INTRouvable','PROGRAMMATION_DISCOURS_INTRouvable','CRENEAU_DUPLIQUE','HOSPITALITE_PROGRAMMATION_INTRouvable','INVITATION_PROGRAMMATION_INTRouvable','DISCOURS_OFFICIEL_INACTIF'].forEach(code => assertContains(integrity, code, `Intégrité : ${code} est absent.`));
