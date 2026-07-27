@@ -27,6 +27,10 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Restriction des orateurs extérieurs à leurs discours déclarés.
 - Alerte non bloquante lorsqu’un discours a déjà été programmé durant les 12 derniers mois.
 - Confirmation explicite avant l’enregistrement d’une programmation comportant une alerte.
+- Tableau de bord actif avec indicateurs, prochaine programmation et liste des priorités.
+- Détection des invitations et hospitalités manquantes pour les orateurs extérieurs dans les 14 prochains jours.
+- Diagnostic visuel de la présence des feuilles de données.
+- Actualisation manuelle et automatique du tableau de bord.
 
 ### Décisions figées
 
