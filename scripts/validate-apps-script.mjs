@@ -103,7 +103,8 @@ function functionBody(source, functionName) {
 }
 
 function hasRequiredGuard(body, role) {
-  const direct = new RegExp(`assertAccess_\\(\\s*['\"]${role}['\"]\\s*\\)`);
+  // Accepte assertAccess_('ROLE') ainsi que assertAccess_('ROLE', 'contexte').
+  const direct = new RegExp(`assertAccess_\\(\\s*['\"]${role}['\"](?:\\s*,[\\s\\S]*?)?\\s*\\)`);
   if (direct.test(body)) return true;
   if (role === 'COORDINATEUR' && /assertEditAccess_\s*\(\s*\)/.test(body)) return true;
   if (role === 'ADMIN' && /assertAdminAccess_\s*\(\s*\)/.test(body)) return true;
