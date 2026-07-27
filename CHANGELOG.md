@@ -50,6 +50,9 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Validation des valeurs numériques et horaires avant enregistrement.
 - Diagnostic de la base, du fuseau horaire et des feuilles nécessaires.
 - Restauration des valeurs par défaut et historisation des changements de configuration.
+- Sélecteur de langue dans les paramètres avec Français et Kréyòl Gwadloup.
+- Dictionnaire centralisé de traductions, application automatique aux écrans existants et aux contenus chargés dynamiquement.
+- Architecture extensible pour ajouter d’autres langues sans modifier les données métier.
 
 ### Décisions figées
 
@@ -59,3 +62,4 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - La répétition sur 12 mois produit une alerte non bloquante.
 - Toutes les modifications de programmation doivent être historisées.
 - Une programmation ne peut avoir qu’une hospitalité active et une invitation active dans la version actuelle.
+- Les données métier ne sont pas traduites automatiquement ; seule l’interface et les textes générés le sont.
