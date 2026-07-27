@@ -17,8 +17,8 @@
 
   function showError(error) {
     const message = error && error.message ? error.message : String(error);
-    toast('Erreur : ' + message);
-    document.getElementById('status').textContent = 'Erreur détectée';
+    toast('Erreur : ' + message.replace('CONFLIT_VERSION|', ''));
+    document.getElementById('status').textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
   }
 
   function showView(name) {
@@ -51,10 +51,20 @@
     return data;
   }
 
+  function ensureVersionField_(form) {
+    if (form.elements.version) return form.elements.version;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'version';
+    form.prepend(input);
+    return input;
+  }
+
   function fillForm(form, item) {
+    ensureVersionField_(form);
     form.reset();
     if (form.elements.active) form.elements.active.checked = true;
-    if (!item) return;
+    if (!item) { form.elements.version.value = ''; return; }
     Object.keys(item).forEach(key => {
       if (!form.elements[key]) return;
       if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
@@ -64,13 +74,8 @@
 
   async function loadCongregations() {
     try {
-      state.congregations = await runServer(
-        'listCongregations',
-        document.getElementById('congregation-search').value,
-        document.getElementById('congregation-archived').checked
-      );
-      renderCongregations();
-      fillCongregationOptions();
+      state.congregations = await runServer('listCongregations', document.getElementById('congregation-search').value, document.getElementById('congregation-archived').checked);
+      renderCongregations(); fillCongregationOptions();
     } catch (error) { showError(error); }
   }
 
@@ -81,12 +86,11 @@
       <article class="record-card ${item.active ? '' : 'archived'}">
         <div><h3>${escapeHtml(item.name)}</h3><div class="record-meta">
           ${item.coordinator ? 'Coordinateur : ' + escapeHtml(item.coordinator) + '<br>' : ''}
-          ${item.phone ? escapeHtml(item.phone) + '<br>' : ''}
-          ${item.email ? escapeHtml(item.email) + '<br>' : ''}
+          ${item.phone ? escapeHtml(item.phone) + '<br>' : ''}${item.email ? escapeHtml(item.email) + '<br>' : ''}
           ${item.address ? escapeHtml(item.address) + '<br>' : ''}
           ${item.meetingDay || item.meetingTime ? 'Réunion : ' + escapeHtml([item.meetingDay, item.meetingTime].filter(Boolean).join(' à ')) : ''}
         </div></div>
-        <div class="record-actions"><button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
+        <div class="record-actions"><button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
@@ -99,15 +103,8 @@
 
   async function loadSpeakers() {
     try {
-      if (!state.congregations.length) {
-        state.congregations = await runServer('listCongregations', '', true);
-        fillCongregationOptions();
-      }
-      state.speakers = await runServer(
-        'listSpeakers',
-        document.getElementById('speaker-search').value,
-        document.getElementById('speaker-archived').checked
-      );
+      if (!state.congregations.length) { state.congregations = await runServer('listCongregations', '', true); fillCongregationOptions(); }
+      state.speakers = await runServer('listSpeakers', document.getElementById('speaker-search').value, document.getElementById('speaker-archived').checked);
       renderSpeakers();
     } catch (error) { showError(error); }
   }
@@ -118,95 +115,67 @@
     container.innerHTML = state.speakers.map(item => `
       <article class="record-card ${item.active ? '' : 'archived'}">
         <div><h3>${escapeHtml(item.fullName || item.lastName)}</h3><div class="record-meta">${item.type === 'EXTERIEUR' ? 'Orateur extérieur' : 'Orateur local'}${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}<br>${item.phone ? escapeHtml(item.phone) + '<br>' : ''}${item.email ? escapeHtml(item.email) : ''}</div></div>
-        <div class="record-actions"><button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
+        <div class="record-actions"><button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
   async function loadTalks() {
-    try {
-      state.talks = await runServer(
-        'listTalks',
-        document.getElementById('talk-search').value,
-        document.getElementById('talk-inactive').checked
-      );
-      renderTalks();
-    } catch (error) { showError(error); }
+    try { state.talks = await runServer('listTalks', document.getElementById('talk-search').value, document.getElementById('talk-inactive').checked); renderTalks(); }
+    catch (error) { showError(error); }
   }
 
   function renderTalks() {
     const container = document.getElementById('talk-list');
     if (!state.talks.length) { container.innerHTML = '<div class="empty-state">Aucun discours trouvé.</div>'; return; }
-    container.innerHTML = state.talks.map(item => `
-      <article class="record-card ${item.active ? '' : 'archived'}">
-        <div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div>
-        <div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div>
-      </article>`).join('');
+    container.innerHTML = state.talks.map(item => `<article class="record-card ${item.active ? '' : 'archived'}"><div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div><div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div></article>`).join('');
   }
 
   function openSpeaker(item) { const form = document.getElementById('speaker-form'); fillForm(form, item); document.getElementById('speaker-dialog').showModal(); }
   function openCongregation(item) { const form = document.getElementById('congregation-form'); fillForm(form, item); document.getElementById('congregation-dialog').showModal(); }
-  function openTalk(item) { const form = document.getElementById('talk-form'); fillForm(form, item); if (item) form.elements.number.readOnly = true; else form.elements.number.readOnly = false; document.getElementById('talk-dialog').showModal(); }
+  function openTalk(item) { const form = document.getElementById('talk-form'); fillForm(form, item); form.elements.number.readOnly = Boolean(item); document.getElementById('talk-dialog').showModal(); }
 
   document.addEventListener('click', async event => {
-    const nav = event.target.closest('[data-view], [data-open]');
-    if (nav) showView(nav.dataset.view || nav.dataset.open);
+    const nav = event.target.closest('[data-view], [data-open]'); if (nav) showView(nav.dataset.view || nav.dataset.open);
     if (event.target.matches('[data-close]')) document.getElementById(event.target.dataset.close).close();
-    if (event.target.id === 'new-speaker') openSpeaker();
-    if (event.target.id === 'new-congregation') openCongregation();
-    if (event.target.id === 'new-talk') openTalk();
-
-    const editSpeaker = event.target.closest('[data-edit-speaker]');
-    if (editSpeaker) openSpeaker(state.speakers.find(item => item.id === editSpeaker.dataset.editSpeaker));
-    const editCongregation = event.target.closest('[data-edit-congregation]');
-    if (editCongregation) openCongregation(state.congregations.find(item => item.id === editCongregation.dataset.editCongregation));
-    const editTalk = event.target.closest('[data-edit-talk]');
-    if (editTalk) openTalk(state.talks.find(item => item.number === Number(editTalk.dataset.editTalk)));
+    if (event.target.id === 'new-speaker') openSpeaker(); if (event.target.id === 'new-congregation') openCongregation(); if (event.target.id === 'new-talk') openTalk();
+    const editSpeaker = event.target.closest('[data-edit-speaker]'); if (editSpeaker) openSpeaker(state.speakers.find(item => item.id === editSpeaker.dataset.editSpeaker));
+    const editCongregation = event.target.closest('[data-edit-congregation]'); if (editCongregation) openCongregation(state.congregations.find(item => item.id === editCongregation.dataset.editCongregation));
+    const editTalk = event.target.closest('[data-edit-talk]'); if (editTalk) openTalk(state.talks.find(item => item.number === Number(editTalk.dataset.editTalk)));
 
     const toggleSpeaker = event.target.closest('[data-toggle-speaker]');
     if (toggleSpeaker) {
-      try { await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker); toast('Fiche orateur mise à jour.'); loadSpeakers(); } catch (error) { showError(error); }
+      try { await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker, toggleSpeaker.dataset.version); toast('Fiche orateur mise à jour.'); await loadSpeakers(); }
+      catch (error) { showError(error); await loadSpeakers(); }
     }
     const toggleCongregation = event.target.closest('[data-toggle-congregation]');
     if (toggleCongregation) {
-      try { await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation); toast('Fiche assemblée mise à jour.'); loadCongregations(); } catch (error) { showError(error); }
+      try { await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation, toggleCongregation.dataset.version); toast('Fiche assemblée mise à jour.'); await loadCongregations(); }
+      catch (error) { showError(error); await loadCongregations(); }
     }
     const toggleTalk = event.target.closest('[data-toggle-talk]');
-    if (toggleTalk) {
-      try { await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true'); toast('Statut du discours mis à jour.'); loadTalks(); } catch (error) { showError(error); }
-    }
+    if (toggleTalk) { try { await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true'); toast('Statut du discours mis à jour.'); loadTalks(); } catch (error) { showError(error); } }
   });
 
   document.getElementById('speaker-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try { await runServer('saveSpeaker', formToObject(event.target)); document.getElementById('speaker-dialog').close(); toast('Orateur enregistré.'); loadSpeakers(); } catch (error) { showError(error); }
+    try { await runServer('saveSpeaker', formToObject(event.target)); document.getElementById('speaker-dialog').close(); toast('Orateur enregistré.'); await loadSpeakers(); }
+    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('speaker-dialog').close(); await loadSpeakers(); } }
   });
-
   document.getElementById('congregation-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try { await runServer('saveCongregation', formToObject(event.target)); document.getElementById('congregation-dialog').close(); toast('Assemblée enregistrée.'); await loadCongregations(); } catch (error) { showError(error); }
+    try { await runServer('saveCongregation', formToObject(event.target)); document.getElementById('congregation-dialog').close(); toast('Assemblée enregistrée.'); await loadCongregations(); }
+    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('congregation-dialog').close(); await loadCongregations(); } }
   });
+  document.getElementById('talk-form').addEventListener('submit', async event => { event.preventDefault(); try { await runServer('saveTalk', formToObject(event.target)); document.getElementById('talk-dialog').close(); toast('Discours enregistré.'); loadTalks(); } catch (error) { showError(error); } });
 
-  document.getElementById('talk-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    try { await runServer('saveTalk', formToObject(event.target)); document.getElementById('talk-dialog').close(); toast('Discours enregistré.'); loadTalks(); } catch (error) { showError(error); }
-  });
-
-  function debounce(elementId, callback) {
-    let timer;
-    document.getElementById(elementId).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); });
-  }
-  debounce('speaker-search', loadSpeakers);
-  debounce('congregation-search', loadCongregations);
-  debounce('talk-search', loadTalks);
+  function debounce(elementId, callback) { let timer; document.getElementById(elementId).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); }); }
+  debounce('speaker-search', loadSpeakers); debounce('congregation-search', loadCongregations); debounce('talk-search', loadTalks);
   document.getElementById('speaker-archived').addEventListener('change', loadSpeakers);
   document.getElementById('congregation-archived').addEventListener('change', loadCongregations);
   document.getElementById('talk-inactive').addEventListener('change', loadTalks);
 
   document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      renderApp(await runServer('getAppBootstrap'));
-      state.congregations = await runServer('listCongregations', '', true);
-      fillCongregationOptions();
-    } catch (error) { showError(error); }
+    try { renderApp(await runServer('getAppBootstrap')); state.congregations = await runServer('listCongregations', '', true); fillCongregationOptions(); }
+    catch (error) { showError(error); }
   });
 </script>
