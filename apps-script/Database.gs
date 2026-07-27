@@ -89,9 +89,10 @@ function seedSettings_(ss) {
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
   if (sheet.getLastRow() > 1) return;
 
-  sheet.getRange(2, 1, 4, 3).setValues([
+  sheet.getRange(2, 1, 5, 3).setValues([
     ['ASSEMBLEE', 'Basse-Terre', 'Assemblée utilisatrice'],
     ['VERSION', APP_CONFIG.version, 'Version installée'],
+    ['LANGUE_INTERFACE', 'fr', 'Langue utilisée dans l’interface'],
     ['ALERTE_REPETITION_MOIS', '12', 'Délai d’alerte de répétition'],
     ['ASSISTANT_LECTURE_SEULE', 'OUI', 'Droits de l’assistant']
   ]);
