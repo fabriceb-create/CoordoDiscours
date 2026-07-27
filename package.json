@@ -1,0 +1,16 @@
+{
+  "name": "coordodiscours",
+  "version": "1.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-apps-script.mjs",
+    "check": "npm run validate",
+    "clasp:login": "npx @google/clasp login",
+    "clasp:push": "npx @google/clasp push",
+    "clasp:deploy": "npx @google/clasp deploy"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.0.0-alpha"
+  }
+}
