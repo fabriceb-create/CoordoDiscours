@@ -9,6 +9,7 @@
   <?!= include('SpeakerTalkStyles'); ?>
   <?!= include('CommunicationStyles'); ?>
   <?!= include('PrintPlanningStyles'); ?>
+  <?!= include('HistoryStyles'); ?>
 </head>
 <body>
   <div class="layout">
@@ -23,6 +24,7 @@
         <button class="nav-button" data-view="speakers">Orateurs</button>
         <button class="nav-button" data-view="congregations">Assemblées</button>
         <button class="nav-button" data-view="talks">Discours</button>
+        <button class="nav-button" data-view="history">Historique</button>
       </nav>
       <a id="database-link" class="database-link" href="#" target="_blank" hidden>Ouvrir les données</a>
     </aside>
@@ -81,6 +83,19 @@
         <div class="toolbar"><input id="talk-search" type="search" placeholder="Rechercher par numéro ou mots du titre..."><label><input id="talk-inactive" type="checkbox"> Voir les inactifs</label></div>
         <div id="talk-list" class="cards-list"></div>
       </section>
+
+      <section id="view-history" class="view">
+        <div class="section-header"><div><p class="eyebrow">Traçabilité</p><h2>Historique des opérations</h2></div><button id="history-print" class="primary-button" type="button">Imprimer</button></div>
+        <div class="history-toolbar">
+          <label class="history-search-label">Recherche<input id="history-search" type="search" placeholder="Utilisateur, action, entité, identifiant ou détail..."></label>
+          <label>Action<select id="history-action"><option value="">Toutes les actions</option></select></label>
+          <label>Entité<select id="history-entity"><option value="">Toutes les entités</option></select></label>
+          <label>Du<input id="history-start" type="date"></label>
+          <label>Au<input id="history-end" type="date"></label>
+        </div>
+        <div class="history-actions-bar"><span id="history-count">0 opération</span><div><button id="history-reset" class="secondary-button" type="button">Réinitialiser</button><button id="history-refresh" class="secondary-button" type="button">Actualiser</button></div></div>
+        <div id="history-list" class="cards-list"><div class="empty-state">Ouvre ce module pour charger l’historique.</div></div>
+      </section>
     </main>
   </div>
 
@@ -98,5 +113,6 @@
   <?!= include('DashboardScripts'); ?>
   <?!= include('CommunicationScripts'); ?>
   <?!= include('PrintPlanningScripts'); ?>
+  <?!= include('HistoryScripts'); ?>
 </body>
 </html>
