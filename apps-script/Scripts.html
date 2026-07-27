@@ -1,11 +1,9 @@
 <script>
-  const state = { speakers: [], congregations: [] };
+  const state = { speakers: [], congregations: [], talks: [] };
 
   function runServer(functionName, ...args) {
     return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)[functionName](...args);
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[functionName](...args);
     });
   }
 
@@ -31,6 +29,7 @@
     if (nav) nav.classList.add('active');
     if (name === 'speakers') loadSpeakers();
     if (name === 'congregations') loadCongregations();
+    if (name === 'talks') loadTalks();
   }
 
   function renderApp(data) {
@@ -39,23 +38,37 @@
     document.getElementById('congregation').textContent = data.congregation;
     document.getElementById('status').textContent = data.installed ? 'Application prête' : 'Installation incomplète';
     const link = document.getElementById('database-link');
-    if (data.spreadsheetUrl) {
-      link.href = data.spreadsheetUrl;
-      link.hidden = false;
-    }
+    if (data.spreadsheetUrl) { link.href = data.spreadsheetUrl; link.hidden = false; }
   }
 
   function escapeHtml(value) {
-    return String(value || '').replace(/[&<>'"]/g, char => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    })[char]);
+    return String(value || '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);
+  }
+
+  function formToObject(form) {
+    const data = Object.fromEntries(new FormData(form).entries());
+    if (form.elements.active) data.active = form.elements.active.checked;
+    return data;
+  }
+
+  function fillForm(form, item) {
+    form.reset();
+    if (form.elements.active) form.elements.active.checked = true;
+    if (!item) return;
+    Object.keys(item).forEach(key => {
+      if (!form.elements[key]) return;
+      if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
+      else form.elements[key].value = item[key] ?? '';
+    });
   }
 
   async function loadCongregations() {
     try {
-      const query = document.getElementById('congregation-search').value;
-      const archived = document.getElementById('congregation-archived').checked;
-      state.congregations = await runServer('listCongregations', query, archived);
+      state.congregations = await runServer(
+        'listCongregations',
+        document.getElementById('congregation-search').value,
+        document.getElementById('congregation-archived').checked
+      );
       renderCongregations();
       fillCongregationOptions();
     } catch (error) { showError(error); }
@@ -63,10 +76,7 @@
 
   function renderCongregations() {
     const container = document.getElementById('congregation-list');
-    if (!state.congregations.length) {
-      container.innerHTML = '<div class="empty-state">Aucune assemblée trouvée.</div>';
-      return;
-    }
+    if (!state.congregations.length) { container.innerHTML = '<div class="empty-state">Aucune assemblée trouvée.</div>'; return; }
     container.innerHTML = state.congregations.map(item => `
       <article class="record-card ${item.active ? '' : 'archived'}">
         <div><h3>${escapeHtml(item.name)}</h3><div class="record-meta">
@@ -76,18 +86,14 @@
           ${item.address ? escapeHtml(item.address) + '<br>' : ''}
           ${item.meetingDay || item.meetingTime ? 'Réunion : ' + escapeHtml([item.meetingDay, item.meetingTime].filter(Boolean).join(' à ')) : ''}
         </div></div>
-        <div class="record-actions">
-          <button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button>
-          <button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button>
-        </div>
+        <div class="record-actions"><button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
   function fillCongregationOptions() {
     const select = document.querySelector('#speaker-form [name="congregationId"]');
     const current = select.value;
-    const active = state.congregations.filter(item => item.active);
-    select.innerHTML = '<option value="">Aucune</option>' + active.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    select.innerHTML = '<option value="">Aucune</option>' + state.congregations.filter(item => item.active).map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
     select.value = current;
   }
 
@@ -97,65 +103,49 @@
         state.congregations = await runServer('listCongregations', '', true);
         fillCongregationOptions();
       }
-      const query = document.getElementById('speaker-search').value;
-      const archived = document.getElementById('speaker-archived').checked;
-      state.speakers = await runServer('listSpeakers', query, archived);
+      state.speakers = await runServer(
+        'listSpeakers',
+        document.getElementById('speaker-search').value,
+        document.getElementById('speaker-archived').checked
+      );
       renderSpeakers();
     } catch (error) { showError(error); }
   }
 
   function renderSpeakers() {
     const container = document.getElementById('speaker-list');
-    if (!state.speakers.length) {
-      container.innerHTML = '<div class="empty-state">Aucun orateur trouvé.</div>';
-      return;
-    }
+    if (!state.speakers.length) { container.innerHTML = '<div class="empty-state">Aucun orateur trouvé.</div>'; return; }
     container.innerHTML = state.speakers.map(item => `
       <article class="record-card ${item.active ? '' : 'archived'}">
-        <div><h3>${escapeHtml(item.fullName || item.lastName)}</h3><div class="record-meta">
-          ${item.type === 'EXTERIEUR' ? 'Orateur extérieur' : 'Orateur local'}
-          ${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}<br>
-          ${item.phone ? escapeHtml(item.phone) + '<br>' : ''}
-          ${item.email ? escapeHtml(item.email) : ''}
-        </div></div>
-        <div class="record-actions">
-          <button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button>
-          <button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button>
-        </div>
+        <div><h3>${escapeHtml(item.fullName || item.lastName)}</h3><div class="record-meta">${item.type === 'EXTERIEUR' ? 'Orateur extérieur' : 'Orateur local'}${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}<br>${item.phone ? escapeHtml(item.phone) + '<br>' : ''}${item.email ? escapeHtml(item.email) : ''}</div></div>
+        <div class="record-actions"><button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
-  function formToObject(form) {
-    const data = Object.fromEntries(new FormData(form).entries());
-    data.active = form.elements.active.checked;
-    return data;
+  async function loadTalks() {
+    try {
+      state.talks = await runServer(
+        'listTalks',
+        document.getElementById('talk-search').value,
+        document.getElementById('talk-inactive').checked
+      );
+      renderTalks();
+    } catch (error) { showError(error); }
   }
 
-  function openSpeaker(item) {
-    const form = document.getElementById('speaker-form');
-    form.reset();
-    form.elements.active.checked = true;
-    if (item) Object.keys(item).forEach(key => {
-      if (form.elements[key]) {
-        if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
-        else form.elements[key].value = item[key] ?? '';
-      }
-    });
-    document.getElementById('speaker-dialog').showModal();
+  function renderTalks() {
+    const container = document.getElementById('talk-list');
+    if (!state.talks.length) { container.innerHTML = '<div class="empty-state">Aucun discours trouvé.</div>'; return; }
+    container.innerHTML = state.talks.map(item => `
+      <article class="record-card ${item.active ? '' : 'archived'}">
+        <div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div>
+        <div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div>
+      </article>`).join('');
   }
 
-  function openCongregation(item) {
-    const form = document.getElementById('congregation-form');
-    form.reset();
-    form.elements.active.checked = true;
-    if (item) Object.keys(item).forEach(key => {
-      if (form.elements[key]) {
-        if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
-        else form.elements[key].value = item[key] ?? '';
-      }
-    });
-    document.getElementById('congregation-dialog').showModal();
-  }
+  function openSpeaker(item) { const form = document.getElementById('speaker-form'); fillForm(form, item); document.getElementById('speaker-dialog').showModal(); }
+  function openCongregation(item) { const form = document.getElementById('congregation-form'); fillForm(form, item); document.getElementById('congregation-dialog').showModal(); }
+  function openTalk(item) { const form = document.getElementById('talk-form'); fillForm(form, item); if (item) form.elements.number.readOnly = true; else form.elements.number.readOnly = false; document.getElementById('talk-dialog').showModal(); }
 
   document.addEventListener('click', async event => {
     const nav = event.target.closest('[data-view], [data-open]');
@@ -163,60 +153,54 @@
     if (event.target.matches('[data-close]')) document.getElementById(event.target.dataset.close).close();
     if (event.target.id === 'new-speaker') openSpeaker();
     if (event.target.id === 'new-congregation') openCongregation();
+    if (event.target.id === 'new-talk') openTalk();
 
     const editSpeaker = event.target.closest('[data-edit-speaker]');
     if (editSpeaker) openSpeaker(state.speakers.find(item => item.id === editSpeaker.dataset.editSpeaker));
     const editCongregation = event.target.closest('[data-edit-congregation]');
     if (editCongregation) openCongregation(state.congregations.find(item => item.id === editCongregation.dataset.editCongregation));
+    const editTalk = event.target.closest('[data-edit-talk]');
+    if (editTalk) openTalk(state.talks.find(item => item.number === Number(editTalk.dataset.editTalk)));
 
     const toggleSpeaker = event.target.closest('[data-toggle-speaker]');
     if (toggleSpeaker) {
-      try {
-        await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker);
-        toast('Fiche orateur mise à jour.');
-        loadSpeakers();
-      } catch (error) { showError(error); }
+      try { await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker); toast('Fiche orateur mise à jour.'); loadSpeakers(); } catch (error) { showError(error); }
     }
     const toggleCongregation = event.target.closest('[data-toggle-congregation]');
     if (toggleCongregation) {
-      try {
-        await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation);
-        toast('Fiche assemblée mise à jour.');
-        loadCongregations();
-      } catch (error) { showError(error); }
+      try { await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation); toast('Fiche assemblée mise à jour.'); loadCongregations(); } catch (error) { showError(error); }
+    }
+    const toggleTalk = event.target.closest('[data-toggle-talk]');
+    if (toggleTalk) {
+      try { await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true'); toast('Statut du discours mis à jour.'); loadTalks(); } catch (error) { showError(error); }
     }
   });
 
   document.getElementById('speaker-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try {
-      await runServer('saveSpeaker', formToObject(event.target));
-      document.getElementById('speaker-dialog').close();
-      toast('Orateur enregistré.');
-      loadSpeakers();
-    } catch (error) { showError(error); }
+    try { await runServer('saveSpeaker', formToObject(event.target)); document.getElementById('speaker-dialog').close(); toast('Orateur enregistré.'); loadSpeakers(); } catch (error) { showError(error); }
   });
 
   document.getElementById('congregation-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try {
-      await runServer('saveCongregation', formToObject(event.target));
-      document.getElementById('congregation-dialog').close();
-      toast('Assemblée enregistrée.');
-      await loadCongregations();
-    } catch (error) { showError(error); }
+    try { await runServer('saveCongregation', formToObject(event.target)); document.getElementById('congregation-dialog').close(); toast('Assemblée enregistrée.'); await loadCongregations(); } catch (error) { showError(error); }
   });
 
-  let speakerTimer;
-  document.getElementById('speaker-search').addEventListener('input', () => {
-    clearTimeout(speakerTimer); speakerTimer = setTimeout(loadSpeakers, 250);
+  document.getElementById('talk-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try { await runServer('saveTalk', formToObject(event.target)); document.getElementById('talk-dialog').close(); toast('Discours enregistré.'); loadTalks(); } catch (error) { showError(error); }
   });
+
+  function debounce(elementId, callback) {
+    let timer;
+    document.getElementById(elementId).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); });
+  }
+  debounce('speaker-search', loadSpeakers);
+  debounce('congregation-search', loadCongregations);
+  debounce('talk-search', loadTalks);
   document.getElementById('speaker-archived').addEventListener('change', loadSpeakers);
-  let congregationTimer;
-  document.getElementById('congregation-search').addEventListener('input', () => {
-    clearTimeout(congregationTimer); congregationTimer = setTimeout(loadCongregations, 250);
-  });
   document.getElementById('congregation-archived').addEventListener('change', loadCongregations);
+  document.getElementById('talk-inactive').addEventListener('change', loadTalks);
 
   document.addEventListener('DOMContentLoaded', async () => {
     try {
