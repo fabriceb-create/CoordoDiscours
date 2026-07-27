@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Coordination des discours publics</p>
+        <h1 id="app-title">CoordoDiscours</h1>
+      </div>
+      <span id="version" class="version-badge">Chargement...</span>
+    </header>
+
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">Assemblée</p>
+        <h2 id="congregation">Basse-Terre</h2>
+        <p id="status">Vérification de l’installation en cours...</p>
+      </div>
+      <a id="database-link" class="primary-button" href="#" target="_blank" hidden>
+        Ouvrir les données
+      </a>
+    </section>
+
+    <section class="module-grid" aria-label="Modules">
+      <article class="module-card"><span>📊</span><h3>Tableau de bord</h3><p>Vue des actions à traiter.</p></article>
+      <article class="module-card"><span>📅</span><h3>Programmation</h3><p>Planifier et contrôler les discours.</p></article>
+      <article class="module-card"><span>👤</span><h3>Orateurs</h3><p>Gérer les fiches et l’historique.</p></article>
+      <article class="module-card"><span>🏛️</span><h3>Assemblées</h3><p>Contacts, horaires et visites.</p></article>
+      <article class="module-card"><span>📖</span><h3>Discours</h3><p>Référentiel et contrôles.</p></article>
+      <article class="module-card"><span>📜</span><h3>Historique</h3><p>Journal complet des modifications.</p></article>
+    </section>
+  </main>
+
+  <?!= include('Scripts'); ?>
+</body>
+</html>
