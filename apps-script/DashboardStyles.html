@@ -1,0 +1,41 @@
+<style>
+  #dashboard-content { display: grid; gap: 20px; }
+  .dashboard-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .metric-card, .dashboard-panel { border: 1px solid #e2e8f2; background: white; box-shadow: 0 10px 30px rgba(32,49,82,.07); }
+  .metric-card { padding: 18px; border-radius: 14px; display: grid; gap: 4px; }
+  .metric-card span, .metric-card small, .dashboard-label, .upcoming-item small, .action-item small { color: #65718a; }
+  .metric-card strong { font-size: 2rem; line-height: 1; margin: 6px 0 2px; }
+  .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 18px; }
+  .lower-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-panel { padding: 20px; border-radius: 16px; min-width: 0; }
+  .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+  .panel-heading h2 { margin: 0; }
+  .next-planning-card { display: grid; gap: 14px; padding: 18px; border-radius: 14px; background: #f6f8fc; }
+  .next-planning-card > div { display: grid; gap: 5px; }
+  .health-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+  .health-dot.ok { background: #2ea665; box-shadow: 0 0 0 6px #e6f6ed; }
+  .health-dot.error { background: #c84242; box-shadow: 0 0 0 6px #fdecec; }
+  .health-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .health-list span { padding: 7px 9px; border-radius: 8px; background: #f3f6fb; color: #526079; font-size: .82rem; }
+  .action-list, .upcoming-list { display: grid; gap: 9px; }
+  .action-item, .upcoming-item { width: 100%; display: grid; align-items: center; gap: 12px; border: 1px solid #e5eaf2; border-radius: 11px; padding: 12px; background: white; text-align: left; }
+  .action-item { grid-template-columns: 10px 1fr; }
+  .action-item:hover, .upcoming-item:hover { border-color: #9db4e8; background: #f8faff; }
+  .action-marker { width: 8px; height: 8px; border-radius: 50%; background: #d79b2f; }
+  .action-item.danger .action-marker { background: #c84242; }
+  .action-item.warning .action-marker { background: #d79b2f; }
+  .action-item span:last-child, .upcoming-item span:last-child { display: grid; gap: 3px; min-width: 0; }
+  .upcoming-item { grid-template-columns: 96px 1fr; }
+  .upcoming-date { display: grid; gap: 2px; font-weight: 800; color: #274690; }
+  .empty-state.success-state { border-color: #b9dec8; background: #f1fbf5; color: #17643a; }
+  .dashboard-updated { margin: -6px 0 0; color: #7a859b; font-size: .8rem; text-align: right; }
+  @media (max-width: 1050px) {
+    .dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dashboard-grid, .lower-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .dashboard-summary { grid-template-columns: 1fr; }
+    .panel-heading { align-items: flex-start; flex-direction: column; }
+    .upcoming-item { grid-template-columns: 1fr; }
+  }
+</style>
