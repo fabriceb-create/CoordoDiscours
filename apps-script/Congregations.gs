@@ -2,10 +2,21 @@ function listCongregations(searchText, includeArchived) {
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.congregations);
   const query = normalizeText_(searchText);
   return sheetRowsAsObjects_(sheet).map(function (row) {
+    const id = String(row.ID || '');
+    const metadata = getEntityVersion_('ASSEMBLEE', id);
     return {
-      id: String(row.ID || ''), name: String(row.NOM || ''), coordinator: String(row.COORDINATEUR || ''),
-      phone: String(row.TELEPHONE || ''), email: String(row.EMAIL || ''), address: String(row.ADRESSE || ''),
-      meetingDay: String(row.JOUR_REUNION || ''), meetingTime: String(row.HEURE_REUNION || ''), active: booleanValue_(row.ACTIF)
+      id: id,
+      name: String(row.NOM || ''),
+      coordinator: String(row.COORDINATEUR || ''),
+      phone: String(row.TELEPHONE || ''),
+      email: String(row.EMAIL || ''),
+      address: String(row.ADRESSE || ''),
+      meetingDay: String(row.JOUR_REUNION || ''),
+      meetingTime: String(row.HEURE_REUNION || ''),
+      active: booleanValue_(row.ACTIF),
+      version: metadata.version,
+      updatedAt: metadata.updatedAt,
+      updatedBy: metadata.updatedBy
     };
   }).filter(function (item) {
     if (!includeArchived && !item.active) return false;
@@ -23,38 +34,46 @@ function getCongregation(id) {
 function saveCongregation(payload) {
   assertAccess_('COORDINATEUR');
   payload = payload || {};
-  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.congregations);
-  const id = String(payload.id || '').trim() || newId_();
-  const name = requiredText_(payload.name, 'Le nom de l’assemblée');
-  const coordinator = String(payload.coordinator || '').trim();
-  const phone = String(payload.phone || '').trim();
-  const email = sanitizeEmail_(payload.email);
-  const address = String(payload.address || '').trim();
-  const meetingDay = String(payload.meetingDay || '').trim();
-  const meetingTime = String(payload.meetingTime || '').trim();
-  const active = payload.active !== false;
-  const row = [id, name, coordinator, phone, email, address, meetingDay, meetingTime, active];
-  const existingRow = findRowById_(sheet, id);
-  const before = existingRow ? getCongregation(id) : {};
-  if (existingRow) sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
-  else sheet.appendRow(row);
-  const after = getCongregation(id);
-  logAction_(existingRow ? 'MODIFICATION' : 'CREATION', 'ASSEMBLEE', id, buildAuditDetails_(before, after));
-  return after;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.congregations);
+    const id = String(payload.id || '').trim() || newId_();
+    const row = [
+      id,
+      requiredText_(payload.name, 'Le nom de l’assemblée'),
+      String(payload.coordinator || '').trim(),
+      String(payload.phone || '').trim(),
+      sanitizeEmail_(payload.email),
+      String(payload.address || '').trim(),
+      String(payload.meetingDay || '').trim(),
+      String(payload.meetingTime || '').trim(),
+      payload.active !== false
+    ];
+    const existingRow = findRowById_(sheet, id);
+    if (existingRow) assertEntityVersion_('ASSEMBLEE', id, payload.version);
+    const before = existingRow ? getCongregation(id) : {};
+    if (existingRow) sheet.getRange(existingRow, 1, 1, row.length).setValues([row]);
+    else sheet.appendRow(row);
+    const metadata = advanceEntityVersion_('ASSEMBLEE', id);
+    const after = Object.assign({}, getCongregation(id), metadata);
+    logAction_(existingRow ? 'MODIFICATION' : 'CREATION', 'ASSEMBLEE', id, buildAuditDetails_(before, after));
+    return after;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-function archiveCongregation(id) {
-  assertAccess_('COORDINATEUR');
+function archiveCongregation(id, expectedVersion) {
   const before = getCongregation(id);
-  const saved = saveCongregation(Object.assign({}, before, { active: false }));
+  const saved = saveCongregation(Object.assign({}, before, { active: false, version: expectedVersion || before.version }));
   logAction_('ARCHIVAGE', 'ASSEMBLEE', id, buildAuditDetails_(before, saved));
   return saved;
 }
 
-function restoreCongregation(id) {
-  assertAccess_('COORDINATEUR');
+function restoreCongregation(id, expectedVersion) {
   const before = getCongregation(id);
-  const saved = saveCongregation(Object.assign({}, before, { active: true }));
+  const saved = saveCongregation(Object.assign({}, before, { active: true, version: expectedVersion || before.version }));
   logAction_('RESTAURATION', 'ASSEMBLEE', id, buildAuditDetails_(before, saved));
   return saved;
 }
