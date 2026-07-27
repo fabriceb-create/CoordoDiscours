@@ -1,0 +1,130 @@
+<script>
+  const communicationState = { hospitalities: [], invitations: [], plannings: [] };
+  const originalShowView = showView;
+  showView = function (name) {
+    originalShowView(name);
+    if (name === 'hospitality') loadHospitalities();
+    if (name === 'invitations') loadInvitations();
+  };
+
+  function communicationStatusLabel(status) {
+    const labels = {
+      A_ATTRIBUER: 'À attribuer', PROPOSE: 'Proposé', CONFIRME: 'Confirmé', REFUSE: 'Refusé', ANNULE: 'Annulé',
+      A_ENVOYER: 'À envoyer', ENVOYEE: 'Envoyée', ACCEPTEE: 'Acceptée', REFUSEE: 'Refusée', RELANCEE: 'Relancée', ANNULEE: 'Annulée'
+    };
+    return labels[status] || status;
+  }
+
+  function communicationStatusClass(status) {
+    if (['CONFIRME', 'ACCEPTEE'].includes(status)) return 'confirmed';
+    if (['REFUSE', 'REFUSEE'].includes(status)) return 'refused';
+    if (['ANNULE', 'ANNULEE'].includes(status)) return 'cancelled';
+    return 'pending';
+  }
+
+  async function loadCommunicationOptions() {
+    const data = await runServer('getCommunicationOptions');
+    communicationState.plannings = data.plannings || [];
+    ['hospitality-form', 'invitation-form'].forEach(function (formId) {
+      const select = document.querySelector('#' + formId + ' [name="planningId"]');
+      if (!select) return;
+      const current = select.value;
+      select.innerHTML = '<option value="">Sélectionner</option>' + communicationState.plannings.map(function (item) {
+        return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.displayDate + ' - ' + item.speakerName + ' - n° ' + item.talkNumber) + '</option>';
+      }).join('');
+      select.value = current;
+    });
+  }
+
+  async function loadHospitalities() {
+    try {
+      await loadCommunicationOptions();
+      communicationState.hospitalities = await runServer('listHospitalities', document.getElementById('hospitality-search').value);
+      const container = document.getElementById('hospitality-list');
+      if (!communicationState.hospitalities.length) {
+        container.innerHTML = '<div class="empty-state">Aucune hospitalité enregistrée.</div>';
+        return;
+      }
+      container.innerHTML = communicationState.hospitalities.map(function (item) {
+        const done = item.status === 'CONFIRME';
+        return '<article class="record-card communication-card ' + (done ? 'done' : 'attention') + '">' +
+          '<div><h3>' + escapeHtml(item.planningLabel) + '</h3><div class="record-meta">' +
+          '<span class="status-badge ' + communicationStatusClass(item.status) + '">' + escapeHtml(communicationStatusLabel(item.status)) + '</span><br>' +
+          (item.group ? 'Groupe : ' + escapeHtml(item.group) + '<br>' : '') +
+          (item.contact ? 'Contact : ' + escapeHtml(item.contact) + '<br>' : '') +
+          (item.notes ? escapeHtml(item.notes) : '') + '</div></div>' +
+          '<div class="record-actions"><button class="secondary-button" data-edit-hospitality="' + item.id + '">Modifier</button>' +
+          (done ? '' : '<button class="primary-button" data-confirm-hospitality="' + item.id + '">Confirmer</button>') + '</div></article>';
+      }).join('');
+    } catch (error) { showError(error); }
+  }
+
+  async function loadInvitations() {
+    try {
+      await loadCommunicationOptions();
+      communicationState.invitations = await runServer('listInvitations', document.getElementById('invitation-search').value);
+      const container = document.getElementById('invitation-list');
+      if (!communicationState.invitations.length) {
+        container.innerHTML = '<div class="empty-state">Aucune invitation enregistrée.</div>';
+        return;
+      }
+      container.innerHTML = communicationState.invitations.map(function (item) {
+        const done = ['ENVOYEE', 'ACCEPTEE'].includes(item.status);
+        return '<article class="record-card communication-card ' + (done ? 'done' : 'attention') + '">' +
+          '<div><h3>' + escapeHtml(item.planningLabel) + '</h3><div class="record-meta">' +
+          '<span class="status-badge ' + communicationStatusClass(item.status) + '">' + escapeHtml(communicationStatusLabel(item.status)) + '</span><br>' +
+          (item.recipient ? 'Destinataire : ' + escapeHtml(item.recipient) + '<br>' : '') +
+          (item.displaySentDate ? 'Envoyée le : ' + escapeHtml(item.displaySentDate) + '<br>' : '') +
+          (item.notes ? escapeHtml(item.notes) : '') + '</div></div>' +
+          '<div class="record-actions"><button class="secondary-button" data-edit-invitation="' + item.id + '">Modifier</button>' +
+          (done ? '' : '<button class="primary-button" data-send-invitation="' + item.id + '">Marquer envoyée</button>') + '</div></article>';
+      }).join('');
+    } catch (error) { showError(error); }
+  }
+
+  function openHospitality(item) {
+    const form = document.getElementById('hospitality-form');
+    fillForm(form, item || null);
+    document.getElementById('hospitality-dialog').showModal();
+  }
+
+  function openInvitation(item) {
+    const form = document.getElementById('invitation-form');
+    fillForm(form, item || null);
+    document.getElementById('invitation-dialog').showModal();
+  }
+
+  document.addEventListener('click', async function (event) {
+    if (event.target.id === 'new-hospitality') { await loadCommunicationOptions(); openHospitality(); }
+    if (event.target.id === 'new-invitation') { await loadCommunicationOptions(); openInvitation(); }
+
+    const editHospitality = event.target.closest('[data-edit-hospitality]');
+    if (editHospitality) { await loadCommunicationOptions(); openHospitality(communicationState.hospitalities.find(function (item) { return item.id === editHospitality.dataset.editHospitality; })); }
+    const editInvitation = event.target.closest('[data-edit-invitation]');
+    if (editInvitation) { await loadCommunicationOptions(); openInvitation(communicationState.invitations.find(function (item) { return item.id === editInvitation.dataset.editInvitation; })); }
+
+    const confirmHospitality = event.target.closest('[data-confirm-hospitality]');
+    if (confirmHospitality) {
+      try { await runServer('setHospitalityStatus', confirmHospitality.dataset.confirmHospitality, 'CONFIRME'); toast('Hospitalité confirmée.'); loadHospitalities(); loadDashboard(); } catch (error) { showError(error); }
+    }
+    const sendInvitation = event.target.closest('[data-send-invitation]');
+    if (sendInvitation) {
+      try { await runServer('setInvitationStatus', sendInvitation.dataset.sendInvitation, 'ENVOYEE'); toast('Invitation marquée comme envoyée.'); loadInvitations(); loadDashboard(); } catch (error) { showError(error); }
+    }
+  });
+
+  document.getElementById('hospitality-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    try { await runServer('saveHospitality', formToObject(event.target)); document.getElementById('hospitality-dialog').close(); toast('Hospitalité enregistrée.'); loadHospitalities(); loadDashboard(); } catch (error) { showError(error); }
+  });
+
+  document.getElementById('invitation-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    try { await runServer('saveInvitation', formToObject(event.target)); document.getElementById('invitation-dialog').close(); toast('Invitation enregistrée.'); loadInvitations(); loadDashboard(); } catch (error) { showError(error); }
+  });
+
+  let hospitalityTimer;
+  document.getElementById('hospitality-search').addEventListener('input', function () { clearTimeout(hospitalityTimer); hospitalityTimer = setTimeout(loadHospitalities, 250); });
+  let invitationTimer;
+  document.getElementById('invitation-search').addEventListener('input', function () { clearTimeout(invitationTimer); invitationTimer = setTimeout(loadInvitations, 250); });
+</script>
