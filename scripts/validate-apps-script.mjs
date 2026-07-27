@@ -76,7 +76,8 @@ const protectedFunctions = [
   ['Settings.gs', 'resetApplicationSettings', 'ADMIN'],
   ['Backup.gs', 'createApplicationBackup', 'ADMIN'],
   ['Backup.gs', 'restoreApplicationBackup', 'ADMIN'],
-  ['Integrity.gs', 'getDataIntegrityReport', 'ADMIN']
+  ['Integrity.gs', 'getDataIntegrityReport', 'ADMIN'],
+  ['Installation.gs', 'runAcceptanceTests', 'ADMIN']
 ];
 
 function functionBody(source, functionName) {
@@ -103,8 +104,7 @@ function functionBody(source, functionName) {
 }
 
 function hasRequiredGuard(body, role) {
-  // Accepte assertAccess_('ROLE') ainsi que assertAccess_('ROLE', 'contexte').
-  const direct = new RegExp(`assertAccess_\\(\\s*['\"]${role}['\"](?:\\s*,[\\s\\S]*?)?\\s*\\)`);
+  const direct = new RegExp(`assertAccess_\\(\\s*['"]${role}['"](?:\\s*,[\\s\\S]*?)?\\s*\\)`);
   if (direct.test(body)) return true;
   if (role === 'COORDINATEUR' && /assertEditAccess_\s*\(\s*\)/.test(body)) return true;
   if (role === 'ADMIN' && /assertAdminAccess_\s*\(\s*\)/.test(body)) return true;
@@ -123,6 +123,14 @@ for (const [file, functionName, role] of protectedFunctions) {
   if (!hasRequiredGuard(body, role)) {
     errors.push(`${file} : ${functionName} doit exiger le rôle ${role}.`);
   }
+}
+
+const installationPath = path.join(root, 'Installation.gs');
+if (fs.existsSync(installationPath)) {
+  const installation = fs.readFileSync(installationPath, 'utf8');
+  if (!installation.includes("LANGUE_INTERFACE")) errors.push('La recette doit contrôler le paramètre LANGUE_INTERFACE.');
+  if (!installation.includes("getDataIntegrityReport_()")) errors.push('La recette doit exécuter le contrôle d’intégrité.');
+  if (!installation.includes("parseAndValidateBackup_")) errors.push('La recette doit valider le format de sauvegarde.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
