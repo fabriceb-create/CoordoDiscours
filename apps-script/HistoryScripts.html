@@ -65,12 +65,20 @@
     loadHistory();
   }
 
+  function printHistory() {
+    document.body.classList.add('history-printing');
+    window.print();
+    setTimeout(() => document.body.classList.remove('history-printing'), 250);
+  }
+
+  window.addEventListener('afterprint', () => document.body.classList.remove('history-printing'));
+
   document.addEventListener('click', event => {
     const target = event.target.closest('[data-view], [data-open]');
     if (target && (target.dataset.view === 'history' || target.dataset.open === 'history')) loadHistory();
     if (event.target.id === 'history-refresh') loadHistory();
     if (event.target.id === 'history-reset') resetHistoryFilters();
-    if (event.target.id === 'history-print') window.print();
+    if (event.target.id === 'history-print') printHistory();
   });
 
   ['history-action','history-entity','history-start','history-end'].forEach(id => {
