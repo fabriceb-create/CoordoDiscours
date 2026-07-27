@@ -1,0 +1,83 @@
+<script>
+  let historyLoaded = false;
+  let historyTimer;
+
+  async function loadHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    list.innerHTML = '<div class="empty-state">Chargement de l’historique...</div>';
+    try {
+      if (!historyLoaded) {
+        const options = await runServer('getHistoryFilterOptions');
+        fillHistorySelect_('history-action', options.actions || [], 'Toutes les actions');
+        fillHistorySelect_('history-entity', options.entities || [], 'Toutes les entités');
+        historyLoaded = true;
+      }
+      const filters = {
+        query: document.getElementById('history-search').value,
+        action: document.getElementById('history-action').value,
+        entity: document.getElementById('history-entity').value,
+        startDate: document.getElementById('history-start').value,
+        endDate: document.getElementById('history-end').value,
+        limit: 500
+      };
+      renderHistory(await runServer('listHistory', filters));
+    } catch (error) {
+      showError(error);
+      list.innerHTML = '<div class="empty-state">Impossible de charger l’historique.</div>';
+    }
+  }
+
+  function fillHistorySelect_(id, values, placeholder) {
+    const select = document.getElementById(id);
+    const current = select.value;
+    select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>' +
+      values.map(value => '<option value="' + escapeHtml(value) + '">' + escapeHtml(historyLabel_(value)) + '</option>').join('');
+    select.value = current;
+  }
+
+  function historyLabel_(value) {
+    return String(value || '').toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+  }
+
+  function renderHistory(rows) {
+    const list = document.getElementById('history-list');
+    document.getElementById('history-count').textContent = rows.length + ' opération' + (rows.length > 1 ? 's' : '');
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-state">Aucune opération ne correspond aux filtres.</div>';
+      return;
+    }
+    list.innerHTML = rows.map(item => `
+      <article class="history-card">
+        <div class="history-time"><strong>${escapeHtml(item.displayDate)}</strong><small>${escapeHtml(item.user)}</small></div>
+        <div class="history-main">
+          <div class="history-tags"><span class="history-action">${escapeHtml(historyLabel_(item.action))}</span><span class="history-entity">${escapeHtml(historyLabel_(item.entity))}</span></div>
+          <strong>${escapeHtml(item.entityId || 'Sans identifiant')}</strong>
+          ${item.detailsText ? `<p>${escapeHtml(item.detailsText)}</p>` : ''}
+        </div>
+      </article>`).join('');
+  }
+
+  function resetHistoryFilters() {
+    ['history-search','history-action','history-entity','history-start','history-end'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    loadHistory();
+  }
+
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-view], [data-open]');
+    if (target && (target.dataset.view === 'history' || target.dataset.open === 'history')) loadHistory();
+    if (event.target.id === 'history-refresh') loadHistory();
+    if (event.target.id === 'history-reset') resetHistoryFilters();
+    if (event.target.id === 'history-print') window.print();
+  });
+
+  ['history-action','history-entity','history-start','history-end'].forEach(id => {
+    document.getElementById(id).addEventListener('change', loadHistory);
+  });
+  document.getElementById('history-search').addEventListener('input', () => {
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(loadHistory, 250);
+  });
+</script>
