@@ -34,6 +34,19 @@ assertContains(rules, /PLAN_006[\s\S]*déjà programmé à cette date/, 'Règles
 assertContains(rules, /PLAN_007[\s\S]*déjà été programmé/, 'Règles : l’alerte de répétition d’un discours est absente.');
 assertContains(rules, /RULE_SEVERITY[\s\S]*ERROR[\s\S]*WARNING[\s\S]*INFO/, 'Règles : les niveaux de sévérité ne sont pas définis.');
 
+const recommendations = read('RecommendationEngine.gs');
+assertContains(recommendations, /function\s+getSpeakerRecommendations\s*\(/, 'Recommandations : le point d’entrée serveur est absent.');
+assertContains(recommendations, /scoreSpeakerRecommendation_\(/, 'Recommandations : le calcul individuel du score est absent.');
+assertContains(recommendations, /speaker\.type\s*===\s*['"]EXTERIEUR['"][\s\S]*getSpeakerTalkNumbers_/, 'Recommandations : les discours déclarés des orateurs extérieurs ne sont pas contrôlés.');
+assertContains(recommendations, /sameMonthCount/, 'Recommandations : la fréquence mensuelle n’est pas prise en compte.');
+assertContains(recommendations, /Math\.min\(100/, 'Recommandations : le score n’est pas plafonné à 100.');
+assertContains(recommendations, /slice\(0,\s*12\)/, 'Recommandations : le nombre de résultats serveur n’est pas limité.');
+
+const planningUi = read('PlanningScripts.html');
+assertContains(planningUi, /getSpeakerRecommendations/, 'Interface : les recommandations ne sont pas chargées depuis le serveur.');
+assertContains(planningUi, /data-select-recommended-speaker/, 'Interface : aucun bouton ne permet de choisir un orateur recommandé.');
+assertContains(planningUi, /event\.target\.name\s*===\s*['"]date['"]/, 'Interface : les recommandations ne sont pas recalculées après changement de date.');
+
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
 assertContains(communication, /Une invitation existe déjà pour cette programmation/, 'Invitations : le contrôle des doublons est absent.');
