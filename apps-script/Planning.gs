@@ -2,16 +2,8 @@ function listPlannings(query, includeCancelled) {
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.events);
   if (!sheet || sheet.getLastRow() < 2) return [];
-
-  const speakers = listSpeakers('', true).reduce((map, item) => {
-    map[item.id] = item;
-    return map;
-  }, {});
-  const talks = listTalks('', true).reduce((map, item) => {
-    map[String(item.number)] = item;
-    return map;
-  }, {});
-
+  const speakers = listSpeakers('', true).reduce((map, item) => { map[item.id] = item; return map; }, {});
+  const talks = listTalks('', true).reduce((map, item) => { map[String(item.number)] = item; return map; }, {});
   const normalizedQuery = normalizeText_(query);
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues()
     .map(row => {
@@ -20,122 +12,66 @@ function listPlannings(query, includeCancelled) {
       const status = String(row[5] || 'PROGRAMME').toUpperCase();
       const date = row[1] instanceof Date ? row[1] : new Date(row[1]);
       return {
-        id: String(row[0] || ''),
-        date: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+        id: String(row[0] || ''), date: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
         displayDate: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd/MM/yyyy'),
-        time: formatTimeValue_(row[2]),
-        speakerId: String(row[3] || ''),
-        speakerName: speaker.fullName || speaker.lastName || 'Orateur à définir',
-        talkNumber: Number(row[4]) || '',
-        talkTitle: talk.title || '',
-        status: status,
-        originCongregationId: String(row[6] || ''),
-        notes: String(row[7] || '')
+        time: formatTimeValue_(row[2]), speakerId: String(row[3] || ''), speakerName: speaker.fullName || speaker.lastName || 'Orateur à définir',
+        talkNumber: Number(row[4]) || '', talkTitle: talk.title || '', status: status, originCongregationId: String(row[6] || ''), notes: String(row[7] || '')
       };
     })
     .filter(item => includeCancelled || item.status !== 'ANNULE')
-    .filter(item => !normalizedQuery || normalizeText_([
-      item.displayDate, item.speakerName, item.talkNumber, item.talkTitle, item.status, item.notes
-    ].join(' ')).includes(normalizedQuery))
+    .filter(item => !normalizedQuery || normalizeText_([item.displayDate, item.speakerName, item.talkNumber, item.talkTitle, item.status, item.notes].join(' ')).includes(normalizedQuery))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)));
 }
 
 function getPlanningOptions() {
-  return {
-    speakers: listSpeakers('', false),
-    talks: listTalks('', false).filter(item => item.active),
-    congregations: listCongregations('', false)
-  };
+  return { speakers: listSpeakers('', false), talks: listTalks('', false).filter(item => item.active), congregations: listCongregations('', false) };
 }
 
 function validatePlanning(payload) {
   const data = normalizePlanningPayload_(payload);
   const warnings = [];
   const errors = [];
-
   const speaker = listSpeakers('', true).find(item => item.id === data.speakerId);
   if (!speaker || !speaker.active) errors.push('L’orateur sélectionné est introuvable ou archivé.');
-
   const talk = listTalks('', true).find(item => Number(item.number) === data.talkNumber);
   if (!talk || !talk.active) errors.push('Le discours sélectionné est introuvable ou inactif.');
-
-  if (speaker && speaker.type === 'EXTERIEUR') {
-    const allowed = getSpeakerTalkNumbers_(speaker.id);
-    if (!allowed.includes(data.talkNumber)) {
-      errors.push('Cet orateur extérieur n’a pas ce discours dans sa liste déclarée.');
-    }
-  }
-
+  if (speaker && speaker.type === 'EXTERIEUR' && !getSpeakerTalkNumbers_(speaker.id).includes(data.talkNumber)) errors.push('Cet orateur extérieur n’a pas ce discours dans sa liste déclarée.');
   const existing = listPlannings('', true).filter(item => item.id !== data.id && item.status !== 'ANNULE');
   const sameSlot = existing.find(item => item.date === data.date && item.time === data.time);
-  if (sameSlot) {
-    errors.push('Ce créneau est déjà occupé par ' + sameSlot.speakerName + ' - discours n° ' + sameSlot.talkNumber + '.');
-  }
-
+  if (sameSlot) errors.push('Ce créneau est déjà occupé par ' + sameSlot.speakerName + ' - discours n° ' + sameSlot.talkNumber + '.');
   const sameSpeaker = existing.find(item => item.date === data.date && item.speakerId === data.speakerId);
   if (sameSpeaker) warnings.push('Cet orateur est déjà programmé à cette date.');
-
   const eventDate = new Date(data.date + 'T12:00:00');
-  const repetitionMonths = Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12;
   const threshold = new Date(eventDate);
-  threshold.setMonth(threshold.getMonth() - repetitionMonths);
-  const repeated = existing
-    .filter(item => Number(item.talkNumber) === data.talkNumber && item.date)
+  threshold.setMonth(threshold.getMonth() - (Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12));
+  const repeated = existing.filter(item => Number(item.talkNumber) === data.talkNumber && item.date)
     .map(item => ({ item: item, date: new Date(item.date + 'T12:00:00') }))
-    .filter(entry => entry.date <= eventDate && entry.date >= threshold)
-    .sort((a, b) => b.date - a.date)[0];
-  if (repeated) {
-    warnings.push('Ce discours a déjà été programmé le ' + repeated.item.displayDate + ' avec ' + repeated.item.speakerName + '.');
-  }
-
+    .filter(entry => entry.date <= eventDate && entry.date >= threshold).sort((a, b) => b.date - a.date)[0];
+  if (repeated) warnings.push('Ce discours a déjà été programmé le ' + repeated.item.displayDate + ' avec ' + repeated.item.speakerName + '.');
   return { valid: errors.length === 0, errors: errors, warnings: warnings, data: data };
 }
 
 function savePlanning(payload, confirmWarnings) {
+  assertEditAccess_();
   const validation = validatePlanning(payload);
   if (!validation.valid) throw new Error(validation.errors.join('\n'));
-  if (validation.warnings.length && !confirmWarnings) {
-    return { saved: false, requiresConfirmation: true, warnings: validation.warnings };
-  }
-
+  if (validation.warnings.length && !confirmWarnings) return { saved: false, requiresConfirmation: true, warnings: validation.warnings };
   const data = validation.data;
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.events);
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
   const id = data.id || Utilities.getUuid();
-  const values = [
-    id,
-    new Date(data.date + 'T12:00:00'),
-    data.time,
-    data.speakerId,
-    data.talkNumber,
-    data.status || 'PROGRAMME',
-    data.originCongregationId || '',
-    data.notes || ''
-  ];
-
+  const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
   const rowIndex = findRowById_(sheet, id);
-  if (rowIndex) {
-    sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
-    logAction_('MODIFICATION', 'PROGRAMMATION', id, data);
-  } else {
-    sheet.appendRow(values);
-    logAction_('CREATION', 'PROGRAMMATION', id, data);
-  }
-
+  if (rowIndex) { sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]); logAction_('MODIFICATION', 'PROGRAMMATION', id, data); }
+  else { sheet.appendRow(values); logAction_('CREATION', 'PROGRAMMATION', id, data); }
   return { saved: true, id: id, warnings: validation.warnings };
 }
 
-function cancelPlanning(id) {
-  return setPlanningStatus_(id, 'ANNULE');
-}
-
-function restorePlanning(id) {
-  return setPlanningStatus_(id, 'PROGRAMME');
-}
+function cancelPlanning(id) { assertEditAccess_(); return setPlanningStatus_(id, 'ANNULE'); }
+function restorePlanning(id) { assertEditAccess_(); return setPlanningStatus_(id, 'PROGRAMME'); }
 
 function setPlanningStatus_(id, status) {
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.events);
+  assertEditAccess_();
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
   const rowIndex = findRowById_(sheet, id);
   if (!rowIndex) throw new Error('Programmation introuvable.');
   sheet.getRange(rowIndex, 6).setValue(status);
@@ -144,13 +80,9 @@ function setPlanningStatus_(id, status) {
 }
 
 function getSpeakerTalkNumbers_(speakerId) {
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.speakerTalks);
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.speakerTalks);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues()
-    .filter(row => String(row[0]) === String(speakerId))
-    .map(row => Number(row[1]))
-    .filter(number => Number.isFinite(number));
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().filter(row => String(row[0]) === String(speakerId)).map(row => Number(row[1])).filter(number => Number.isFinite(number));
 }
 
 function normalizePlanningPayload_(payload) {
@@ -163,16 +95,7 @@ function normalizePlanningPayload_(payload) {
   if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('L’heure est obligatoire.');
   if (!speakerId) throw new Error('L’orateur est obligatoire.');
   if (!Number.isFinite(talkNumber)) throw new Error('Le discours est obligatoire.');
-  return {
-    id: String(data.id || ''),
-    date: date,
-    time: time,
-    speakerId: speakerId,
-    talkNumber: talkNumber,
-    status: String(data.status || 'PROGRAMME').toUpperCase(),
-    originCongregationId: String(data.originCongregationId || ''),
-    notes: String(data.notes || '').trim()
-  };
+  return { id: String(data.id || ''), date: date, time: time, speakerId: speakerId, talkNumber: talkNumber, status: String(data.status || 'PROGRAMME').toUpperCase(), originCongregationId: String(data.originCongregationId || ''), notes: String(data.notes || '').trim() };
 }
 
 function formatTimeValue_(value) {
