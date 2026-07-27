@@ -41,6 +41,10 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Aperçu mensuel avec date, heure, orateur, numéro et titre du discours.
 - Mise en page A4 paysage optimisée pour l’impression et l’affichage au tableau.
 - Sélection libre du mois de départ et actualisation de l’aperçu.
+- Module Historique avec recherche libre et filtres par action, entité et période.
+- Affichage de l’utilisateur, de l’identifiant concerné et du détail enregistré pour chaque opération.
+- Impression ciblée de l’historique filtré.
+- Limitation sécurisée à 1 000 lignes par consultation.
 
 ### Décisions figées
 
