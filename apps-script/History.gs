@@ -24,6 +24,8 @@ function listHistory(filters) {
         entity: String(row[3] || '').toUpperCase(),
         entityId: String(row[4] || ''),
         details: details,
+        changes: historyChanges_(details),
+        changedFields: Array.isArray(details.changedFields) ? details.changedFields : [],
         detailsText: historyDetailsText_(details)
       };
     })
@@ -58,9 +60,35 @@ function parseHistoryDetails_(value) {
   catch (error) { return { information: String(value) }; }
 }
 
+function historyChanges_(details) {
+  if (!details || typeof details !== 'object' || !details.changes || typeof details.changes !== 'object') return [];
+  return Object.keys(details.changes).map(function (field) {
+    const change = details.changes[field] || {};
+    return {
+      field: field,
+      before: historyDisplayValue_(change.before),
+      after: historyDisplayValue_(change.after)
+    };
+  });
+}
+
+function historyDisplayValue_(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
 function historyDetailsText_(details) {
   if (!details || typeof details !== 'object') return String(details || '');
-  return Object.keys(details).map(function (key) {
+  const changes = historyChanges_(details);
+  if (changes.length) {
+    return changes.map(function (change) {
+      return change.field + ': ' + change.before + ' → ' + change.after;
+    }).join(' · ');
+  }
+  return Object.keys(details).filter(function (key) {
+    return ['before', 'after', 'changes', 'changedFields'].indexOf(key) === -1;
+  }).map(function (key) {
     const value = details[key];
     return key + ': ' + (typeof value === 'object' ? JSON.stringify(value) : String(value));
   }).join(' · ');
