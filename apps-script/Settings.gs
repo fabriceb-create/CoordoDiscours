@@ -1,5 +1,6 @@
 const SETTINGS_DEFINITIONS = Object.freeze([
   { key: 'ASSEMBLEE', label: 'Nom de l’assemblée', type: 'text', defaultValue: 'Basse-Terre', description: 'Nom affiché dans l’application et sur les documents imprimés.' },
+  { key: 'LANGUE_INTERFACE', label: 'Langue de l’application', type: 'select', options: ['fr', 'gcf'], optionLabels: { fr: 'Français', gcf: 'Kréyòl Gwadloup' }, defaultValue: 'fr', description: 'Langue utilisée pour les menus, formulaires, messages et documents générés.' },
   { key: 'ALERTE_REPETITION_MOIS', label: 'Alerte de répétition', type: 'number', min: 1, max: 60, defaultValue: '12', suffix: 'mois', description: 'Période utilisée pour avertir qu’un discours a déjà été programmé.' },
   { key: 'HEURE_REUNION_DEFAUT', label: 'Heure de réunion par défaut', type: 'time', defaultValue: '09:30', description: 'Heure proposée lors de la création d’une programmation.' },
   { key: 'DUREE_IMPRESSION_MOIS', label: 'Période d’impression par défaut', type: 'select', options: ['3', '6'], defaultValue: '3', suffix: 'mois', description: 'Nombre de mois proposé dans le planning imprimable.' },
@@ -23,7 +24,8 @@ function getApplicationSettings() {
     })),
     diagnostics: getSettingsDiagnostics_(),
     spreadsheetUrl: ss.getUrl(),
-    version: APP_CONFIG.version
+    version: APP_CONFIG.version,
+    language: getInterfaceLanguage()
   };
 }
 
