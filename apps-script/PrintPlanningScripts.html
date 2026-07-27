@@ -1,0 +1,56 @@
+<script>
+  async function loadPrintablePlanning() {
+    const preview = document.getElementById('print-preview');
+    const month = document.getElementById('print-start-month').value;
+    const duration = Number(document.getElementById('print-duration').value || 3);
+    preview.innerHTML = '<div class="empty-state">Préparation de l’aperçu...</div>';
+    try {
+      const data = await runServer('getPrintablePlanning', month, duration);
+      renderPrintablePlanning(data);
+    } catch (error) {
+      showError(error);
+      preview.innerHTML = '<div class="empty-state">Impossible de préparer le planning imprimable.</div>';
+    }
+  }
+
+  function renderPrintablePlanning(data) {
+    const preview = document.getElementById('print-preview');
+    preview.innerHTML = `
+      <div class="print-document">
+        <header class="print-header">
+          <p>Assemblée de ${escapeHtml(data.congregation)}</p>
+          <h1>Programme des discours publics</h1>
+          <small>Période de ${data.durationMonths} mois — édité le ${escapeHtml(data.generatedAt)}</small>
+        </header>
+        <div class="print-months">
+          ${(data.months || []).map(month => `
+            <section class="print-month-block">
+              <h2>${escapeHtml(month.label)}</h2>
+              ${month.items.length ? `
+                <table class="print-table">
+                  <thead><tr><th>Date</th><th>Heure</th><th>Orateur</th><th>Discours public</th></tr></thead>
+                  <tbody>${month.items.map(item => `
+                    <tr>
+                      <td>${escapeHtml(item.displayDate)}</td>
+                      <td>${escapeHtml(item.time)}</td>
+                      <td>${escapeHtml(item.speakerName)}</td>
+                      <td><strong>N° ${escapeHtml(item.talkNumber)}</strong><br>${escapeHtml(item.talkTitle || 'Titre à compléter')}</td>
+                    </tr>`).join('')}</tbody>
+                </table>` : '<p class="print-empty">Aucune programmation pour ce mois.</p>'}
+            </section>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function setDefaultPrintMonth() {
+    const input = document.getElementById('print-start-month');
+    if (!input.value) input.value = new Date().toISOString().slice(0, 7);
+  }
+
+  document.getElementById('print-generate').addEventListener('click', loadPrintablePlanning);
+  document.getElementById('print-now').addEventListener('click', () => window.print());
+  document.addEventListener('DOMContentLoaded', () => {
+    setDefaultPrintMonth();
+    loadPrintablePlanning();
+  });
+</script>
