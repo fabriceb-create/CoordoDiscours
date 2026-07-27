@@ -12,6 +12,7 @@
       <div class="brand"><div class="brand-mark">CD</div><div><strong id="app-title">CoordoDiscours</strong><small id="version">Chargement...</small></div></div>
       <nav>
         <button class="nav-button active" data-view="dashboard">Tableau de bord</button>
+        <button class="nav-button" data-view="planning">Programmation</button>
         <button class="nav-button" data-view="speakers">Orateurs</button>
         <button class="nav-button" data-view="congregations">Assemblées</button>
         <button class="nav-button" data-view="talks">Discours</button>
@@ -23,12 +24,19 @@
       <header class="topbar"><div><p class="eyebrow">Assemblée</p><h1 id="congregation">Basse-Terre</h1></div><span id="status" class="status-pill">Initialisation...</span></header>
 
       <section id="view-dashboard" class="view active-view">
-        <div class="hero-card"><div><p class="eyebrow">Coordination des discours publics</p><h2>Bienvenue dans CoordoDiscours</h2><p>Les premiers modules de gestion sont maintenant opérationnels.</p></div></div>
+        <div class="hero-card"><div><p class="eyebrow">Coordination des discours publics</p><h2>Bienvenue dans CoordoDiscours</h2><p>Le planning et les principaux répertoires sont maintenant opérationnels.</p></div></div>
         <div class="module-grid">
+          <button class="module-card" data-open="planning"><span>📅</span><h3>Programmation</h3><p>Programmer, contrôler et modifier les discours.</p></button>
           <button class="module-card" data-open="speakers"><span>👤</span><h3>Orateurs</h3><p>Créer, rechercher, modifier et archiver.</p></button>
           <button class="module-card" data-open="congregations"><span>🏛️</span><h3>Assemblées</h3><p>Gérer les contacts, adresses et horaires.</p></button>
           <button class="module-card" data-open="talks"><span>📖</span><h3>Discours</h3><p>Rechercher, corriger et gérer les statuts.</p></button>
         </div>
+      </section>
+
+      <section id="view-planning" class="view">
+        <div class="section-header"><div><p class="eyebrow">Calendrier</p><h2>Programmation</h2></div><button class="primary-button" id="new-planning">Programmer un discours</button></div>
+        <div class="toolbar"><input id="planning-search" type="search" placeholder="Rechercher une date, un orateur ou un discours..."><label><input id="planning-cancelled" type="checkbox"> Voir les annulées</label></div>
+        <div id="planning-list" class="cards-list"></div>
       </section>
 
       <section id="view-speakers" class="view">
@@ -50,6 +58,8 @@
       </section>
     </main>
   </div>
+
+  <dialog id="planning-dialog"><form id="planning-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Programmation</h2><button type="button" class="icon-button" data-close="planning-dialog">×</button></div><input type="hidden" name="id"><input type="hidden" name="status" value="PROGRAMME"><div class="form-grid"><label>Date*<input name="date" type="date" required></label><label>Heure*<input name="time" type="time" required></label><label class="full-width">Orateur*<select name="speakerId" required><option value="">Sélectionner</option></select></label><label class="full-width">Discours*<select name="talkNumber" required><option value="">Sélectionner</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div id="planning-warning" class="warning-box" hidden></div><div class="form-actions"><button type="button" class="secondary-button" data-close="planning-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
   <dialog id="speaker-dialog"><form id="speaker-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Fiche orateur</h2><button type="button" class="icon-button" data-close="speaker-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="lastName" required></label><label>Prénom<input name="firstName"></label><label>Type<select name="type"><option value="LOCAL">Local</option><option value="EXTERIEUR">Extérieur</option></select></label><label>Assemblée<select name="congregationId"><option value="">Aucune</option></select></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="speaker-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
