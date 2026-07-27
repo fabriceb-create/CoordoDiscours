@@ -1,0 +1,23 @@
+<style>
+  .backup-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr); gap: 20px; }
+  .backup-panel { background: #fff; border: 1px solid #e4e7ec; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(16,24,40,.05); }
+  .backup-panel h3 { margin: 0 0 8px; }
+  .backup-panel > p { color: #667085; line-height: 1.5; }
+  .backup-overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+  .backup-overview div { background: #f8fafc; border-radius: 12px; padding: 14px; }
+  .backup-overview span { display: block; color: #667085; font-size: .82rem; margin-bottom: 6px; }
+  .backup-overview strong { font-size: 1.05rem; }
+  .backup-sheet-list { display: grid; gap: 8px; }
+  .backup-sheet-list div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #eef0f3; padding: 9px 0; }
+  .backup-sheet-list span { color: #667085; }
+  .backup-restore-form { display: grid; gap: 14px; }
+  .backup-restore-form label { display: grid; gap: 7px; font-weight: 600; }
+  .backup-restore-form small { color: #667085; font-weight: 400; }
+  .backup-preview { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px; }
+  .backup-preview p { margin: 6px 0 0; }
+  .backup-danger { border-left: 4px solid #d92d20; background: #fff5f5; padding: 12px 14px; border-radius: 8px; color: #7a271a; }
+  @media (max-width: 900px) {
+    .backup-grid { grid-template-columns: 1fr; }
+    .backup-overview { grid-template-columns: 1fr; }
+  }
+</style>
