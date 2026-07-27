@@ -1,0 +1,111 @@
+<script>
+  state.plannings = [];
+  state.planningOptions = { speakers: [], talks: [], congregations: [] };
+
+  async function loadPlanningOptions() {
+    state.planningOptions = await runServer('getPlanningOptions');
+    const form = document.getElementById('planning-form');
+    const speakerSelect = form.elements.speakerId;
+    const talkSelect = form.elements.talkNumber;
+    speakerSelect.innerHTML = '<option value="">Sélectionner un orateur</option>' +
+      state.planningOptions.speakers.map(item => `<option value="${item.id}">${escapeHtml(item.fullName || item.lastName)}${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}</option>`).join('');
+    talkSelect.innerHTML = '<option value="">Sélectionner un discours</option>' +
+      state.planningOptions.talks.map(item => `<option value="${item.number}">N° ${item.number} - ${escapeHtml(item.title)}</option>`).join('');
+  }
+
+  async function loadPlannings() {
+    try {
+      state.plannings = await runServer(
+        'listPlannings',
+        document.getElementById('planning-search').value,
+        document.getElementById('planning-cancelled').checked
+      );
+      renderPlannings();
+    } catch (error) { showError(error); }
+  }
+
+  function renderPlannings() {
+    const container = document.getElementById('planning-list');
+    if (!state.plannings.length) {
+      container.innerHTML = '<div class="empty-state">Aucune programmation trouvée.</div>';
+      return;
+    }
+    container.innerHTML = state.plannings.map(item => `
+      <article class="record-card ${item.status === 'ANNULE' ? 'archived' : ''}">
+        <div>
+          <p class="eyebrow">${escapeHtml(item.displayDate)} à ${escapeHtml(item.time)}</p>
+          <h3>${escapeHtml(item.speakerName)}</h3>
+          <div class="record-meta">Discours n° ${item.talkNumber} - ${escapeHtml(item.talkTitle || 'Titre à compléter')}<br>Statut : ${escapeHtml(item.status)}${item.notes ? '<br>' + escapeHtml(item.notes) : ''}</div>
+        </div>
+        <div class="record-actions">
+          <button class="secondary-button" data-edit-planning="${item.id}">Modifier</button>
+          <button class="${item.status === 'ANNULE' ? 'secondary-button' : 'danger-button'}" data-toggle-planning="${item.id}" data-status="${item.status}">${item.status === 'ANNULE' ? 'Restaurer' : 'Annuler'}</button>
+        </div>
+      </article>`).join('');
+  }
+
+  async function openPlanning(item) {
+    try {
+      if (!state.planningOptions.speakers.length) await loadPlanningOptions();
+      const form = document.getElementById('planning-form');
+      fillForm(form, item);
+      form.elements.status.value = item ? item.status : 'PROGRAMME';
+      if (!item) {
+        form.elements.time.value = '10:00';
+        const today = new Date();
+        form.elements.date.value = today.toISOString().slice(0, 10);
+      }
+      document.getElementById('planning-warning').hidden = true;
+      document.getElementById('planning-dialog').showModal();
+    } catch (error) { showError(error); }
+  }
+
+  async function submitPlanning(form, confirmWarnings) {
+    const result = await runServer('savePlanning', formToObject(form), Boolean(confirmWarnings));
+    if (result.requiresConfirmation) {
+      const warning = document.getElementById('planning-warning');
+      warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
+      warning.hidden = false;
+      if (window.confirm(result.warnings.join('\n') + '\n\nSouhaites-tu quand même enregistrer cette programmation ?')) {
+        return submitPlanning(form, true);
+      }
+      return;
+    }
+    document.getElementById('planning-dialog').close();
+    toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
+    await loadPlannings();
+  }
+
+  document.addEventListener('click', async event => {
+    const navigation = event.target.closest('[data-view="planning"], [data-open="planning"]');
+    if (navigation) {
+      if (!state.planningOptions.speakers.length) await loadPlanningOptions();
+      await loadPlannings();
+    }
+    if (event.target.id === 'new-planning') await openPlanning();
+
+    const edit = event.target.closest('[data-edit-planning]');
+    if (edit) await openPlanning(state.plannings.find(item => item.id === edit.dataset.editPlanning));
+
+    const toggle = event.target.closest('[data-toggle-planning]');
+    if (toggle) {
+      try {
+        await runServer(toggle.dataset.status === 'ANNULE' ? 'restorePlanning' : 'cancelPlanning', toggle.dataset.togglePlanning);
+        toast(toggle.dataset.status === 'ANNULE' ? 'Programmation restaurée.' : 'Programmation annulée.');
+        await loadPlannings();
+      } catch (error) { showError(error); }
+    }
+  });
+
+  document.getElementById('planning-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    try { await submitPlanning(event.target, false); } catch (error) { showError(error); }
+  });
+
+  debounce('planning-search', loadPlannings);
+  document.getElementById('planning-cancelled').addEventListener('change', loadPlannings);
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try { await loadPlanningOptions(); } catch (error) { showError(error); }
+  });
+</script>
