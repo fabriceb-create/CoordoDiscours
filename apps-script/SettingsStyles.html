@@ -1,0 +1,25 @@
+<style>
+  .settings-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr); gap: 20px; align-items: start; }
+  .settings-panel { border: 1px solid #e2e8f2; border-radius: 18px; background: white; padding: 22px; box-shadow: 0 10px 30px rgba(32,49,82,.07); }
+  .settings-grid { display: grid; gap: 14px; margin-top: 18px; }
+  .setting-field { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .7fr); gap: 18px; align-items: center; padding: 14px 0; border-bottom: 1px solid #edf1f7; }
+  .setting-field:last-child { border-bottom: 0; }
+  .setting-field > span { display: grid; gap: 4px; }
+  .setting-field small { color: #65718a; line-height: 1.45; font-weight: 400; }
+  .setting-input-wrap { display: flex; align-items: center; gap: 10px; }
+  .setting-input-wrap span { color: #65718a; white-space: nowrap; }
+  .settings-actions { justify-content: space-between; }
+  .diagnostic-list { display: grid; gap: 12px; margin: 18px 0; }
+  .diagnostic-list div { display: flex; justify-content: space-between; gap: 14px; padding-bottom: 10px; border-bottom: 1px solid #edf1f7; }
+  .diagnostic-list dt { color: #65718a; }
+  .diagnostic-list dd { margin: 0; font-weight: 700; text-align: right; word-break: break-word; }
+  .settings-success { padding: 14px; border-radius: 12px; background: #e8f6ed; color: #17643a; line-height: 1.45; }
+  .settings-database-link { display: flex; margin-top: 16px; text-decoration: none; }
+  @media (max-width: 900px) {
+    .settings-layout { grid-template-columns: 1fr; }
+    .setting-field { grid-template-columns: 1fr; gap: 8px; }
+  }
+  @media print {
+    #view-settings { display: none !important; }
+  }
+</style>
