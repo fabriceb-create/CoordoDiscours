@@ -29,6 +29,11 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Batterie de tests automatiques avec `runAcceptanceTests`.
 - Procédure détaillée d’installation Apps Script.
 - Plan complet de recette fonctionnelle.
+- Export JSON complet de la base depuis l’interface.
+- Inspection et validation d’une sauvegarde avant restauration.
+- Restauration protégée par confirmation explicite et verrou Apps Script.
+- Copie de sécurité automatique dans Google Drive avant chaque restauration.
+- Limites de taille et contrôle strict des feuilles autorisées pendant l’import.
 
 ### Décisions figées
 
@@ -40,6 +45,7 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Une programmation ne peut avoir qu’une hospitalité active et une invitation active dans la version actuelle.
 - Le français est la langue par défaut ; le créole guadeloupéen peut être sélectionné dans les paramètres.
 - Les données métier ne sont pas traduites automatiquement ; seule l’interface et les textes générés le sont.
+- Une restauration ne peut être exécutée qu’après création d’une copie de sécurité automatique.
 
 ### À valider avant publication stable
 
@@ -49,3 +55,4 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Recette fonctionnelle sur ordinateur et téléphone.
 - Vérification et ajustement du vocabulaire créole.
 - Validation de l’impression sur un document réel.
+- Test réel d’un cycle sauvegarde puis restauration sur une base de démonstration.
