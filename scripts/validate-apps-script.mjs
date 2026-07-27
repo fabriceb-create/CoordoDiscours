@@ -8,7 +8,7 @@ const required = [
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
-  'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs'
+  'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs'
 ];
 
 const errors = [];
@@ -32,9 +32,7 @@ if (fs.existsSync(indexPath)) {
   const index = fs.readFileSync(indexPath, 'utf8');
   const includes = [...index.matchAll(/include\('([^']+)'\)/g)].map(match => match[1]);
   for (const include of includes) {
-    if (!fs.existsSync(path.join(root, `${include}.html`))) {
-      errors.push(`Include HTML introuvable : ${include}.html`);
-    }
+    if (!fs.existsSync(path.join(root, `${include}.html`))) errors.push(`Include HTML introuvable : ${include}.html`);
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
 }
@@ -120,25 +118,33 @@ for (const [file, functionName, role] of protectedFunctions) {
     errors.push(`Fonction sensible introuvable ou incomplète : ${functionName} dans ${file}.`);
     continue;
   }
-  if (!hasRequiredGuard(body, role)) {
-    errors.push(`${file} : ${functionName} doit exiger le rôle ${role}.`);
-  }
+  if (!hasRequiredGuard(body, role)) errors.push(`${file} : ${functionName} doit exiger le rôle ${role}.`);
 }
 
 const installationPath = path.join(root, 'Installation.gs');
 if (fs.existsSync(installationPath)) {
   const installation = fs.readFileSync(installationPath, 'utf8');
-  if (!installation.includes("LANGUE_INTERFACE")) errors.push('La recette doit contrôler le paramètre LANGUE_INTERFACE.');
-  if (!installation.includes("getDataIntegrityReport_()")) errors.push('La recette doit exécuter le contrôle d’intégrité.');
-  if (!installation.includes("parseAndValidateBackup_")) errors.push('La recette doit valider le format de sauvegarde.');
+  if (!installation.includes('LANGUE_INTERFACE')) errors.push('La recette doit contrôler le paramètre LANGUE_INTERFACE.');
+  if (!installation.includes('getDataIntegrityReport_()')) errors.push('La recette doit exécuter le contrôle d’intégrité.');
+  if (!installation.includes('parseAndValidateBackup_')) errors.push('La recette doit valider le format de sauvegarde.');
+}
+
+const planningPath = path.join(root, 'Planning.gs');
+const rulesPath = path.join(root, 'RulesEngine.gs');
+if (fs.existsSync(planningPath) && !fs.readFileSync(planningPath, 'utf8').includes('evaluatePlanningRules_')) {
+  errors.push('Planning.gs doit utiliser le moteur central de règles.');
+}
+if (fs.existsSync(rulesPath)) {
+  const rules = fs.readFileSync(rulesPath, 'utf8');
+  ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => {
+    if (!rules.includes(code)) errors.push(`Règle métier obligatoire absente : ${code}.`);
+  });
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
 for (const file of allFiles.filter(name => name.endsWith('.gs'))) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
-  if (/\bvar\s+SPREADSHEET_ID\b/.test(source)) {
-    errors.push(`${file} contient encore une configuration SPREADSHEET_ID héritée.`);
-  }
+  if (/\bvar\s+SPREADSHEET_ID\b/.test(source)) errors.push(`${file} contient encore une configuration SPREADSHEET_ID héritée.`);
 }
 
 if (errors.length) {
