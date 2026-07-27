@@ -8,6 +8,7 @@
   <?!= include('DashboardStyles'); ?>
   <?!= include('SpeakerTalkStyles'); ?>
   <?!= include('CommunicationStyles'); ?>
+  <?!= include('PrintPlanningStyles'); ?>
 </head>
 <body>
   <div class="layout">
@@ -16,6 +17,7 @@
       <nav>
         <button class="nav-button active" data-view="dashboard">Tableau de bord</button>
         <button class="nav-button" data-view="planning">Programmation</button>
+        <button class="nav-button" data-view="print">Planning imprimable</button>
         <button class="nav-button" data-view="hospitality">Hospitalité</button>
         <button class="nav-button" data-view="invitations">Invitations</button>
         <button class="nav-button" data-view="speakers">Orateurs</button>
@@ -37,6 +39,17 @@
         <div class="section-header"><div><p class="eyebrow">Calendrier</p><h2>Programmation</h2></div><button class="primary-button" id="new-planning">Programmer un discours</button></div>
         <div class="toolbar"><input id="planning-search" type="search" placeholder="Rechercher une date, un orateur ou un discours..."><label><input id="planning-cancelled" type="checkbox"> Voir les annulées</label></div>
         <div id="planning-list" class="cards-list"></div>
+      </section>
+
+      <section id="view-print" class="view">
+        <div class="section-header"><div><p class="eyebrow">Affichage et impression</p><h2>Planning imprimable</h2></div></div>
+        <div class="print-toolbar">
+          <label>Mois de départ<input id="print-start-month" type="month"></label>
+          <label>Période<select id="print-duration"><option value="3">3 mois</option><option value="6">6 mois</option></select></label>
+          <button id="print-generate" class="secondary-button" type="button">Actualiser l’aperçu</button>
+          <button id="print-now" class="primary-button" type="button">Imprimer</button>
+        </div>
+        <div id="print-preview" class="print-preview-shell"><div class="empty-state">Préparation de l’aperçu...</div></div>
       </section>
 
       <section id="view-hospitality" class="view">
@@ -72,15 +85,10 @@
   </div>
 
   <dialog id="planning-dialog"><form id="planning-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Programmation</h2><button type="button" class="icon-button" data-close="planning-dialog">×</button></div><input type="hidden" name="id"><input type="hidden" name="status" value="PROGRAMME"><div class="form-grid"><label>Date*<input name="date" type="date" required></label><label>Heure*<input name="time" type="time" required></label><label class="full-width">Orateur*<select name="speakerId" required><option value="">Sélectionner</option></select></label><label class="full-width">Discours*<select name="talkNumber" required><option value="">Sélectionner</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div id="planning-warning" class="warning-box" hidden></div><div class="form-actions"><button type="button" class="secondary-button" data-close="planning-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
-
   <dialog id="hospitality-dialog"><form id="hospitality-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Hospitalité</h2><button type="button" class="icon-button" data-close="hospitality-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label class="full-width">Programmation*<select name="planningId" required><option value="">Sélectionner</option></select></label><label>Groupe d’accueil<input name="group"></label><label>Contact<input name="contact"></label><label>Statut<select name="status"><option value="A_ATTRIBUER">À attribuer</option><option value="PROPOSE">Proposé</option><option value="CONFIRME">Confirmé</option><option value="REFUSE">Refusé</option><option value="ANNULE">Annulé</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="hospitality-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
-
   <dialog id="invitation-dialog"><form id="invitation-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Invitation</h2><button type="button" class="icon-button" data-close="invitation-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label class="full-width">Programmation*<select name="planningId" required><option value="">Sélectionner</option></select></label><label>Destinataire<input name="recipient"></label><label>Date d’envoi<input name="sentDate" type="date"></label><label>Statut<select name="status"><option value="A_ENVOYER">À envoyer</option><option value="ENVOYEE">Envoyée</option><option value="ACCEPTEE">Acceptée</option><option value="REFUSEE">Refusée</option><option value="RELANCEE">Relancée</option><option value="ANNULEE">Annulée</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="invitation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
-
   <dialog id="speaker-dialog"><form id="speaker-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Fiche orateur</h2><button type="button" class="icon-button" data-close="speaker-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="lastName" required></label><label>Prénom<input name="firstName"></label><label>Type<select name="type"><option value="LOCAL">Local</option><option value="EXTERIEUR">Extérieur</option></select></label><label>Assemblée<select name="congregationId"><option value="">Aucune</option></select></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="speaker-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
-
   <dialog id="congregation-dialog"><form id="congregation-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Fiche assemblée</h2><button type="button" class="icon-button" data-close="congregation-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="name" required></label><label>Coordinateur<input name="coordinator"></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Adresse<textarea name="address" rows="2"></textarea></label><label>Jour de réunion<input name="meetingDay"></label><label>Heure<input name="meetingTime" type="time"></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Active</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="congregation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
-
   <dialog id="talk-dialog"><form id="talk-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Fiche discours</h2><button type="button" class="icon-button" data-close="talk-dialog">×</button></div><div class="form-grid"><label>Numéro*<input name="number" type="number" min="1" required></label><label class="full-width">Titre*<textarea name="title" rows="3" required></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="talk-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
   <div id="toast" class="toast" hidden></div>
@@ -89,5 +97,6 @@
   <?!= include('SpeakerTalkUI'); ?>
   <?!= include('DashboardScripts'); ?>
   <?!= include('CommunicationScripts'); ?>
+  <?!= include('PrintPlanningScripts'); ?>
 </body>
 </html>
