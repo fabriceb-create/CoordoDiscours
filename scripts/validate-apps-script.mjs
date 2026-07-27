@@ -7,7 +7,8 @@ const required = [
   'Styles.html','Scripts.html','Planning.gs','PlanningScripts.html','Dashboard.gs',
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
-  'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html'
+  'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
+  'HospitalityInvitations.gs','CommunicationScripts.html'
 ];
 
 const errors = [];
@@ -54,6 +55,44 @@ if (fs.existsSync(configPath)) {
   if (!config.includes("users: 'UTILISATEURS'")) errors.push('La feuille UTILISATEURS n’est pas déclarée dans Config.gs.');
 }
 
+const protectedFunctions = [
+  ['Speakers.gs', 'saveSpeaker', 'COORDINATEUR'],
+  ['Speakers.gs', 'archiveSpeaker', 'COORDINATEUR'],
+  ['Speakers.gs', 'restoreSpeaker', 'COORDINATEUR'],
+  ['Congregations.gs', 'saveCongregation', 'COORDINATEUR'],
+  ['Congregations.gs', 'archiveCongregation', 'COORDINATEUR'],
+  ['Congregations.gs', 'restoreCongregation', 'COORDINATEUR'],
+  ['Talks.gs', 'saveTalk', 'COORDINATEUR'],
+  ['Talks.gs', 'setTalkActive', 'COORDINATEUR'],
+  ['Talks.gs', 'importTalkReference', 'ADMIN'],
+  ['Planning.gs', 'savePlanning', 'COORDINATEUR'],
+  ['Planning.gs', 'cancelPlanning', 'COORDINATEUR'],
+  ['Planning.gs', 'restorePlanning', 'COORDINATEUR'],
+  ['HospitalityInvitations.gs', 'saveHospitality', 'COORDINATEUR'],
+  ['HospitalityInvitations.gs', 'setHospitalityStatus', 'COORDINATEUR'],
+  ['HospitalityInvitations.gs', 'saveInvitation', 'COORDINATEUR'],
+  ['HospitalityInvitations.gs', 'setInvitationStatus', 'COORDINATEUR'],
+  ['Settings.gs', 'saveApplicationSettings', 'ADMIN'],
+  ['Settings.gs', 'resetApplicationSettings', 'ADMIN'],
+  ['Backup.gs', 'createApplicationBackup', 'ADMIN'],
+  ['Backup.gs', 'restoreApplicationBackup', 'ADMIN']
+];
+
+for (const [file, functionName, role] of protectedFunctions) {
+  const filePath = path.join(root, file);
+  if (!fs.existsSync(filePath)) continue;
+  const source = fs.readFileSync(filePath, 'utf8');
+  const functionPattern = new RegExp(`function\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)(?=\\nfunction\\s+|$)`);
+  const match = source.match(functionPattern);
+  if (!match) {
+    errors.push(`Fonction sensible introuvable : ${functionName} dans ${file}.`);
+    continue;
+  }
+  if (!match[1].includes(`assertAccess_('${role}'`)) {
+    errors.push(`${file} : ${functionName} doit exiger le rôle ${role}.`);
+  }
+}
+
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
 for (const file of allFiles.filter(name => name.endsWith('.gs'))) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
@@ -68,4 +107,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validation CoordoDiscours réussie : ${required.length} fichiers essentiels contrôlés.`);
+console.log(`Validation CoordoDiscours réussie : ${required.length} fichiers essentiels et ${protectedFunctions.length} fonctions sensibles contrôlés.`);
