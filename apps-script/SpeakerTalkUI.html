@@ -5,6 +5,7 @@
       <button type="button" class="icon-button" data-close="speaker-talk-dialog">×</button>
     </div>
     <input type="hidden" name="speakerId">
+    <input type="hidden" name="version">
     <input id="speaker-talk-search" type="search" placeholder="Rechercher par numéro ou mots du titre...">
     <div id="speaker-talk-list" class="selection-list"></div>
     <div class="form-actions">
@@ -37,10 +38,11 @@
       state.speakerTalkSelection = await runServer('getSpeakerTalkSelection', speakerId);
       const dialog = document.getElementById('speaker-talk-dialog');
       dialog.querySelector('[name="speakerId"]').value = speakerId;
+      dialog.querySelector('[name="version"]').value = state.speakerTalkSelection.version || '';
       document.getElementById('speaker-talk-title').textContent = state.speakerTalkSelection.speaker.fullName || state.speakerTalkSelection.speaker.lastName;
       document.getElementById('speaker-talk-search').value = '';
       renderSpeakerTalkSelection();
-      dialog.showModal();
+      if (!dialog.open) dialog.showModal();
     } catch (error) { showError(error); }
   }
 
@@ -77,14 +79,17 @@
 
   document.getElementById('speaker-talk-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const speakerId = event.target.elements.speakerId.value;
     try {
-      const speakerId = event.target.elements.speakerId.value;
       const selected = state.speakerTalkSelection.talks.filter(item => item.selected).map(item => item.number);
-      await runServer('saveSpeakerTalkSelection', speakerId, selected);
+      await runServer('saveSpeakerTalkSelection', speakerId, selected, event.target.elements.version.value);
       document.getElementById('speaker-talk-dialog').close();
       toast('Liste des discours enregistrée.');
       if (state.planningOptions) state.planningOptions = { speakers: [], talks: [], congregations: [] };
-    } catch (error) { showError(error); }
+    } catch (error) {
+      showError(error);
+      if (String(error.message || error).includes('CONFLIT_VERSION|')) await openSpeakerTalks(speakerId);
+    }
   });
 
   document.addEventListener('DOMContentLoaded', installSpeakerTalkButton);
