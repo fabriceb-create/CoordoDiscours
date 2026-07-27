@@ -11,6 +11,7 @@ const APP_CONFIG = Object.freeze({
     events: 'PROGRAMMATIONS',
     hospitality: 'HOSPITALITE',
     invitations: 'INVITATIONS',
+    users: 'UTILISATEURS',
     history: 'HISTORIQUE'
   },
   inactiveTalks: [59, 82, 122, 123]
