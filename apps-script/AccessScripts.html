@@ -1,0 +1,115 @@
+<style>
+  .access-panel{margin-top:24px;padding:20px;border:1px solid #d9dee7;border-radius:14px;background:#fff}.access-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px}.access-grid{display:grid;grid-template-columns:1.4fr 1fr .9fr auto;gap:10px;align-items:end}.access-list{display:grid;gap:10px;margin-top:16px}.access-user{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:14px;border:1px solid #e4e8ef;border-radius:12px}.access-user small{display:block;color:#667085}.access-role{font-weight:700}.access-disabled{opacity:.55}.access-banner{margin:0 0 16px;padding:10px 12px;border-radius:10px;background:#eef4ff}.read-only [data-write-action],.read-only .primary-button[data-requires-edit]{display:none!important}@media(max-width:800px){.access-grid{grid-template-columns:1fr}.access-user{align-items:flex-start;flex-direction:column}}
+</style>
+<script>
+  let currentAccess = null;
+
+  async function loadCurrentAccess() {
+    try {
+      currentAccess = await runServer('getCurrentUserAccess');
+      applyAccessToInterface_(currentAccess);
+      return currentAccess;
+    } catch (error) {
+      showError(error);
+      return null;
+    }
+  }
+
+  function applyAccessToInterface_(access) {
+    if (!access) return;
+    document.body.classList.toggle('read-only', !access.canEdit);
+    document.querySelectorAll('#new-planning,#new-hospitality,#new-invitation,#new-speaker,#new-congregation,#new-talk,#backup-confirm,#settings-reset').forEach(button => {
+      if (button) button.hidden = !access.canEdit;
+    });
+    document.querySelectorAll('[data-view="backup"],[data-view="settings"]').forEach(button => {
+      if (button && !access.canAdminister) button.hidden = true;
+    });
+    const status = document.getElementById('status');
+    if (status) status.title = access.email + ' — ' + access.roleLabel;
+  }
+
+  async function renderAccessManagement_() {
+    const settings = document.getElementById('settings-content');
+    if (!settings || !currentAccess || !currentAccess.canAdminister) return;
+    let panel = document.getElementById('access-management');
+    if (!panel) {
+      panel = document.createElement('section');
+      panel.id = 'access-management';
+      panel.className = 'access-panel';
+      settings.appendChild(panel);
+    }
+    panel.innerHTML = '<div class="empty-state">Chargement des utilisateurs...</div>';
+    try {
+      const users = await runServer('listAccessUsers');
+      panel.innerHTML = `
+        <div class="access-head"><div><p class="eyebrow">Sécurité</p><h2>Utilisateurs et droits d’accès</h2></div><span class="version-badge">${users.length} utilisateur${users.length > 1 ? 's' : ''}</span></div>
+        <p class="access-banner">Administrateur : tous les droits. Coordinateur : modification des données métier. Consultation seule : lecture et impression.</p>
+        <form id="access-form" class="access-grid">
+          <label>Adresse e-mail<input name="email" type="email" required></label>
+          <label>Nom<input name="name"></label>
+          <label>Rôle<select name="role"><option value="ADMIN">Administrateur</option><option value="COORDINATEUR">Coordinateur</option><option value="CONSULTATION">Consultation seule</option></select></label>
+          <button class="primary-button" type="submit">Ajouter</button>
+        </form>
+        <div class="access-list">${users.map(user => `
+          <article class="access-user ${user.active ? '' : 'access-disabled'}">
+            <div><strong>${escapeHtml(user.name || user.email)}</strong><small>${escapeHtml(user.email)}</small></div>
+            <div><span class="access-role">${escapeHtml(user.roleLabel)}</span><small>${user.active ? 'Accès actif' : 'Accès désactivé'}</small></div>
+            <div class="record-actions">
+              <button class="secondary-button" type="button" data-access-edit="${escapeHtml(user.email)}">Modifier</button>
+              <button class="${user.active ? 'danger-button' : 'secondary-button'}" type="button" data-access-toggle="${escapeHtml(user.email)}" data-active="${user.active}">${user.active ? 'Désactiver' : 'Réactiver'}</button>
+            </div>
+          </article>`).join('')}</div>`;
+      panel._users = users;
+      document.getElementById('access-form').addEventListener('submit', saveAccessUser_);
+    } catch (error) {
+      showError(error);
+      panel.innerHTML = '<div class="empty-state">Impossible de charger les utilisateurs.</div>';
+    }
+  }
+
+  async function saveAccessUser_(event) {
+    event.preventDefault();
+    try {
+      await runServer('saveAccessUser', Object.fromEntries(new FormData(event.currentTarget).entries()));
+      toast('Utilisateur enregistré.');
+      renderAccessManagement_();
+    } catch (error) { showError(error); }
+  }
+
+  document.addEventListener('click', async event => {
+    const edit = event.target.closest('[data-access-edit]');
+    if (edit) {
+      const panel = document.getElementById('access-management');
+      const user = (panel._users || []).find(item => item.email === edit.dataset.accessEdit);
+      const form = document.getElementById('access-form');
+      if (user && form) {
+        form.elements.email.value = user.email;
+        form.elements.name.value = user.name || '';
+        form.elements.role.value = user.role;
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    const toggle = event.target.closest('[data-access-toggle]');
+    if (toggle) {
+      try {
+        await runServer('setAccessUserActive', toggle.dataset.accessToggle, toggle.dataset.active !== 'true');
+        toast('Accès utilisateur mis à jour.');
+        renderAccessManagement_();
+      } catch (error) { showError(error); }
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', loadCurrentAccess);
+  const originalRenderSettings = window.renderSettings;
+  if (originalRenderSettings) {
+    window.renderSettings = function(data) {
+      originalRenderSettings(data);
+      setTimeout(renderAccessManagement_, 0);
+    };
+  } else {
+    document.addEventListener('click', event => {
+      const target = event.target.closest('[data-view="settings"]');
+      if (target) setTimeout(renderAccessManagement_, 500);
+    });
+  }
+</script>
