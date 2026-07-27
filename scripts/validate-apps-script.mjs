@@ -6,7 +6,8 @@ const required = [
   'appsscript.json','Config.gs','Database.gs','Installation.gs','Code.gs','Index.html',
   'Styles.html','Scripts.html','Planning.gs','PlanningScripts.html','Dashboard.gs',
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
-  'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html'
+  'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
+  'Backup.gs','BackupScripts.html','BackupStyles.html'
 ];
 
 const errors = [];
@@ -35,6 +36,8 @@ if (fs.existsSync(indexPath)) {
     }
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
+  if (!index.includes('BackupScripts')) errors.push('Le script de sauvegarde n’est pas inclus.');
+  if (!index.includes('view-backup')) errors.push('La page de sauvegarde est absente de l’interface.');
 }
 
 const codePath = path.join(root, 'Code.gs');
@@ -43,6 +46,14 @@ if (fs.existsSync(codePath)) {
   const directInclude = fs.readFileSync(indexPath, 'utf8').includes('I18nScripts');
   const bundledInclude = code.includes("createHtmlOutputFromFile('I18nScripts')");
   if (!directInclude && !bundledInclude) errors.push('Le moteur multilingue n’est pas chargé par l’interface.');
+}
+
+const backupPath = path.join(root, 'Backup.gs');
+if (fs.existsSync(backupPath)) {
+  const backup = fs.readFileSync(backupPath, 'utf8');
+  if (!backup.includes('LockService.getScriptLock')) errors.push('La restauration doit utiliser un verrou Apps Script.');
+  if (!backup.includes("confirmation || '').trim().toUpperCase() !== 'RESTAURER'")) errors.push('La confirmation de restauration est absente.');
+  if (!backup.includes('createDriveSafetyBackup_')) errors.push('La copie de sécurité avant restauration est absente.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
