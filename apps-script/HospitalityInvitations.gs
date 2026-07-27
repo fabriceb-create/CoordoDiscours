@@ -42,6 +42,7 @@ function listHospitalities(searchText) {
 }
 
 function saveHospitality(payload) {
+  assertAccess_('COORDINATEUR', 'saveHospitality');
   payload = payload || {};
   const planningId = requiredText_(payload.planningId, 'La programmation');
   const planning = listPlannings('', true).find(function (item) {
@@ -79,6 +80,7 @@ function saveHospitality(payload) {
 }
 
 function setHospitalityStatus(id, status) {
+  assertAccess_('COORDINATEUR', 'setHospitalityStatus');
   const allowed = ['A_ATTRIBUER', 'PROPOSE', 'CONFIRME', 'REFUSE', 'ANNULE'];
   status = String(status || '').toUpperCase();
   if (!allowed.includes(status)) throw new Error('Statut d’hospitalité invalide.');
@@ -130,6 +132,7 @@ function listInvitations(searchText) {
 }
 
 function saveInvitation(payload) {
+  assertAccess_('COORDINATEUR', 'saveInvitation');
   payload = payload || {};
   const planningId = requiredText_(payload.planningId, 'La programmation');
   const planning = listPlannings('', true).find(function (item) {
@@ -170,6 +173,7 @@ function saveInvitation(payload) {
 }
 
 function setInvitationStatus(id, status) {
+  assertAccess_('COORDINATEUR', 'setInvitationStatus');
   const allowed = ['A_ENVOYER', 'ENVOYEE', 'ACCEPTEE', 'REFUSEE', 'RELANCEE', 'ANNULEE'];
   status = String(status || '').toUpperCase();
   if (!allowed.includes(status)) throw new Error('Statut d’invitation invalide.');
