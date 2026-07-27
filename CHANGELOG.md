@@ -34,6 +34,12 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Restauration protégée par confirmation explicite et verrou Apps Script.
 - Copie de sécurité automatique dans Google Drive avant chaque restauration.
 - Limites de taille et contrôle strict des feuilles autorisées pendant l’import.
+- Feuille `UTILISATEURS` créée automatiquement lors de l’installation ou d’une migration.
+- Gestion des rôles Administrateur, Coordinateur et Consultation seule.
+- Premier utilisateur Google automatiquement enregistré comme administrateur sur une installation vide.
+- Interface d’administration des utilisateurs intégrée aux paramètres.
+- Activation, désactivation et modification des droits avec traçabilité dans l’historique.
+- Masquage automatique des commandes de modification et d’administration pour les profils en consultation seule.
 
 ### Décisions figées
 
@@ -46,6 +52,7 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Le français est la langue par défaut ; le créole guadeloupéen peut être sélectionné dans les paramètres.
 - Les données métier ne sont pas traduites automatiquement ; seule l’interface et les textes générés le sont.
 - Une restauration ne peut être exécutée qu’après création d’une copie de sécurité automatique.
+- L’administrateur gère les utilisateurs et la configuration ; le coordinateur gère les données métier ; le profil Consultation ne peut que lire et imprimer.
 
 ### À valider avant publication stable
 
@@ -56,3 +63,4 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Vérification et ajustement du vocabulaire créole.
 - Validation de l’impression sur un document réel.
 - Test réel d’un cycle sauvegarde puis restauration sur une base de démonstration.
+- Vérification de l’adresse renvoyée par `Session.getActiveUser().getEmail()` selon le mode de déploiement Google choisi.
