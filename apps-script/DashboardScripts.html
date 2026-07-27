@@ -1,0 +1,71 @@
+<script>
+  async function loadDashboard() {
+    const container = document.getElementById('dashboard-content');
+    if (!container) return;
+    container.innerHTML = '<div class="empty-state">Chargement du tableau de bord...</div>';
+    try {
+      renderDashboard(await runServer('getDashboardData'));
+    } catch (error) {
+      showError(error);
+      container.innerHTML = '<div class="empty-state">Le tableau de bord n’a pas pu être chargé.</div>';
+    }
+  }
+
+  function renderDashboard(data) {
+    const container = document.getElementById('dashboard-content');
+    const metrics = data.metrics || {};
+    const next = data.nextPlanning;
+    const health = data.health || { ok: false, checks: [] };
+
+    container.innerHTML = `
+      <div class="dashboard-summary">
+        <article class="metric-card"><span>À venir</span><strong>${metrics.upcoming || 0}</strong><small>programmations</small></article>
+        <article class="metric-card"><span>Orateurs</span><strong>${metrics.activeSpeakers || 0}</strong><small>actifs</small></article>
+        <article class="metric-card"><span>Assemblées</span><strong>${metrics.activeCongregations || 0}</strong><small>actives</small></article>
+        <article class="metric-card"><span>À traiter</span><strong>${metrics.actions || 0}</strong><small>actions</small></article>
+      </div>
+
+      <div class="dashboard-grid">
+        <section class="dashboard-panel next-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Prochaine réunion</p><h2>${next ? escapeHtml(next.displayDate + ' à ' + next.time) : 'Aucune programmation'}</h2></div><button class="secondary-button" data-open="planning">Voir le planning</button></div>
+          ${next ? `
+            <div class="next-planning-card">
+              <div><span class="dashboard-label">Orateur</span><strong>${escapeHtml(next.speakerName)}</strong></div>
+              <div><span class="dashboard-label">Discours</span><strong>N° ${escapeHtml(next.talkNumber)} - ${escapeHtml(next.talkTitle || 'Titre à compléter')}</strong></div>
+            </div>` : '<div class="empty-state">Commence par programmer un discours.</div>'}
+        </section>
+
+        <section class="dashboard-panel health-panel">
+          <div class="panel-heading"><div><p class="eyebrow">État du système</p><h2>${health.ok ? 'Tout fonctionne' : 'Vérification nécessaire'}</h2></div><span class="health-dot ${health.ok ? 'ok' : 'error'}"></span></div>
+          <div class="health-list">${(health.checks || []).map(item => `<span>${item.ok ? '✓' : '!' } ${escapeHtml(item.name)}</span>`).join('')}</div>
+        </section>
+      </div>
+
+      <div class="dashboard-grid lower-grid">
+        <section class="dashboard-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Priorités</p><h2>Ce qui nécessite ton attention</h2></div></div>
+          <div class="action-list">
+            ${(data.actions || []).length ? data.actions.map(action => `
+              <button class="action-item ${escapeHtml(action.level)}" data-open="${escapeHtml(action.target)}">
+                <span class="action-marker"></span>
+                <span><strong>${escapeHtml(action.title)}</strong><small>${escapeHtml(action.detail)}</small></span>
+              </button>`).join('') : '<div class="empty-state success-state">Aucune action urgente dans les 14 prochains jours.</div>'}
+          </div>
+        </section>
+
+        <section class="dashboard-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Calendrier</p><h2>Prochaines programmations</h2></div></div>
+          <div class="upcoming-list">
+            ${(data.upcoming || []).length ? data.upcoming.map(item => `
+              <button class="upcoming-item" data-open="planning">
+                <span class="upcoming-date">${escapeHtml(item.displayDate)}<small>${escapeHtml(item.time)}</small></span>
+                <span><strong>${escapeHtml(item.speakerName)}</strong><small>N° ${escapeHtml(item.talkNumber)} - ${escapeHtml(item.talkTitle || 'Titre à compléter')}</small></span>
+              </button>`).join('') : '<div class="empty-state">Aucune programmation à venir.</div>'}
+          </div>
+        </section>
+      </div>
+      <p class="dashboard-updated">Actualisé le ${escapeHtml(data.generatedAt || '')}</p>`;
+  }
+
+  document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
