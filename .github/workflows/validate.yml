@@ -11,11 +11,11 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
+
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Installer les dépendances
-        run: npm install
+          node-version: '22'
+
       - name: Contrôler les fichiers Apps Script
         run: npm run validate
