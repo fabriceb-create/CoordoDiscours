@@ -31,6 +31,12 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Détection des invitations et hospitalités manquantes pour les orateurs extérieurs dans les 14 prochains jours.
 - Diagnostic visuel de la présence des feuilles de données.
 - Actualisation manuelle et automatique du tableau de bord.
+- Module Hospitalité : rattachement à une programmation, groupe d’accueil, contact, notes et suivi du statut.
+- Module Invitations : rattachement à une programmation, destinataire, date d’envoi, notes et suivi du statut.
+- Recherche dans les hospitalités et les invitations.
+- Actions rapides pour confirmer une hospitalité et marquer une invitation comme envoyée.
+- Blocage des doublons d’hospitalité ou d’invitation pour une même programmation.
+- Actualisation automatique du tableau de bord après une action de communication.
 
 ### Décisions figées
 
@@ -39,3 +45,4 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Les discours 59, 82, 122 et 123 sont inactifs.
 - La répétition sur 12 mois produit une alerte non bloquante.
 - Toutes les modifications de programmation doivent être historisées.
+- Une programmation ne peut avoir qu’une hospitalité active et une invitation active dans la version actuelle.
