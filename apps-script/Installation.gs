@@ -1,4 +1,4 @@
-const INSTALLATION_SCHEMA_VERSION = '1.4.0';
+const INSTALLATION_SCHEMA_VERSION = '1.5.0';
 
 function installCoordoDiscours() {
   const startedAt = new Date();
@@ -25,10 +25,11 @@ function runDatabaseMigrations_() {
   const applied = [];
 
   const defaults = {
-    LANGUE: 'fr',
+    LANGUE_INTERFACE: 'fr',
     HEURE_REUNION_DEFAUT: '09:30',
     DUREE_IMPRESSION_MOIS: '3',
-    HORIZON_ACTIONS_JOURS: '14'
+    HORIZON_ACTIONS_JOURS: '14',
+    ALERTE_REPETITION_MOIS: '12'
   };
 
   Object.keys(defaults).forEach(function (key) {
@@ -37,6 +38,13 @@ function runDatabaseMigrations_() {
       applied.push('Ajout du paramètre ' + key);
     }
   });
+
+  // Migration de l’ancien paramètre LANGUE vers LANGUE_INTERFACE.
+  const legacyLanguage = String(getSetting_('LANGUE') || '').trim();
+  if (legacyLanguage && !String(getSetting_('LANGUE_INTERFACE') || '').trim()) {
+    upsertSetting_(sheet, 'LANGUE_INTERFACE', legacyLanguage, 'Langue de l’interface migrée automatiquement.');
+    applied.push('Migration du paramètre LANGUE vers LANGUE_INTERFACE');
+  }
 
   upsertSetting_(sheet, 'SCHEMA_VERSION', INSTALLATION_SCHEMA_VERSION, 'Version de structure de la base.');
   upsertSetting_(sheet, 'VERSION', APP_CONFIG.version, 'Version installée de l’application.');
@@ -70,14 +78,15 @@ function getInstallationStatus() {
 }
 
 function runAcceptanceTests() {
+  assertAccess_('ADMIN', 'runAcceptanceTests');
   const tests = [];
 
-  function test(name, callback) {
+  function test(name, callback, blocking) {
     try {
       const details = callback();
-      tests.push({ name: name, success: true, details: details || '' });
+      tests.push({ name: name, success: true, blocking: blocking !== false, details: details || '' });
     } catch (error) {
-      tests.push({ name: name, success: false, error: error.message || String(error) });
+      tests.push({ name: name, success: false, blocking: blocking !== false, error: error.message || String(error) });
     }
   }
 
@@ -89,32 +98,42 @@ function runAcceptanceTests() {
 
   test('Présence des feuilles obligatoires', function () {
     const status = getInstallationStatus();
-    if (status.missingSheets.length) {
-      throw new Error('Feuilles manquantes : ' + status.missingSheets.join(', '));
-    }
+    if (status.missingSheets.length) throw new Error('Feuilles manquantes : ' + status.missingSheets.join(', '));
     return Object.values(APP_CONFIG.sheets).length + ' feuilles vérifiées';
   });
 
+  test('Fuseau horaire Guadeloupe', function () {
+    const timezone = Session.getScriptTimeZone();
+    if (timezone !== 'America/Guadeloupe') throw new Error('Fuseau incorrect : ' + timezone);
+    return timezone;
+  });
+
   test('Paramètres essentiels', function () {
-    const required = ['ASSEMBLEE', 'LANGUE', 'ALERTE_REPETITION_MOIS', 'SCHEMA_VERSION'];
+    const required = ['ASSEMBLEE', 'LANGUE_INTERFACE', 'ALERTE_REPETITION_MOIS', 'SCHEMA_VERSION'];
     const missing = required.filter(function (key) { return !String(getSetting_(key) || '').trim(); });
     if (missing.length) throw new Error('Paramètres manquants : ' + missing.join(', '));
     return required.join(', ');
   });
 
   test('Langue configurée', function () {
-    const language = String(getSetting_('LANGUE') || 'fr').toLowerCase();
+    const language = String(getSetting_('LANGUE_INTERFACE') || 'fr').toLowerCase();
     if (['fr', 'gcf'].indexOf(language) === -1) throw new Error('Langue non reconnue : ' + language);
     return language;
+  });
+
+  test('Compte administrateur actif', function () {
+    const administrators = listAccessUsers_().filter(function (user) { return user.active && user.role === 'ADMIN'; });
+    if (!administrators.length) throw new Error('Aucun administrateur actif.');
+    return administrators.length + ' administrateur(s) actif(s)';
   });
 
   test('Discours officiellement inactifs', function () {
     const talks = listTalks('', true);
     const invalid = APP_CONFIG.inactiveTalks.filter(function (number) {
       const talk = talks.find(function (item) { return Number(item.number) === Number(number); });
-      return talk && talk.active;
+      return !talk || talk.active;
     });
-    if (invalid.length) throw new Error('Discours actifs à tort : ' + invalid.join(', '));
+    if (invalid.length) throw new Error('Discours absents ou actifs à tort : ' + invalid.join(', '));
     return APP_CONFIG.inactiveTalks.join(', ');
   });
 
@@ -123,15 +142,45 @@ function runAcceptanceTests() {
     listCongregations('', true);
     listTalks('', true);
     listPlannings('', true);
-    return 'Orateurs, assemblées, discours et programmations';
+    listHospitalities('');
+    listInvitations('');
+    return 'Tous les modules métier sont accessibles';
   });
 
-  const failed = tests.filter(function (item) { return !item.success; });
+  test('Intégrité des relations', function () {
+    const integrity = getDataIntegrityReport_();
+    if (!integrity.ok) throw new Error(integrity.issues.length + ' anomalie(s) bloquante(s) détectée(s).');
+    return integrity.counts;
+  });
+
+  test('Création d’une sauvegarde en mémoire', function () {
+    const payload = buildBackupPayload_();
+    const summary = backupSummaryFromPayload_(payload);
+    if (!payload.sheets.length) throw new Error('La sauvegarde ne contient aucune feuille.');
+    return summary.sheets.length + ' feuilles sauvegardables';
+  });
+
+  test('Validation du format de sauvegarde', function () {
+    const payload = buildBackupPayload_();
+    const parsed = parseAndValidateBackup_(JSON.stringify(payload));
+    if (parsed.product !== APP_CONFIG.name) throw new Error('Produit de sauvegarde incorrect.');
+    return 'Format ' + parsed.formatVersion;
+  });
+
+  test('Disponibilité de l’impression', function () {
+    if (typeof getPrintablePlanning !== 'function' && typeof buildPrintablePlanning !== 'function') {
+      throw new Error('Fonction d’impression du planning introuvable.');
+    }
+    return 'Module d’impression chargé';
+  }, false);
+
+  const blockingFailures = tests.filter(function (item) { return !item.success && item.blocking; });
   const result = {
-    success: failed.length === 0,
+    success: blockingFailures.length === 0,
     total: tests.length,
-    passed: tests.length - failed.length,
-    failed: failed.length,
+    passed: tests.filter(function (item) { return item.success; }).length,
+    failed: tests.filter(function (item) { return !item.success; }).length,
+    blockingFailed: blockingFailures.length,
     tests: tests,
     executedAt: new Date().toISOString()
   };
