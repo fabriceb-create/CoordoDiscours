@@ -7,9 +7,11 @@
     "validate": "node scripts/validate-apps-script.mjs",
     "test:business": "node scripts/test-business-rules.mjs",
     "check": "npm run validate && npm run test:business",
+    "predeploy:check": "npm run check && node scripts/predeploy-check.mjs",
     "clasp:login": "npx @google/clasp login",
-    "clasp:push": "npx @google/clasp push",
-    "clasp:deploy": "npx @google/clasp deploy"
+    "clasp:status": "npx @google/clasp status",
+    "clasp:push": "npm run predeploy:check && npx @google/clasp push",
+    "clasp:deploy": "npm run predeploy:check && npx @google/clasp deploy"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0-alpha"
