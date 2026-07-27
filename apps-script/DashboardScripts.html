@@ -67,5 +67,10 @@
       <p class="dashboard-updated">Actualisé le ${escapeHtml(data.generatedAt || '')}</p>`;
   }
 
+  document.addEventListener('click', function (event) {
+    const dashboardTrigger = event.target.closest('[data-view="dashboard"], [data-open="dashboard"]');
+    if (dashboardTrigger) setTimeout(loadDashboard, 0);
+  });
+
   document.addEventListener('DOMContentLoaded', loadDashboard);
 </script>
