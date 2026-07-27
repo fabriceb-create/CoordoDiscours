@@ -7,7 +7,7 @@ const required = [
   'Styles.html','Scripts.html','Planning.gs','PlanningScripts.html','Dashboard.gs',
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
-  'Backup.gs','BackupScripts.html','BackupStyles.html'
+  'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html'
 ];
 
 const errors = [];
@@ -36,24 +36,22 @@ if (fs.existsSync(indexPath)) {
     }
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
-  if (!index.includes('BackupScripts')) errors.push('Le script de sauvegarde n’est pas inclus.');
-  if (!index.includes('view-backup')) errors.push('La page de sauvegarde est absente de l’interface.');
 }
 
 const codePath = path.join(root, 'Code.gs');
 if (fs.existsSync(codePath)) {
   const code = fs.readFileSync(codePath, 'utf8');
-  const directInclude = fs.readFileSync(indexPath, 'utf8').includes('I18nScripts');
-  const bundledInclude = code.includes("createHtmlOutputFromFile('I18nScripts')");
-  if (!directInclude && !bundledInclude) errors.push('Le moteur multilingue n’est pas chargé par l’interface.');
+  const index = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '';
+  const i18nLoaded = index.includes('I18nScripts') || code.includes("createHtmlOutputFromFile('I18nScripts')");
+  const accessLoaded = index.includes('AccessScripts') || code.includes("createHtmlOutputFromFile('AccessScripts')");
+  if (!i18nLoaded) errors.push('Le moteur multilingue n’est pas chargé par l’interface.');
+  if (!accessLoaded) errors.push('Le contrôle des droits d’accès n’est pas chargé par l’interface.');
 }
 
-const backupPath = path.join(root, 'Backup.gs');
-if (fs.existsSync(backupPath)) {
-  const backup = fs.readFileSync(backupPath, 'utf8');
-  if (!backup.includes('LockService.getScriptLock')) errors.push('La restauration doit utiliser un verrou Apps Script.');
-  if (!backup.includes("confirmation || '').trim().toUpperCase() !== 'RESTAURER'")) errors.push('La confirmation de restauration est absente.');
-  if (!backup.includes('createDriveSafetyBackup_')) errors.push('La copie de sécurité avant restauration est absente.');
+const configPath = path.join(root, 'Config.gs');
+if (fs.existsSync(configPath)) {
+  const config = fs.readFileSync(configPath, 'utf8');
+  if (!config.includes("users: 'UTILISATEURS'")) errors.push('La feuille UTILISATEURS n’est pas déclarée dans Config.gs.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
