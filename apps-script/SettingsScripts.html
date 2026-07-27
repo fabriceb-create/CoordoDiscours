@@ -1,0 +1,86 @@
+<script>
+  let settingsLoaded = false;
+
+  async function loadSettings() {
+    const container = document.getElementById('settings-content');
+    if (!container) return;
+    container.innerHTML = '<div class="empty-state">Chargement des paramètres...</div>';
+    try {
+      renderSettings(await runServer('getApplicationSettings'));
+      settingsLoaded = true;
+    } catch (error) {
+      showError(error);
+      container.innerHTML = '<div class="empty-state">Impossible de charger les paramètres.</div>';
+    }
+  }
+
+  function renderSettings(data) {
+    const container = document.getElementById('settings-content');
+    const diagnostic = data.diagnostics || {};
+    container.innerHTML = `
+      <form id="settings-form" class="settings-layout">
+        <section class="settings-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Configuration</p><h2>Réglages généraux</h2></div><span class="version-badge">${escapeHtml(data.version || '')}</span></div>
+          <div class="settings-grid">
+            ${(data.settings || []).map(renderSettingField_).join('')}
+          </div>
+          <div class="form-actions settings-actions">
+            <button id="settings-reset" type="button" class="secondary-button">Valeurs par défaut</button>
+            <button type="submit" class="primary-button">Enregistrer les paramètres</button>
+          </div>
+        </section>
+        <aside class="settings-panel diagnostics-panel">
+          <div class="panel-heading"><div><p class="eyebrow">Diagnostic</p><h2>${diagnostic.ok ? 'Configuration valide' : 'Action nécessaire'}</h2></div><span class="health-dot ${diagnostic.ok ? 'ok' : 'error'}"></span></div>
+          <dl class="diagnostic-list">
+            <div><dt>Base de données</dt><dd>${escapeHtml(diagnostic.databaseName || '')}</dd></div>
+            <div><dt>Fuseau horaire</dt><dd>${escapeHtml(diagnostic.timezone || '')}</dd></div>
+            <div><dt>Feuilles disponibles</dt><dd>${escapeHtml(diagnostic.sheetCount || 0)} / ${escapeHtml(diagnostic.expectedSheetCount || 0)}</dd></div>
+          </dl>
+          ${(diagnostic.missingSheets || []).length ? `<div class="warning-box"><strong>Feuilles manquantes</strong><br>${diagnostic.missingSheets.map(escapeHtml).join(', ')}</div>` : '<div class="settings-success">Toutes les feuilles nécessaires sont présentes.</div>'}
+          <a class="secondary-button settings-database-link" href="${escapeHtml(data.spreadsheetUrl || '#')}" target="_blank">Ouvrir la base de données</a>
+        </aside>
+      </form>`;
+
+    document.getElementById('settings-form').addEventListener('submit', saveSettings_);
+    document.getElementById('settings-reset').addEventListener('click', resetSettings_);
+  }
+
+  function renderSettingField_(setting) {
+    const name = escapeHtml(setting.key);
+    const value = String(setting.value ?? '');
+    let control = '';
+    if (setting.type === 'boolean') {
+      control = `<select name="${name}"><option value="OUI" ${value === 'OUI' ? 'selected' : ''}>Oui</option><option value="NON" ${value === 'NON' ? 'selected' : ''}>Non</option></select>`;
+    } else if (setting.type === 'select') {
+      control = `<select name="${name}">${(setting.options || []).map(option => `<option value="${escapeHtml(option)}" ${String(option) === value ? 'selected' : ''}>${escapeHtml(option)} ${escapeHtml(setting.suffix || '')}</option>`).join('')}</select>`;
+    } else {
+      control = `<div class="setting-input-wrap"><input name="${name}" type="${escapeHtml(setting.type || 'text')}" value="${escapeHtml(value)}" ${setting.min != null ? `min="${setting.min}"` : ''} ${setting.max != null ? `max="${setting.max}"` : ''} required>${setting.suffix ? `<span>${escapeHtml(setting.suffix)}</span>` : ''}</div>`;
+    }
+    return `<label class="setting-field"><span><strong>${escapeHtml(setting.label)}</strong><small>${escapeHtml(setting.description || '')}</small></span>${control}</label>`;
+  }
+
+  async function saveSettings_(event) {
+    event.preventDefault();
+    try {
+      const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+      const data = await runServer('saveApplicationSettings', payload);
+      renderSettings(data);
+      document.getElementById('congregation').textContent = payload.ASSEMBLEE || 'Basse-Terre';
+      toast('Paramètres enregistrés.');
+      if (typeof loadDashboard === 'function') loadDashboard();
+    } catch (error) { showError(error); }
+  }
+
+  async function resetSettings_() {
+    if (!confirm('Rétablir toutes les valeurs par défaut ?')) return;
+    try {
+      renderSettings(await runServer('resetApplicationSettings'));
+      toast('Valeurs par défaut restaurées.');
+    } catch (error) { showError(error); }
+  }
+
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-view], [data-open]');
+    if (target && (target.dataset.view === 'settings' || target.dataset.open === 'settings')) loadSettings();
+  });
+</script>
