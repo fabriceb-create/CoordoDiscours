@@ -1,4 +1,4 @@
-const RECOMMENDATION_ENGINE_VERSION = '1.0.0';
+const RECOMMENDATION_ENGINE_VERSION = '1.1.0';
 
 function getSpeakerRecommendations(payload) {
   const request = payload || {};
@@ -15,6 +15,7 @@ function getSpeakerRecommendations(payload) {
     return { ready: true, recommendations: [], message: 'Ce discours est introuvable ou inactif.' };
   }
 
+  const weights = getRecommendationWeights_();
   const eventDate = new Date(date + 'T12:00:00');
   const monthKey = date.slice(0, 7);
   const plannings = listPlannings('', true).filter(function (item) {
@@ -27,7 +28,7 @@ function getSpeakerRecommendations(payload) {
   const maxCount = Math.max.apply(null, [1].concat(Object.keys(speakerCounts).map(function (id) { return speakerCounts[id]; })));
 
   const recommendations = listSpeakers('', false).map(function (speaker) {
-    return scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount);
+    return scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights);
   }).filter(function (item) {
     return item.eligible;
   }).sort(function (a, b) {
@@ -39,15 +40,41 @@ function getSpeakerRecommendations(payload) {
     version: RECOMMENDATION_ENGINE_VERSION,
     date: date,
     talkNumber: talkNumber,
+    weights: weights,
     recommendations: recommendations,
     message: recommendations.length ? '' : 'Aucun orateur actif ne peut actuellement présenter ce discours.'
   };
 }
 
-function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount) {
+function getRecommendationWeights_() {
+  const weights = {
+    talk: recommendationWeight_('RECO_POIDS_DISCOURS', 40),
+    recency: recommendationWeight_('RECO_POIDS_ANCIENNETE', 30),
+    month: recommendationWeight_('RECO_POIDS_MOIS', 15),
+    local: recommendationWeight_('RECO_POIDS_LOCAL', 10),
+    balance: recommendationWeight_('RECO_POIDS_EQUILIBRE', 5)
+  };
+  weights.total = weights.talk + weights.recency + weights.month + weights.local + weights.balance;
+  if (weights.total <= 0) {
+    weights.talk = 40;
+    weights.recency = 30;
+    weights.month = 15;
+    weights.local = 10;
+    weights.balance = 5;
+    weights.total = 100;
+  }
+  return weights;
+}
+
+function recommendationWeight_(key, fallback) {
+  const value = Number(getSetting_(key));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights) {
   const reasons = [];
   const cautions = [];
-  let score = 0;
+  let rawScore = 0;
   let eligible = true;
 
   const authorizedTalks = speaker.type === 'EXTERIEUR' ? getSpeakerTalkNumbers_(speaker.id) : [];
@@ -55,7 +82,7 @@ function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, p
     eligible = false;
     cautions.push('Discours absent de sa liste déclarée.');
   } else {
-    score += 40;
+    rawScore += weights.talk;
     reasons.push(speaker.type === 'EXTERIEUR' ? 'Discours déclaré par l’orateur.' : 'Orateur local disponible pour ce discours.');
   }
 
@@ -67,40 +94,40 @@ function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, p
   }).sort(function (a, b) { return b.date - a.date; })[0];
 
   if (!previous) {
-    score += 30;
+    rawScore += weights.recency;
     reasons.push('Aucun passage antérieur enregistré.');
   } else {
     const days = Math.max(0, Math.floor((eventDate - previous.date) / 86400000));
     const months = Math.floor(days / 30.44);
-    const recencyScore = Math.min(30, Math.max(0, Math.round(months * 2.5)));
-    score += recencyScore;
+    const recencyRatio = Math.min(1, Math.max(0, months / 12));
+    rawScore += weights.recency * recencyRatio;
     if (months >= 6) reasons.push('Dernier passage il y a environ ' + months + ' mois.');
     else cautions.push('Dernier passage il y a environ ' + months + ' mois.');
   }
 
   const sameMonthCount = speakerPlannings.filter(function (item) { return String(item.date).slice(0, 7) === monthKey; }).length;
   if (!sameMonthCount) {
-    score += 15;
+    rawScore += weights.month;
     reasons.push('Aucune autre programmation ce mois-ci.');
   } else {
-    score += Math.max(0, 15 - sameMonthCount * 8);
+    rawScore += Math.max(0, weights.month * (1 - sameMonthCount * 0.5));
     cautions.push('Déjà programmé ' + sameMonthCount + ' fois ce mois-ci.');
   }
 
   if (speaker.type === 'LOCAL') {
-    score += 10;
+    rawScore += weights.local;
     reasons.push('Pas de déplacement extérieur à organiser.');
   } else {
-    score += 5;
+    rawScore += weights.local * 0.5;
     cautions.push('Déplacement et accueil à prévoir.');
   }
 
   const count = speakerCounts[speaker.id] || 0;
-  const balanceScore = Math.round(5 * (1 - count / maxCount));
-  score += Math.max(0, balanceScore);
+  const balanceRatio = Math.max(0, 1 - count / maxCount);
+  rawScore += weights.balance * balanceRatio;
   if (count === 0) reasons.push('Orateur encore peu sollicité dans le planning.');
 
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  const score = Math.max(0, Math.min(100, Math.round((rawScore / weights.total) * 100)));
   return {
     speakerId: speaker.id,
     speakerName: speaker.fullName || speaker.lastName,
