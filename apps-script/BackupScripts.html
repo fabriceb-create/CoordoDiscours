@@ -1,0 +1,114 @@
+<script>
+  let selectedBackupContent = '';
+
+  async function loadBackupModule() {
+    const container = document.getElementById('backup-summary');
+    if (!container) return;
+    container.innerHTML = '<div class="empty-state">Chargement des informations...</div>';
+    try {
+      renderBackupSummary(await runServer('getBackupSummary'));
+    } catch (error) {
+      showError(error);
+      container.innerHTML = '<div class="empty-state">Impossible de charger les informations de sauvegarde.</div>';
+    }
+  }
+
+  function renderBackupSummary(data) {
+    const container = document.getElementById('backup-summary');
+    container.innerHTML = `
+      <div class="backup-overview">
+        <div><span>Base de données</span><strong>${escapeHtml(data.databaseName || '')}</strong></div>
+        <div><span>Feuilles contrôlées</span><strong>${(data.sheets || []).length}</strong></div>
+        <div><span>Lignes de données</span><strong>${data.totalRows || 0}</strong></div>
+      </div>
+      <div class="backup-sheet-list">
+        ${(data.sheets || []).map(item => `<div><strong>${escapeHtml(item.name)}</strong><span>${item.exists ? item.rows + ' ligne(s)' : 'Feuille absente'}</span></div>`).join('')}
+      </div>`;
+  }
+
+  async function downloadBackup_() {
+    const button = document.getElementById('backup-download');
+    button.disabled = true;
+    try {
+      const result = await runServer('createApplicationBackup');
+      const blob = new Blob([result.content], { type: result.mimeType || 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = result.fileName || 'CoordoDiscours-sauvegarde.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast('Sauvegarde créée.');
+      loadBackupModule();
+    } catch (error) {
+      showError(error);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function inspectBackupFile_(file) {
+    selectedBackupContent = await file.text();
+    const result = await runServer('inspectApplicationBackup', selectedBackupContent);
+    const preview = document.getElementById('backup-preview');
+    preview.hidden = false;
+    preview.innerHTML = `
+      <strong>Sauvegarde reconnue</strong>
+      <p>Version application : ${escapeHtml(result.applicationVersion || '')}</p>
+      <p>Date : ${escapeHtml(result.createdAt || '')}</p>
+      <p>${(result.sheets || []).length} feuille(s) prête(s) à être restaurée(s).</p>`;
+    document.getElementById('backup-confirm').disabled = false;
+  }
+
+  async function restoreBackup_() {
+    if (!selectedBackupContent) return;
+    const confirmation = document.getElementById('backup-confirmation').value;
+    if (confirmation.trim().toUpperCase() !== 'RESTAURER') {
+      toast('Saisis RESTAURER pour confirmer.');
+      return;
+    }
+    if (!confirm('Cette opération remplacera les données actuelles. Continuer ?')) return;
+
+    const button = document.getElementById('backup-confirm');
+    button.disabled = true;
+    try {
+      const result = await runServer('restoreApplicationBackup', selectedBackupContent, confirmation);
+      toast(result.message || 'Restauration terminée.');
+      document.getElementById('backup-file').value = '';
+      document.getElementById('backup-confirmation').value = '';
+      document.getElementById('backup-preview').hidden = true;
+      selectedBackupContent = '';
+      await loadBackupModule();
+      if (typeof loadDashboard === 'function') loadDashboard();
+    } catch (error) {
+      showError(error);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-view], [data-open]');
+    if (target && (target.dataset.view === 'backup' || target.dataset.open === 'backup')) loadBackupModule();
+    if (event.target.id === 'backup-refresh') loadBackupModule();
+    if (event.target.id === 'backup-download') downloadBackup_();
+    if (event.target.id === 'backup-confirm') restoreBackup_();
+  });
+
+  document.getElementById('backup-file').addEventListener('change', async event => {
+    const file = event.target.files && event.target.files[0];
+    document.getElementById('backup-confirm').disabled = true;
+    document.getElementById('backup-preview').hidden = true;
+    selectedBackupContent = '';
+    if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error('Le fichier dépasse 10 Mo.');
+      await inspectBackupFile_(file);
+    } catch (error) {
+      showError(error);
+      event.target.value = '';
+    }
+  });
+</script>
