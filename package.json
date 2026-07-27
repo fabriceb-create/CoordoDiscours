@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate-apps-script.mjs",
-    "check": "npm run validate",
+    "test:business": "node scripts/test-business-rules.mjs",
+    "check": "npm run validate && npm run test:business",
     "clasp:login": "npx @google/clasp login",
     "clasp:push": "npx @google/clasp push",
     "clasp:deploy": "npx @google/clasp deploy"
