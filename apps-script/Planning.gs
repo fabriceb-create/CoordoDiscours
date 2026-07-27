@@ -29,41 +29,37 @@ function getPlanningOptions() {
 
 function validatePlanning(payload) {
   const data = normalizePlanningPayload_(payload);
-  const warnings = [];
-  const errors = [];
-  const speaker = listSpeakers('', true).find(item => item.id === data.speakerId);
-  if (!speaker || !speaker.active) errors.push('L’orateur sélectionné est introuvable ou archivé.');
-  const talk = listTalks('', true).find(item => Number(item.number) === data.talkNumber);
-  if (!talk || !talk.active) errors.push('Le discours sélectionné est introuvable ou inactif.');
-  if (speaker && speaker.type === 'EXTERIEUR' && !getSpeakerTalkNumbers_(speaker.id).includes(data.talkNumber)) errors.push('Cet orateur extérieur n’a pas ce discours dans sa liste déclarée.');
-  const existing = listPlannings('', true).filter(item => item.id !== data.id && item.status !== 'ANNULE');
-  const sameSlot = existing.find(item => item.date === data.date && item.time === data.time);
-  if (sameSlot) errors.push('Ce créneau est déjà occupé par ' + sameSlot.speakerName + ' - discours n° ' + sameSlot.talkNumber + '.');
-  const sameSpeaker = existing.find(item => item.date === data.date && item.speakerId === data.speakerId);
-  if (sameSpeaker) warnings.push('Cet orateur est déjà programmé à cette date.');
-  const eventDate = new Date(data.date + 'T12:00:00');
-  const threshold = new Date(eventDate);
-  threshold.setMonth(threshold.getMonth() - (Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12));
-  const repeated = existing.filter(item => Number(item.talkNumber) === data.talkNumber && item.date)
-    .map(item => ({ item: item, date: new Date(item.date + 'T12:00:00') }))
-    .filter(entry => entry.date <= eventDate && entry.date >= threshold).sort((a, b) => b.date - a.date)[0];
-  if (repeated) warnings.push('Ce discours a déjà été programmé le ' + repeated.item.displayDate + ' avec ' + repeated.item.speakerName + '.');
-  return { valid: errors.length === 0, errors: errors, warnings: warnings, data: data };
+  const evaluation = evaluatePlanningRules_(data);
+  return {
+    valid: evaluation.valid,
+    errors: ruleMessages_(evaluation.errors),
+    warnings: ruleMessages_(evaluation.warnings),
+    infos: ruleMessages_(evaluation.infos),
+    rules: evaluation.rules,
+    data: data
+  };
 }
 
 function savePlanning(payload, confirmWarnings) {
   assertEditAccess_();
   const validation = validatePlanning(payload);
   if (!validation.valid) throw new Error(validation.errors.join('\n'));
-  if (validation.warnings.length && !confirmWarnings) return { saved: false, requiresConfirmation: true, warnings: validation.warnings };
+  if (validation.warnings.length && !confirmWarnings) {
+    return { saved: false, requiresConfirmation: true, warnings: validation.warnings, rules: validation.rules };
+  }
   const data = validation.data;
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
   const id = data.id || Utilities.getUuid();
   const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
   const rowIndex = findRowById_(sheet, id);
-  if (rowIndex) { sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]); logAction_('MODIFICATION', 'PROGRAMMATION', id, data); }
-  else { sheet.appendRow(values); logAction_('CREATION', 'PROGRAMMATION', id, data); }
-  return { saved: true, id: id, warnings: validation.warnings };
+  if (rowIndex) {
+    sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
+    logAction_('MODIFICATION', 'PROGRAMMATION', id, { data: data, rules: validation.rules });
+  } else {
+    sheet.appendRow(values);
+    logAction_('CREATION', 'PROGRAMMATION', id, { data: data, rules: validation.rules });
+  }
+  return { saved: true, id: id, warnings: validation.warnings, rules: validation.rules };
 }
 
 function cancelPlanning(id) { assertEditAccess_(); return setPlanningStatus_(id, 'ANNULE'); }
