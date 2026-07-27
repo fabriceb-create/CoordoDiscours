@@ -8,7 +8,7 @@ const required = [
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
-  'HospitalityInvitations.gs','CommunicationScripts.html'
+  'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs'
 ];
 
 const errors = [];
@@ -75,20 +75,51 @@ const protectedFunctions = [
   ['Settings.gs', 'saveApplicationSettings', 'ADMIN'],
   ['Settings.gs', 'resetApplicationSettings', 'ADMIN'],
   ['Backup.gs', 'createApplicationBackup', 'ADMIN'],
-  ['Backup.gs', 'restoreApplicationBackup', 'ADMIN']
+  ['Backup.gs', 'restoreApplicationBackup', 'ADMIN'],
+  ['Integrity.gs', 'getDataIntegrityReport', 'ADMIN']
 ];
+
+function functionBody(source, functionName) {
+  const startPattern = new RegExp(`function\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{`);
+  const match = startPattern.exec(source);
+  if (!match) return null;
+  let depth = 1;
+  let quote = null;
+  let escaped = false;
+  for (let i = match.index + match[0].length; i < source.length; i += 1) {
+    const char = source[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === '`') { quote = char; continue; }
+    if (char === '{') depth += 1;
+    if (char === '}') depth -= 1;
+    if (depth === 0) return source.slice(match.index + match[0].length, i);
+  }
+  return null;
+}
+
+function hasRequiredGuard(body, role) {
+  const direct = new RegExp(`assertAccess_\\(\\s*['\"]${role}['\"]\\s*\\)`);
+  if (direct.test(body)) return true;
+  if (role === 'COORDINATEUR' && /assertEditAccess_\s*\(\s*\)/.test(body)) return true;
+  if (role === 'ADMIN' && /assertAdminAccess_\s*\(\s*\)/.test(body)) return true;
+  return false;
+}
 
 for (const [file, functionName, role] of protectedFunctions) {
   const filePath = path.join(root, file);
   if (!fs.existsSync(filePath)) continue;
   const source = fs.readFileSync(filePath, 'utf8');
-  const functionPattern = new RegExp(`function\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)(?=\\nfunction\\s+|$)`);
-  const match = source.match(functionPattern);
-  if (!match) {
-    errors.push(`Fonction sensible introuvable : ${functionName} dans ${file}.`);
+  const body = functionBody(source, functionName);
+  if (body == null) {
+    errors.push(`Fonction sensible introuvable ou incomplète : ${functionName} dans ${file}.`);
     continue;
   }
-  if (!match[1].includes(`assertAccess_('${role}'`)) {
+  if (!hasRequiredGuard(body, role)) {
     errors.push(`${file} : ${functionName} doit exiger le rôle ${role}.`);
   }
 }
