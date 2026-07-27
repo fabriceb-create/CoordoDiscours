@@ -41,10 +41,7 @@
       await loadCommunicationOptions();
       communicationState.hospitalities = await runServer('listHospitalities', document.getElementById('hospitality-search').value);
       const container = document.getElementById('hospitality-list');
-      if (!communicationState.hospitalities.length) {
-        container.innerHTML = '<div class="empty-state">Aucune hospitalité enregistrée.</div>';
-        return;
-      }
+      if (!communicationState.hospitalities.length) { container.innerHTML = '<div class="empty-state">Aucune hospitalité enregistrée.</div>'; return; }
       container.innerHTML = communicationState.hospitalities.map(function (item) {
         const done = item.status === 'CONFIRME';
         return '<article class="record-card communication-card ' + (done ? 'done' : 'attention') + '">' +
@@ -54,7 +51,7 @@
           (item.contact ? 'Contact : ' + escapeHtml(item.contact) + '<br>' : '') +
           (item.notes ? escapeHtml(item.notes) : '') + '</div></div>' +
           '<div class="record-actions"><button class="secondary-button" data-edit-hospitality="' + item.id + '">Modifier</button>' +
-          (done ? '' : '<button class="primary-button" data-confirm-hospitality="' + item.id + '">Confirmer</button>') + '</div></article>';
+          (done ? '' : '<button class="primary-button" data-confirm-hospitality="' + item.id + '" data-version="' + escapeHtml(item.version) + '">Confirmer</button>') + '</div></article>';
       }).join('');
     } catch (error) { showError(error); }
   }
@@ -64,10 +61,7 @@
       await loadCommunicationOptions();
       communicationState.invitations = await runServer('listInvitations', document.getElementById('invitation-search').value);
       const container = document.getElementById('invitation-list');
-      if (!communicationState.invitations.length) {
-        container.innerHTML = '<div class="empty-state">Aucune invitation enregistrée.</div>';
-        return;
-      }
+      if (!communicationState.invitations.length) { container.innerHTML = '<div class="empty-state">Aucune invitation enregistrée.</div>'; return; }
       container.innerHTML = communicationState.invitations.map(function (item) {
         const done = ['ENVOYEE', 'ACCEPTEE'].includes(item.status);
         return '<article class="record-card communication-card ' + (done ? 'done' : 'attention') + '">' +
@@ -77,7 +71,7 @@
           (item.displaySentDate ? 'Envoyée le : ' + escapeHtml(item.displaySentDate) + '<br>' : '') +
           (item.notes ? escapeHtml(item.notes) : '') + '</div></div>' +
           '<div class="record-actions"><button class="secondary-button" data-edit-invitation="' + item.id + '">Modifier</button>' +
-          (done ? '' : '<button class="primary-button" data-send-invitation="' + item.id + '">Marquer envoyée</button>') + '</div></article>';
+          (done ? '' : '<button class="primary-button" data-send-invitation="' + item.id + '" data-version="' + escapeHtml(item.version) + '">Marquer envoyée</button>') + '</div></article>';
       }).join('');
     } catch (error) { showError(error); }
   }
@@ -105,22 +99,25 @@
 
     const confirmHospitality = event.target.closest('[data-confirm-hospitality]');
     if (confirmHospitality) {
-      try { await runServer('setHospitalityStatus', confirmHospitality.dataset.confirmHospitality, 'CONFIRME'); toast('Hospitalité confirmée.'); loadHospitalities(); loadDashboard(); } catch (error) { showError(error); }
+      try { await runServer('setHospitalityStatus', confirmHospitality.dataset.confirmHospitality, 'CONFIRME', confirmHospitality.dataset.version); toast('Hospitalité confirmée.'); await loadHospitalities(); loadDashboard(); }
+      catch (error) { showError(error); await loadHospitalities(); }
     }
     const sendInvitation = event.target.closest('[data-send-invitation]');
     if (sendInvitation) {
-      try { await runServer('setInvitationStatus', sendInvitation.dataset.sendInvitation, 'ENVOYEE'); toast('Invitation marquée comme envoyée.'); loadInvitations(); loadDashboard(); } catch (error) { showError(error); }
+      try { await runServer('setInvitationStatus', sendInvitation.dataset.sendInvitation, 'ENVOYEE', sendInvitation.dataset.version); toast('Invitation marquée comme envoyée.'); await loadInvitations(); loadDashboard(); }
+      catch (error) { showError(error); await loadInvitations(); }
     }
   });
 
   document.getElementById('hospitality-form').addEventListener('submit', async function (event) {
     event.preventDefault();
-    try { await runServer('saveHospitality', formToObject(event.target)); document.getElementById('hospitality-dialog').close(); toast('Hospitalité enregistrée.'); loadHospitalities(); loadDashboard(); } catch (error) { showError(error); }
+    try { await runServer('saveHospitality', formToObject(event.target)); document.getElementById('hospitality-dialog').close(); toast('Hospitalité enregistrée.'); await loadHospitalities(); loadDashboard(); }
+    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('hospitality-dialog').close(); await loadHospitalities(); } }
   });
-
   document.getElementById('invitation-form').addEventListener('submit', async function (event) {
     event.preventDefault();
-    try { await runServer('saveInvitation', formToObject(event.target)); document.getElementById('invitation-dialog').close(); toast('Invitation enregistrée.'); loadInvitations(); loadDashboard(); } catch (error) { showError(error); }
+    try { await runServer('saveInvitation', formToObject(event.target)); document.getElementById('invitation-dialog').close(); toast('Invitation enregistrée.'); await loadInvitations(); loadDashboard(); }
+    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('invitation-dialog').close(); await loadInvitations(); } }
   });
 
   let hospitalityTimer;
