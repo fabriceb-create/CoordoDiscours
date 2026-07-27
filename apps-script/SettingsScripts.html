@@ -1,3 +1,6 @@
+<style>
+  .integrity-panel{margin-top:18px;padding-top:18px;border-top:1px solid #e4e8ef}.integrity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.integrity-summary{margin:12px 0;padding:12px;border-radius:10px;background:#f5f7fa}.integrity-summary.ok{background:#ecfdf3}.integrity-summary.error{background:#fef3f2}.integrity-list{display:grid;gap:8px;margin-top:12px}.integrity-item{padding:10px;border:1px solid #e4e8ef;border-radius:10px;background:#fff}.integrity-item strong{display:block;margin-bottom:4px}.integrity-item small{color:#667085;word-break:break-word}
+</style>
 <script>
   let settingsLoaded = false;
   let currentLanguage = 'fr';
@@ -31,12 +34,8 @@
 
   function translateElement_(element) {
     if (!element || element.closest('[data-no-translate]')) return;
-    if (element.placeholder && currentTranslations[element.placeholder]) {
-      element.placeholder = currentTranslations[element.placeholder];
-    }
-    if (element.title && currentTranslations[element.title]) {
-      element.title = currentTranslations[element.title];
-    }
+    if (element.placeholder && currentTranslations[element.placeholder]) element.placeholder = currentTranslations[element.placeholder];
+    if (element.title && currentTranslations[element.title]) element.title = currentTranslations[element.title];
     Array.from(element.childNodes || []).forEach(node => {
       if (node.nodeType !== Node.TEXT_NODE) return;
       const raw = node.nodeValue || '';
@@ -50,12 +49,10 @@
     if (translationObserver) translationObserver.disconnect();
     translationObserver = new MutationObserver(mutations => {
       if (currentLanguage === 'fr') return;
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) applyTranslations(node);
-          if (node.nodeType === Node.TEXT_NODE && node.parentElement) translateElement_(node.parentElement);
-        });
-      });
+      mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) applyTranslations(node);
+        if (node.nodeType === Node.TEXT_NODE && node.parentElement) translateElement_(node.parentElement);
+      }));
     });
     translationObserver.observe(document.body, { childList: true, subtree: true });
   }
@@ -77,13 +74,12 @@
   function renderSettings(data) {
     const container = document.getElementById('settings-content');
     const diagnostic = data.diagnostics || {};
+    const canAdminister = typeof currentAccess === 'undefined' || !currentAccess ? true : Boolean(currentAccess.canAdminister);
     container.innerHTML = `
       <form id="settings-form" class="settings-layout">
         <section class="settings-panel">
           <div class="panel-heading"><div><p class="eyebrow">${t('Configuration')}</p><h2>${t('Réglages généraux')}</h2></div><span class="version-badge">${escapeHtml(data.version || '')}</span></div>
-          <div class="settings-grid">
-            ${(data.settings || []).map(renderSettingField_).join('')}
-          </div>
+          <div class="settings-grid">${(data.settings || []).map(renderSettingField_).join('')}</div>
           <div class="form-actions settings-actions">
             <button id="settings-reset" type="button" class="secondary-button">${t('Valeurs par défaut')}</button>
             <button type="submit" class="primary-button">${t('Enregistrer les paramètres')}</button>
@@ -98,11 +94,14 @@
           </dl>
           ${(diagnostic.missingSheets || []).length ? `<div class="warning-box"><strong>${t('Feuilles manquantes')}</strong><br>${diagnostic.missingSheets.map(escapeHtml).join(', ')}</div>` : '<div class="settings-success">' + t('Toutes les feuilles nécessaires sont présentes.') + '</div>'}
           <a class="secondary-button settings-database-link" href="${escapeHtml(data.spreadsheetUrl || '#')}" target="_blank">${t('Ouvrir la base de données')}</a>
+          ${canAdminister ? `<section class="integrity-panel"><div class="integrity-head"><div><p class="eyebrow">${t('Intégrité')}</p><strong>${t('Contrôle des données')}</strong></div><button id="run-integrity-check" type="button" class="secondary-button">${t('Analyser')}</button></div><div id="integrity-results" class="integrity-summary">${t('Aucun contrôle lancé.')}</div></section>` : ''}
         </aside>
       </form>`;
 
     document.getElementById('settings-form').addEventListener('submit', saveSettings_);
     document.getElementById('settings-reset').addEventListener('click', resetSettings_);
+    const integrityButton = document.getElementById('run-integrity-check');
+    if (integrityButton) integrityButton.addEventListener('click', runIntegrityCheck_);
   }
 
   function renderSettingField_(setting) {
@@ -122,6 +121,27 @@
     return `<label class="setting-field"><span><strong>${escapeHtml(t(setting.label))}</strong><small>${escapeHtml(t(setting.description || ''))}</small></span>${control}</label>`;
   }
 
+  async function runIntegrityCheck_() {
+    const results = document.getElementById('integrity-results');
+    const button = document.getElementById('run-integrity-check');
+    if (!results || !button) return;
+    button.disabled = true;
+    results.className = 'integrity-summary';
+    results.textContent = t('Analyse en cours...');
+    try {
+      const report = await runServer('getDataIntegrityReport');
+      results.className = 'integrity-summary ' + (report.ok ? 'ok' : 'error');
+      results.innerHTML = `<strong>${report.ok ? t('Aucune anomalie bloquante détectée.') : escapeHtml(report.counts.issues + ' anomalie(s) détectée(s).')}</strong><div class="integrity-list">${(report.issues || []).map(issue => `<article class="integrity-item"><strong>${escapeHtml(issue.message || issue.code)}</strong><small>${escapeHtml(JSON.stringify(issue.details || {}))}</small></article>`).join('')}</div>`;
+      if (report.ok) toast(t('Contrôle d’intégrité terminé.'));
+    } catch (error) {
+      showError(error);
+      results.className = 'integrity-summary error';
+      results.textContent = t('Le contrôle d’intégrité a échoué.');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function saveSettings_(event) {
     event.preventDefault();
     try {
@@ -129,10 +149,7 @@
       const previousLanguage = currentLanguage;
       const data = await runServer('saveApplicationSettings', payload);
       const nextLanguage = payload.LANGUE_INTERFACE || 'fr';
-      if (nextLanguage !== previousLanguage) {
-        window.location.reload();
-        return;
-      }
+      if (nextLanguage !== previousLanguage) { window.location.reload(); return; }
       renderSettings(data);
       document.getElementById('congregation').textContent = payload.ASSEMBLEE || 'Basse-Terre';
       toast(t('Paramètres enregistrés.'));
@@ -145,10 +162,7 @@
     try {
       const previousLanguage = currentLanguage;
       const data = await runServer('resetApplicationSettings');
-      if ((data.language || 'fr') !== previousLanguage) {
-        window.location.reload();
-        return;
-      }
+      if ((data.language || 'fr') !== previousLanguage) { window.location.reload(); return; }
       renderSettings(data);
       toast(t('Valeurs par défaut restaurées.'));
     } catch (error) { showError(error); }
@@ -159,7 +173,5 @@
     if (target && (target.dataset.view === 'settings' || target.dataset.open === 'settings')) loadSettings();
   });
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    await setInterfaceLanguage('');
-  });
+  document.addEventListener('DOMContentLoaded', async () => { await setInterfaceLanguage(''); });
 </script>
