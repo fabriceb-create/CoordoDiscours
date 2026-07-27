@@ -40,9 +40,34 @@
         </div>
         <div class="record-actions">
           <button class="secondary-button" data-edit-planning="${item.id}">Modifier</button>
-          <button class="${item.status === 'ANNULE' ? 'secondary-button' : 'danger-button'}" data-toggle-planning="${item.id}" data-status="${item.status}">${item.status === 'ANNULE' ? 'Restaurer' : 'Annuler'}</button>
+          <button class="${item.status === 'ANNULE' ? 'secondary-button' : 'danger-button'}" data-toggle-planning="${item.id}" data-version="${escapeHtml(item.version || '')}" data-status="${item.status}">${item.status === 'ANNULE' ? 'Restaurer' : 'Annuler'}</button>
         </div>
       </article>`).join('');
+  }
+
+  function ensurePlanningVersionField_() {
+    const form = document.getElementById('planning-form');
+    let field = form.elements.version;
+    if (!field) {
+      field = document.createElement('input');
+      field.type = 'hidden';
+      field.name = 'version';
+      form.appendChild(field);
+    }
+    return field;
+  }
+
+  function isPlanningVersionConflict_(error) {
+    return String(error && (error.message || error)).includes('CONFLIT_VERSION');
+  }
+
+  async function handlePlanningVersionConflict_(error) {
+    const message = String(error && (error.message || error)).replace(/^.*CONFLIT_VERSION\|/, '');
+    const warning = document.getElementById('planning-warning');
+    warning.innerHTML = '<strong>Modification concurrente</strong><p>' + escapeHtml(message || 'Cette fiche a changé depuis son ouverture.') + '</p>';
+    warning.hidden = false;
+    await loadPlannings();
+    toast('La fiche a été actualisée. Ouvre-la de nouveau pour reprendre la modification.');
   }
 
   function ensureRecommendationPanel_() {
@@ -102,7 +127,9 @@
     try {
       if (!state.planningOptions.speakers.length) await loadPlanningOptions();
       const form = document.getElementById('planning-form');
+      ensurePlanningVersionField_();
       fillForm(form, item);
+      form.elements.version.value = item ? item.version || '' : '';
       form.elements.status.value = item ? item.status : 'PROGRAMME';
       if (!item) {
         form.elements.time.value = '10:00';
@@ -117,19 +144,24 @@
   }
 
   async function submitPlanning(form, confirmWarnings) {
-    const result = await runServer('savePlanning', formToObject(form), Boolean(confirmWarnings));
-    if (result.requiresConfirmation) {
-      const warning = document.getElementById('planning-warning');
-      warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
-      warning.hidden = false;
-      if (window.confirm(result.warnings.join('\n') + '\n\nSouhaites-tu quand même enregistrer cette programmation ?')) {
-        return submitPlanning(form, true);
+    try {
+      const result = await runServer('savePlanning', formToObject(form), Boolean(confirmWarnings));
+      if (result.requiresConfirmation) {
+        const warning = document.getElementById('planning-warning');
+        warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
+        warning.hidden = false;
+        if (window.confirm(result.warnings.join('\n') + '\n\nSouhaites-tu quand même enregistrer cette programmation ?')) {
+          return submitPlanning(form, true);
+        }
+        return;
       }
-      return;
+      document.getElementById('planning-dialog').close();
+      toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
+      await loadPlannings();
+    } catch (error) {
+      if (isPlanningVersionConflict_(error)) return handlePlanningVersionConflict_(error);
+      throw error;
     }
-    document.getElementById('planning-dialog').close();
-    toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
-    await loadPlannings();
   }
 
   document.addEventListener('click', async event => {
@@ -153,10 +185,13 @@
     const toggle = event.target.closest('[data-toggle-planning]');
     if (toggle) {
       try {
-        await runServer(toggle.dataset.status === 'ANNULE' ? 'restorePlanning' : 'cancelPlanning', toggle.dataset.togglePlanning);
+        await runServer(toggle.dataset.status === 'ANNULE' ? 'restorePlanning' : 'cancelPlanning', toggle.dataset.togglePlanning, toggle.dataset.version);
         toast(toggle.dataset.status === 'ANNULE' ? 'Programmation restaurée.' : 'Programmation annulée.');
         await loadPlannings();
-      } catch (error) { showError(error); }
+      } catch (error) {
+        if (isPlanningVersionConflict_(error)) await handlePlanningVersionConflict_(error);
+        else showError(error);
+      }
     }
   });
 
@@ -173,6 +208,7 @@
   document.getElementById('planning-cancelled').addEventListener('change', loadPlannings);
 
   document.addEventListener('DOMContentLoaded', async () => {
+    ensurePlanningVersionField_();
     try { await loadPlanningOptions(); } catch (error) { showError(error); }
   });
 </script>
