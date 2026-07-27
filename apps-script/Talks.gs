@@ -29,11 +29,10 @@ function getTalk(number) {
 }
 
 function saveTalk(payload) {
+  assertAccess_('COORDINATEUR');
   payload = payload || {};
   const number = Number(payload.number);
-  if (!Number.isInteger(number) || number <= 0) {
-    throw new Error('Le numéro du discours doit être un entier positif.');
-  }
+  if (!Number.isInteger(number) || number <= 0) throw new Error('Le numéro du discours doit être un entier positif.');
   const title = requiredText_(payload.title, 'Le titre');
   const active = payload.active !== false && !APP_CONFIG.inactiveTalks.includes(number);
   const ss = getDatabase_();
@@ -53,6 +52,7 @@ function saveTalk(payload) {
 }
 
 function setTalkActive(number, active) {
+  assertAccess_('COORDINATEUR');
   const talk = getTalk(number);
   if (active && APP_CONFIG.inactiveTalks.includes(Number(number))) {
     throw new Error('Ce discours est officiellement inactif et ne peut pas être réactivé.');
@@ -64,16 +64,14 @@ function setTalkActive(number, active) {
 }
 
 function importTalkReference(rows) {
+  assertAccess_('ADMIN');
   if (!Array.isArray(rows)) throw new Error('Format d’import invalide.');
   const summary = { created: 0, updated: 0, ignored: 0, errors: [] };
   rows.forEach(function (row, index) {
     try {
       const number = Number(row.number || row.NUMERO);
       const title = String(row.title || row.TITRE || '').trim();
-      if (!number || !title) {
-        summary.ignored += 1;
-        return;
-      }
+      if (!number || !title) { summary.ignored += 1; return; }
       const exists = listTalks('', true).some(function (talk) { return talk.number === number; });
       saveTalk({ number: number, title: title, active: row.active !== false });
       if (exists) summary.updated += 1;
