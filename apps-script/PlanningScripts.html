@@ -1,6 +1,7 @@
 <script>
   state.plannings = [];
   state.planningOptions = { speakers: [], talks: [], congregations: [] };
+  let recommendationRequestId = 0;
 
   async function loadPlanningOptions() {
     state.planningOptions = await runServer('getPlanningOptions');
@@ -44,6 +45,59 @@
       </article>`).join('');
   }
 
+  function ensureRecommendationPanel_() {
+    let panel = document.getElementById('speaker-recommendations');
+    if (panel) return panel;
+    const warning = document.getElementById('planning-warning');
+    panel = document.createElement('section');
+    panel.id = 'speaker-recommendations';
+    panel.style.marginTop = '14px';
+    panel.innerHTML = '<div class="empty-state">Sélectionne une date et un discours pour afficher les meilleurs orateurs.</div>';
+    warning.parentNode.insertBefore(panel, warning);
+    return panel;
+  }
+
+  async function refreshSpeakerRecommendations_() {
+    const panel = ensureRecommendationPanel_();
+    const form = document.getElementById('planning-form');
+    const payload = formToObject(form);
+    if (!payload.date || !payload.talkNumber) {
+      panel.innerHTML = '<div class="empty-state">Sélectionne une date et un discours pour afficher les meilleurs orateurs.</div>';
+      return;
+    }
+    const requestId = ++recommendationRequestId;
+    panel.innerHTML = '<div class="empty-state">Analyse des orateurs disponibles...</div>';
+    try {
+      const result = await runServer('getSpeakerRecommendations', payload);
+      if (requestId !== recommendationRequestId) return;
+      renderSpeakerRecommendations_(result);
+    } catch (error) {
+      if (requestId !== recommendationRequestId) return;
+      panel.innerHTML = '<div class="warning-box">Impossible de calculer les recommandations.</div>';
+      showError(error);
+    }
+  }
+
+  function renderSpeakerRecommendations_(result) {
+    const panel = ensureRecommendationPanel_();
+    const items = result.recommendations || [];
+    if (!items.length) {
+      panel.innerHTML = `<div class="empty-state">${escapeHtml(result.message || 'Aucune recommandation disponible.')}</div>`;
+      return;
+    }
+    panel.innerHTML = `
+      <div class="panel-heading"><div><p class="eyebrow">Aide au choix</p><h3>Orateurs recommandés</h3></div><span class="version-badge">${items.length} proposition${items.length > 1 ? 's' : ''}</span></div>
+      <div class="cards-list">${items.slice(0, 6).map((item, index) => `
+        <article class="record-card" style="padding:12px">
+          <div>
+            <p class="eyebrow">${index < 3 ? ['🥇','🥈','🥉'][index] + ' ' : ''}${escapeHtml(item.label)} — ${item.score}/100</p>
+            <h3>${escapeHtml(item.speakerName)}</h3>
+            <div class="record-meta">${item.congregationName ? escapeHtml(item.congregationName) + '<br>' : ''}${item.reasons.slice(0, 2).map(reason => '✓ ' + escapeHtml(reason)).join('<br>')}${item.cautions.length ? '<br>' + item.cautions.slice(0, 1).map(reason => '⚠ ' + escapeHtml(reason)).join('<br>') : ''}</div>
+          </div>
+          <div class="record-actions"><button type="button" class="secondary-button" data-select-recommended-speaker="${escapeHtml(item.speakerId)}">Choisir</button></div>
+        </article>`).join('')}</div>`;
+  }
+
   async function openPlanning(item) {
     try {
       if (!state.planningOptions.speakers.length) await loadPlanningOptions();
@@ -56,7 +110,9 @@
         form.elements.date.value = today.toISOString().slice(0, 10);
       }
       document.getElementById('planning-warning').hidden = true;
+      ensureRecommendationPanel_();
       document.getElementById('planning-dialog').showModal();
+      await refreshSpeakerRecommendations_();
     } catch (error) { showError(error); }
   }
 
@@ -84,6 +140,13 @@
     }
     if (event.target.id === 'new-planning') await openPlanning();
 
+    const recommended = event.target.closest('[data-select-recommended-speaker]');
+    if (recommended) {
+      const form = document.getElementById('planning-form');
+      form.elements.speakerId.value = recommended.dataset.selectRecommendedSpeaker;
+      toast('Orateur recommandé sélectionné.');
+    }
+
     const edit = event.target.closest('[data-edit-planning]');
     if (edit) await openPlanning(state.plannings.find(item => item.id === edit.dataset.editPlanning));
 
@@ -100,6 +163,10 @@
   document.getElementById('planning-form').addEventListener('submit', async event => {
     event.preventDefault();
     try { await submitPlanning(event.target, false); } catch (error) { showError(error); }
+  });
+
+  document.getElementById('planning-form').addEventListener('change', event => {
+    if (event.target.name === 'date' || event.target.name === 'talkNumber') refreshSpeakerRecommendations_();
   });
 
   debounce('planning-search', loadPlannings);
