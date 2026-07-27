@@ -1,7 +1,12 @@
-const RECOMMENDATION_ENGINE_VERSION = '1.1.0';
+const RECOMMENDATION_ENGINE_VERSION = '1.2.0';
 
 function getSpeakerRecommendations(payload) {
+  return getSpeakerRecommendationsWithData_(payload, buildPlanningRuleDataset_());
+}
+
+function getSpeakerRecommendationsWithData_(payload, dataset) {
   const request = payload || {};
+  const resources = dataset || buildPlanningRuleDataset_();
   const date = String(request.date || '').trim();
   const talkNumber = Number(request.talkNumber);
   const currentPlanningId = String(request.id || '').trim();
@@ -10,7 +15,7 @@ function getSpeakerRecommendations(payload) {
     return { ready: false, recommendations: [], message: 'Sélectionne une date et un discours pour obtenir des recommandations.' };
   }
 
-  const talk = listTalks('', true).find(function (item) { return Number(item.number) === talkNumber; });
+  const talk = (resources.talks || []).find(function (item) { return Number(item.number) === talkNumber; });
   if (!talk || !talk.active) {
     return { ready: true, recommendations: [], message: 'Ce discours est introuvable ou inactif.' };
   }
@@ -18,7 +23,7 @@ function getSpeakerRecommendations(payload) {
   const weights = getRecommendationWeights_();
   const eventDate = new Date(date + 'T12:00:00');
   const monthKey = date.slice(0, 7);
-  const plannings = listPlannings('', true).filter(function (item) {
+  const plannings = (resources.plannings || []).filter(function (item) {
     return item.id !== currentPlanningId && item.status !== 'ANNULE' && item.date;
   });
   const speakerCounts = plannings.reduce(function (map, item) {
@@ -27,8 +32,10 @@ function getSpeakerRecommendations(payload) {
   }, {});
   const maxCount = Math.max.apply(null, [1].concat(Object.keys(speakerCounts).map(function (id) { return speakerCounts[id]; })));
 
-  const recommendations = listSpeakers('', false).map(function (speaker) {
-    return scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights);
+  const recommendations = (resources.speakers || []).filter(function (speaker) {
+    return speaker.active;
+  }).map(function (speaker) {
+    return scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights, resources.speakerTalks || {});
   }).filter(function (item) {
     return item.eligible;
   }).sort(function (a, b) {
@@ -71,13 +78,14 @@ function recommendationWeight_(key, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights) {
+function scoreSpeakerRecommendation_(speaker, talkNumber, eventDate, monthKey, plannings, speakerCounts, maxCount, weights, speakerTalks) {
   const reasons = [];
   const cautions = [];
   let rawScore = 0;
   let eligible = true;
 
-  const authorizedTalks = speaker.type === 'EXTERIEUR' ? getSpeakerTalkNumbers_(speaker.id) : [];
+  const declaredTalks = speakerTalks || getSpeakerTalkNumbersMap_();
+  const authorizedTalks = speaker.type === 'EXTERIEUR' ? (declaredTalks[String(speaker.id)] || []) : [];
   if (speaker.type === 'EXTERIEUR' && authorizedTalks.indexOf(talkNumber) === -1) {
     eligible = false;
     cautions.push('Discours absent de sa liste déclarée.');
