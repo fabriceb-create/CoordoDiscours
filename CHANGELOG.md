@@ -45,6 +45,11 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Affichage de l’utilisateur, de l’identifiant concerné et du détail enregistré pour chaque opération.
 - Impression ciblée de l’historique filtré.
 - Limitation sécurisée à 1 000 lignes par consultation.
+- Module Paramètres accessible depuis l’interface.
+- Modification du nom de l’assemblée, de l’alerte de répétition, de l’heure de réunion, de la période d’impression et de l’horizon des actions.
+- Validation des valeurs numériques et horaires avant enregistrement.
+- Diagnostic de la base, du fuseau horaire et des feuilles nécessaires.
+- Restauration des valeurs par défaut et historisation des changements de configuration.
 
 ### Décisions figées
 
