@@ -11,6 +11,7 @@
   <?!= include('PrintPlanningStyles'); ?>
   <?!= include('HistoryStyles'); ?>
   <?!= include('SettingsStyles'); ?>
+  <?!= include('BackupStyles'); ?>
 </head>
 <body>
   <div class="layout">
@@ -26,6 +27,7 @@
         <button class="nav-button" data-view="congregations">Assemblées</button>
         <button class="nav-button" data-view="talks">Discours</button>
         <button class="nav-button" data-view="history">Historique</button>
+        <button class="nav-button" data-view="backup">Sauvegardes</button>
         <button class="nav-button" data-view="settings">Paramètres</button>
       </nav>
       <a id="database-link" class="database-link" href="#" target="_blank" hidden>Ouvrir les données</a>
@@ -99,6 +101,28 @@
         <div id="history-list" class="cards-list"><div class="empty-state">Ouvre ce module pour charger l’historique.</div></div>
       </section>
 
+      <section id="view-backup" class="view">
+        <div class="section-header"><div><p class="eyebrow">Sécurité des données</p><h2>Sauvegardes et restauration</h2></div><button id="backup-refresh" class="secondary-button" type="button">Actualiser</button></div>
+        <div class="backup-grid">
+          <section class="backup-panel">
+            <h3>Créer une sauvegarde</h3>
+            <p>Télécharge une copie complète des paramètres, orateurs, assemblées, discours, programmations, invitations, hospitalités et de l’historique.</p>
+            <div id="backup-summary"><div class="empty-state">Ouvre ce module pour charger les informations.</div></div>
+            <button id="backup-download" class="primary-button" type="button">Télécharger la sauvegarde</button>
+          </section>
+          <section class="backup-panel">
+            <h3>Restaurer une sauvegarde</h3>
+            <p class="backup-danger">La restauration remplace les données actuelles. Une copie de sécurité est automatiquement créée dans Google Drive avant toute modification.</p>
+            <div class="backup-restore-form">
+              <label>Fichier JSON<input id="backup-file" type="file" accept="application/json,.json"></label>
+              <div id="backup-preview" class="backup-preview" hidden></div>
+              <label>Confirmation<input id="backup-confirmation" type="text" autocomplete="off" placeholder="Saisir RESTAURER"><small>Saisis exactement RESTAURER pour autoriser l’opération.</small></label>
+              <button id="backup-confirm" class="danger-button" type="button" disabled>Restaurer les données</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section id="view-settings" class="view">
         <div class="section-header"><div><p class="eyebrow">Administration</p><h2>Paramètres</h2></div><button class="secondary-button" type="button" onclick="loadSettings()">Actualiser</button></div>
         <div id="settings-content"><div class="empty-state">Ouvre ce module pour charger les paramètres.</div></div>
@@ -121,6 +145,8 @@
   <?!= include('CommunicationScripts'); ?>
   <?!= include('PrintPlanningScripts'); ?>
   <?!= include('HistoryScripts'); ?>
+  <?!= include('BackupScripts'); ?>
   <?!= include('SettingsScripts'); ?>
+  <?!= include('I18nScripts'); ?>
 </body>
 </html>
