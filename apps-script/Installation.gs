@@ -1,4 +1,4 @@
-const INSTALLATION_SCHEMA_VERSION = '1.5.0';
+const INSTALLATION_SCHEMA_VERSION = '1.6.0';
 
 function installCoordoDiscours() {
   const startedAt = new Date();
@@ -29,7 +29,12 @@ function runDatabaseMigrations_() {
     HEURE_REUNION_DEFAUT: '09:30',
     DUREE_IMPRESSION_MOIS: '3',
     HORIZON_ACTIONS_JOURS: '14',
-    ALERTE_REPETITION_MOIS: '12'
+    ALERTE_REPETITION_MOIS: '12',
+    RECO_POIDS_DISCOURS: '40',
+    RECO_POIDS_ANCIENNETE: '30',
+    RECO_POIDS_MOIS: '15',
+    RECO_POIDS_LOCAL: '10',
+    RECO_POIDS_EQUILIBRE: '5'
   };
 
   Object.keys(defaults).forEach(function (key) {
@@ -39,7 +44,6 @@ function runDatabaseMigrations_() {
     }
   });
 
-  // Migration de l’ancien paramètre LANGUE vers LANGUE_INTERFACE.
   const legacyLanguage = String(getSetting_('LANGUE') || '').trim();
   if (legacyLanguage && !String(getSetting_('LANGUE_INTERFACE') || '').trim()) {
     upsertSetting_(sheet, 'LANGUE_INTERFACE', legacyLanguage, 'Langue de l’interface migrée automatiquement.');
@@ -113,6 +117,12 @@ function runAcceptanceTests() {
     const missing = required.filter(function (key) { return !String(getSetting_(key) || '').trim(); });
     if (missing.length) throw new Error('Paramètres manquants : ' + missing.join(', '));
     return required.join(', ');
+  });
+
+  test('Pondérations de recommandation', function () {
+    const weights = getRecommendationWeights_();
+    if (!weights || weights.total <= 0) throw new Error('Pondérations de recommandation invalides.');
+    return weights;
   });
 
   test('Langue configurée', function () {
