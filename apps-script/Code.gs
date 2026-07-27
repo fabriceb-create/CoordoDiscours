@@ -44,6 +44,40 @@ function getSetting_(key) {
   return row ? row[1] : '';
 }
 
+function buildAuditDetails_(before, after, extra) {
+  const previous = normalizeAuditValue_(before || {});
+  const current = normalizeAuditValue_(after || {});
+  const keys = Array.from(new Set(Object.keys(previous).concat(Object.keys(current))));
+  const changes = {};
+
+  keys.forEach(function (key) {
+    const oldValue = previous[key];
+    const newValue = current[key];
+    if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      changes[key] = { before: oldValue, after: newValue };
+    }
+  });
+
+  return Object.assign({
+    before: previous,
+    after: current,
+    changes: changes,
+    changedFields: Object.keys(changes)
+  }, extra || {});
+}
+
+function normalizeAuditValue_(value) {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalizeAuditValue_);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value).sort().reduce(function (result, key) {
+    if (String(key).charAt(0) === '_') return result;
+    const item = value[key];
+    if (typeof item !== 'function' && item !== undefined) result[key] = normalizeAuditValue_(item);
+    return result;
+  }, {});
+}
+
 function logAction_(action, entity, entityId, details) {
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.history);
