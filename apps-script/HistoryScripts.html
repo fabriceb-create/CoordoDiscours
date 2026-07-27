@@ -40,6 +40,18 @@
     return String(value || '').toLowerCase().replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
   }
 
+  function renderHistoryChanges_(changes) {
+    if (!changes || !changes.length) return '';
+    return `<div class="history-changes">
+      <div class="history-change-head"><span>Champ</span><span>Avant</span><span>Après</span></div>
+      ${changes.map(change => `<div class="history-change-row">
+        <strong>${escapeHtml(historyLabel_(change.field))}</strong>
+        <span>${escapeHtml(change.before)}</span>
+        <span>${escapeHtml(change.after)}</span>
+      </div>`).join('')}
+    </div>`;
+  }
+
   function renderHistory(rows) {
     const list = document.getElementById('history-list');
     document.getElementById('history-count').textContent = rows.length + ' opération' + (rows.length > 1 ? 's' : '');
@@ -53,7 +65,8 @@
         <div class="history-main">
           <div class="history-tags"><span class="history-action">${escapeHtml(historyLabel_(item.action))}</span><span class="history-entity">${escapeHtml(historyLabel_(item.entity))}</span></div>
           <strong>${escapeHtml(item.entityId || 'Sans identifiant')}</strong>
-          ${item.detailsText ? `<p>${escapeHtml(item.detailsText)}</p>` : ''}
+          ${renderHistoryChanges_(item.changes || [])}
+          ${(!item.changes || !item.changes.length) && item.detailsText ? `<p>${escapeHtml(item.detailsText)}</p>` : ''}
         </div>
       </article>`).join('');
   }
