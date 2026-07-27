@@ -21,11 +21,18 @@ function assertContains(source, pattern, message) {
 }
 
 const planning = read('Planning.gs');
-assertContains(planning, /sameSlot[\s\S]*créneau est déjà occupé/, 'Planning : le blocage d’un créneau déjà occupé est absent.');
-assertContains(planning, /speaker\.type\s*===\s*['"]EXTERIEUR['"][\s\S]*getSpeakerTalkNumbers_/, 'Planning : le contrôle des discours autorisés pour un orateur extérieur est absent.');
-assertContains(planning, /ALERTE_REPETITION_MOIS[\s\S]*warnings\.push/, 'Planning : l’alerte de répétition d’un discours est absente.');
+const rules = read('RulesEngine.gs');
+assertContains(planning, /evaluatePlanningRules_\(data\)/, 'Planning : le moteur central de règles n’est pas utilisé.');
 assertContains(planning, /validation\.warnings\.length\s*&&\s*!confirmWarnings/, 'Planning : la confirmation des avertissements avant enregistrement est absente.');
 assertContains(planning, /status\s*!==\s*['"]ANNULE['"]/, 'Planning : les programmations annulées ne sont pas exclues des contrôles.');
+assertContains(rules, /PLAN_001[\s\S]*orateur sélectionné est introuvable ou archivé/, 'Règles : le contrôle de l’orateur actif est absent.');
+assertContains(rules, /PLAN_002[\s\S]*discours sélectionné est introuvable ou inactif/, 'Règles : le contrôle du discours actif est absent.');
+assertContains(rules, /PLAN_003[\s\S]*orateur extérieur/, 'Règles : le contrôle des discours autorisés pour un orateur extérieur est absent.');
+assertContains(rules, /PLAN_004[\s\S]*assemblée d’origine/, 'Règles : le contrôle de l’assemblée d’origine est absent.');
+assertContains(rules, /PLAN_005[\s\S]*créneau est déjà occupé/, 'Règles : le blocage d’un créneau déjà occupé est absent.');
+assertContains(rules, /PLAN_006[\s\S]*déjà programmé à cette date/, 'Règles : l’avertissement de double programmation d’un orateur est absent.');
+assertContains(rules, /PLAN_007[\s\S]*déjà été programmé/, 'Règles : l’alerte de répétition d’un discours est absente.');
+assertContains(rules, /RULE_SEVERITY[\s\S]*ERROR[\s\S]*WARNING[\s\S]*INFO/, 'Règles : les niveaux de sévérité ne sont pas définis.');
 
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
