@@ -17,5 +17,5 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Contrôler les fichiers Apps Script
-        run: npm run validate
+      - name: Contrôler l’application et les règles métier
+        run: npm run check
