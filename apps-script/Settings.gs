@@ -9,6 +9,7 @@ const SETTINGS_DEFINITIONS = Object.freeze([
 ]);
 
 function getApplicationSettings() {
+  assertAccess_('ADMIN');
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
   const stored = {};
@@ -30,6 +31,7 @@ function getApplicationSettings() {
 }
 
 function saveApplicationSettings(payload) {
+  assertAccess_('ADMIN');
   const values = payload || {};
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
@@ -55,6 +57,7 @@ function saveApplicationSettings(payload) {
 }
 
 function resetApplicationSettings() {
+  assertAccess_('ADMIN');
   const defaults = {};
   SETTINGS_DEFINITIONS.forEach(item => { defaults[item.key] = item.defaultValue; });
   logAction_('REINITIALISATION', 'PARAMETRES', 'APPLICATION', defaults);
