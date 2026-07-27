@@ -55,6 +55,7 @@ function saveHospitality(payload) {
 }
 
 function setHospitalityStatus(id, status, expectedVersion) {
+  assertAccess_('COORDINATEUR', 'setHospitalityStatus');
   const current = listHospitalities('').find(function (item) { return item.id === String(id); });
   if (!current) throw new Error('Hospitalité introuvable.');
   return saveHospitality(Object.assign({}, current, { status: status, version: expectedVersion || current.version }));
@@ -119,6 +120,7 @@ function saveInvitation(payload) {
 }
 
 function setInvitationStatus(id, status, expectedVersion) {
+  assertAccess_('COORDINATEUR', 'setInvitationStatus');
   const current = listInvitations('').find(function (item) { return item.id === String(id); });
   if (!current) throw new Error('Invitation introuvable.');
   return saveInvitation(Object.assign({}, current, { status: status, version: expectedVersion || current.version }));
