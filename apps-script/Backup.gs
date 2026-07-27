@@ -1,6 +1,7 @@
 const BACKUP_FORMAT_VERSION = 1;
 
 function getBackupSummary() {
+  assertAccess_('ADMIN');
   const ss = getDatabase_();
   const sheets = Object.values(APP_CONFIG.sheets).map(name => {
     const sheet = ss.getSheetByName(name);
@@ -21,6 +22,7 @@ function getBackupSummary() {
 }
 
 function createApplicationBackup() {
+  assertAccess_('ADMIN');
   const payload = buildBackupPayload_();
   const json = JSON.stringify(payload, null, 2);
   const fileName = buildBackupFileName_();
@@ -32,11 +34,13 @@ function createApplicationBackup() {
 }
 
 function inspectApplicationBackup(content) {
+  assertAccess_('ADMIN');
   const payload = parseAndValidateBackup_(content);
   return backupSummaryFromPayload_(payload);
 }
 
 function restoreApplicationBackup(content, confirmation) {
+  assertAccess_('ADMIN');
   if (String(confirmation || '').trim().toUpperCase() !== 'RESTAURER') {
     throw new Error('La confirmation RESTAURER est obligatoire.');
   }
