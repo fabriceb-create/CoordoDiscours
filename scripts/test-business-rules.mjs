@@ -55,6 +55,16 @@ assertContains(planningUi, /getSpeakerRecommendations/, 'Interface : les recomma
 assertContains(planningUi, /data-select-recommended-speaker/, 'Interface : aucun bouton ne permet de choisir un orateur recommandé.');
 assertContains(planningUi, /event\.target\.name\s*===\s*['"]date['"]/, 'Interface : les recommandations ne sont pas recalculées après changement de date.');
 
+const dashboard = read('Dashboard.gs');
+const dashboardUi = read('DashboardScripts.html');
+assertContains(dashboard, /HORIZON_ACTIONS_JOURS/, 'Tableau de bord : l’horizon configurable des actions n’est pas utilisé.');
+assertContains(dashboard, /Conflit de créneau/, 'Tableau de bord : la détection des conflits de créneau est absente.');
+assertContains(dashboard, /Invitation à traiter/, 'Tableau de bord : les invitations à traiter ne sont pas signalées.');
+assertContains(dashboard, /Hospitalité à attribuer/, 'Tableau de bord : les hospitalités à attribuer ne sont pas signalées.');
+assertContains(dashboard, /topPriority/, 'Tableau de bord : l’action prioritaire n’est pas calculée.');
+assertContains(dashboardUi, /Action recommandée/, 'Interface : la carte d’action recommandée est absente.');
+assertContains(dashboardUi, /metrics\.confirmations/, 'Interface : les confirmations en attente ne sont pas affichées.');
+
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
 assertContains(communication, /Une invitation existe déjà pour cette programmation/, 'Invitations : le contrôle des doublons est absent.');
