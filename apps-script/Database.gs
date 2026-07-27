@@ -71,6 +71,9 @@ function setupDatabase_() {
   ensureSheet_(ss, APP_CONFIG.sheets.invitations, [
     'ID', 'PROGRAMMATION_ID', 'DATE_ENVOI', 'STATUT', 'DESTINATAIRE', 'NOTES'
   ]);
+  ensureSheet_(ss, APP_CONFIG.sheets.users, [
+    'EMAIL', 'NOM', 'ROLE', 'ACTIF', 'DATE_MISE_A_JOUR', 'MODIFIE_PAR'
+  ]);
   ensureSheet_(ss, APP_CONFIG.sheets.history, [
     'DATE_HEURE', 'UTILISATEUR', 'ACTION', 'ENTITE', 'ENTITE_ID', 'DETAILS'
   ]);
