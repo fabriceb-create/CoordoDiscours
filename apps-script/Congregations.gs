@@ -21,18 +21,11 @@ function listCongregations(searchText, includeArchived) {
       if (!includeArchived && !item.active) return false;
       if (!query) return true;
       return normalizeText_([
-        item.name,
-        item.coordinator,
-        item.phone,
-        item.email,
-        item.address,
-        item.meetingDay,
-        item.meetingTime
+        item.name, item.coordinator, item.phone, item.email,
+        item.address, item.meetingDay, item.meetingTime
       ].join(' ')).includes(query);
     })
-    .sort(function (a, b) {
-      return a.name.localeCompare(b.name, 'fr');
-    });
+    .sort(function (a, b) { return a.name.localeCompare(b.name, 'fr'); });
 }
 
 function getCongregation(id) {
@@ -44,6 +37,7 @@ function getCongregation(id) {
 }
 
 function saveCongregation(payload) {
+  assertAccess_('COORDINATEUR');
   payload = payload || {};
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.congregations);
@@ -56,10 +50,7 @@ function saveCongregation(payload) {
   const meetingDay = String(payload.meetingDay || '').trim();
   const meetingTime = String(payload.meetingTime || '').trim();
   const active = payload.active !== false;
-  const row = [
-    id, name, coordinator, phone, email,
-    address, meetingDay, meetingTime, active
-  ];
+  const row = [id, name, coordinator, phone, email, address, meetingDay, meetingTime, active];
   const existingRow = findRowById_(sheet, id);
 
   if (existingRow) {
@@ -69,11 +60,11 @@ function saveCongregation(payload) {
     sheet.appendRow(row);
     logAction_('CREATION', 'ASSEMBLEE', id, { nom: name });
   }
-
   return getCongregation(id);
 }
 
 function archiveCongregation(id) {
+  assertAccess_('COORDINATEUR');
   const item = getCongregation(id);
   item.active = false;
   const saved = saveCongregation(item);
@@ -82,6 +73,7 @@ function archiveCongregation(id) {
 }
 
 function restoreCongregation(id) {
+  assertAccess_('COORDINATEUR');
   const item = getCongregation(id);
   item.active = true;
   const saved = saveCongregation(item);
