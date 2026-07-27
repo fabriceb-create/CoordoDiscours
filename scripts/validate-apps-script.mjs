@@ -9,7 +9,7 @@ const required = [
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
   'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs',
-  'RecommendationEngine.gs'
+  'RecommendationEngine.gs','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
 ];
 
 const errors = [];
@@ -64,6 +64,7 @@ const protectedFunctions = [
   ['Talks.gs', 'saveTalk', 'COORDINATEUR'],
   ['Talks.gs', 'setTalkActive', 'COORDINATEUR'],
   ['Talks.gs', 'importTalkReference', 'ADMIN'],
+  ['SpeakerTalks.gs', 'saveSpeakerTalkSelection', 'COORDINATEUR'],
   ['Planning.gs', 'savePlanning', 'COORDINATEUR'],
   ['Planning.gs', 'cancelPlanning', 'COORDINATEUR'],
   ['Planning.gs', 'restorePlanning', 'COORDINATEUR'],
@@ -73,6 +74,8 @@ const protectedFunctions = [
   ['HospitalityInvitations.gs', 'setInvitationStatus', 'COORDINATEUR'],
   ['Settings.gs', 'saveApplicationSettings', 'ADMIN'],
   ['Settings.gs', 'resetApplicationSettings', 'ADMIN'],
+  ['Access.gs', 'saveAccessUser', 'ADMIN'],
+  ['Access.gs', 'setAccessUserActive', 'ADMIN'],
   ['Backup.gs', 'createApplicationBackup', 'ADMIN'],
   ['Backup.gs', 'restoreApplicationBackup', 'ADMIN'],
   ['Integrity.gs', 'getDataIntegrityReport', 'ADMIN'],
