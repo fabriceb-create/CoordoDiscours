@@ -7,36 +7,87 @@
   <?!= include('Styles'); ?>
 </head>
 <body>
-  <main class="app-shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Coordination des discours publics</p>
-        <h1 id="app-title">CoordoDiscours</h1>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">CD</div>
+        <div><strong id="app-title">CoordoDiscours</strong><small id="version">Chargement...</small></div>
       </div>
-      <span id="version" class="version-badge">Chargement...</span>
-    </header>
+      <nav>
+        <button class="nav-button active" data-view="dashboard">Tableau de bord</button>
+        <button class="nav-button" data-view="speakers">Orateurs</button>
+        <button class="nav-button" data-view="congregations">Assemblées</button>
+      </nav>
+      <a id="database-link" class="database-link" href="#" target="_blank" hidden>Ouvrir les données</a>
+    </aside>
 
-    <section class="hero-card">
-      <div>
-        <p class="eyebrow">Assemblée</p>
-        <h2 id="congregation">Basse-Terre</h2>
-        <p id="status">Vérification de l’installation en cours...</p>
+    <main class="main-content">
+      <header class="topbar">
+        <div><p class="eyebrow">Assemblée</p><h1 id="congregation">Basse-Terre</h1></div>
+        <span id="status" class="status-pill">Initialisation...</span>
+      </header>
+
+      <section id="view-dashboard" class="view active-view">
+        <div class="hero-card">
+          <div><p class="eyebrow">Coordination des discours publics</p><h2>Bienvenue dans CoordoDiscours</h2><p>Les premiers modules de gestion sont maintenant opérationnels.</p></div>
+        </div>
+        <div class="module-grid">
+          <button class="module-card" data-open="speakers"><span>👤</span><h3>Orateurs</h3><p>Créer, rechercher, modifier et archiver.</p></button>
+          <button class="module-card" data-open="congregations"><span>🏛️</span><h3>Assemblées</h3><p>Gérer les contacts, adresses et horaires.</p></button>
+        </div>
+      </section>
+
+      <section id="view-speakers" class="view">
+        <div class="section-header"><div><p class="eyebrow">Répertoire</p><h2>Orateurs</h2></div><button class="primary-button" id="new-speaker">Nouvel orateur</button></div>
+        <div class="toolbar"><input id="speaker-search" type="search" placeholder="Rechercher un nom, une assemblée, un téléphone..."><label><input id="speaker-archived" type="checkbox"> Voir les archivés</label></div>
+        <div id="speaker-list" class="cards-list"></div>
+      </section>
+
+      <section id="view-congregations" class="view">
+        <div class="section-header"><div><p class="eyebrow">Répertoire</p><h2>Assemblées</h2></div><button class="primary-button" id="new-congregation">Nouvelle assemblée</button></div>
+        <div class="toolbar"><input id="congregation-search" type="search" placeholder="Rechercher une assemblée, un coordinateur, une adresse..."><label><input id="congregation-archived" type="checkbox"> Voir les archivées</label></div>
+        <div id="congregation-list" class="cards-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="speaker-dialog">
+    <form id="speaker-form" method="dialog" class="form-panel">
+      <div class="dialog-header"><h2>Fiche orateur</h2><button type="button" class="icon-button" data-close="speaker-dialog">×</button></div>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Nom*<input name="lastName" required></label>
+        <label>Prénom<input name="firstName"></label>
+        <label>Type<select name="type"><option value="LOCAL">Local</option><option value="EXTERIEUR">Extérieur</option></select></label>
+        <label>Assemblée<select name="congregationId"><option value="">Aucune</option></select></label>
+        <label>Téléphone<input name="phone"></label>
+        <label>E-mail<input name="email" type="email"></label>
+        <label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label>
+        <label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label>
       </div>
-      <a id="database-link" class="primary-button" href="#" target="_blank" hidden>
-        Ouvrir les données
-      </a>
-    </section>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="speaker-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>
+    </form>
+  </dialog>
 
-    <section class="module-grid" aria-label="Modules">
-      <article class="module-card"><span>📊</span><h3>Tableau de bord</h3><p>Vue des actions à traiter.</p></article>
-      <article class="module-card"><span>📅</span><h3>Programmation</h3><p>Planifier et contrôler les discours.</p></article>
-      <article class="module-card"><span>👤</span><h3>Orateurs</h3><p>Gérer les fiches et l’historique.</p></article>
-      <article class="module-card"><span>🏛️</span><h3>Assemblées</h3><p>Contacts, horaires et visites.</p></article>
-      <article class="module-card"><span>📖</span><h3>Discours</h3><p>Référentiel et contrôles.</p></article>
-      <article class="module-card"><span>📜</span><h3>Historique</h3><p>Journal complet des modifications.</p></article>
-    </section>
-  </main>
+  <dialog id="congregation-dialog">
+    <form id="congregation-form" method="dialog" class="form-panel">
+      <div class="dialog-header"><h2>Fiche assemblée</h2><button type="button" class="icon-button" data-close="congregation-dialog">×</button></div>
+      <input type="hidden" name="id">
+      <div class="form-grid">
+        <label>Nom*<input name="name" required></label>
+        <label>Coordinateur<input name="coordinator"></label>
+        <label>Téléphone<input name="phone"></label>
+        <label>E-mail<input name="email" type="email"></label>
+        <label class="full-width">Adresse<textarea name="address" rows="2"></textarea></label>
+        <label>Jour de réunion<input name="meetingDay"></label>
+        <label>Heure<input name="meetingTime" type="time"></label>
+        <label class="checkbox-field"><input name="active" type="checkbox" checked> Active</label>
+      </div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="congregation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div>
+    </form>
+  </dialog>
 
+  <div id="toast" class="toast" hidden></div>
   <?!= include('Scripts'); ?>
 </body>
 </html>
