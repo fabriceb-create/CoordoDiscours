@@ -15,6 +15,18 @@ assertContains(planning, /status\s*!==\s*['"]ANNULE['"]/, 'Planning : les progra
 ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => assertContains(rules, code, `Règles : ${code} est absente.`));
 assertContains(rules, /RULE_SEVERITY[\s\S]*ERROR[\s\S]*WARNING[\s\S]*INFO/, 'Règles : les niveaux de sévérité sont absents.');
 
+const concurrency = read('Concurrency.gs');
+const planningUi = read('PlanningScripts.html');
+assertContains(concurrency, /function\s+assertEntityVersion_\s*\(/, 'Concurrence : le contrôle de version est absent.');
+assertContains(concurrency, /CONFLIT_VERSION/, 'Concurrence : le code de conflit explicite est absent.');
+assertContains(concurrency, /function\s+advanceEntityVersion_\s*\(/, 'Concurrence : le renouvellement de version est absent.');
+assertContains(planning, /assertEntityVersion_\(['"]PROGRAMMATION['"]/, 'Planning : la version attendue n’est pas contrôlée.');
+assertContains(planning, /LockService\.getScriptLock\(\)/, 'Planning : la vérification et l’écriture ne sont pas protégées par un verrou.');
+assertContains(planning, /version:\s*String\(data\.version/, 'Planning : la version du formulaire n’est pas normalisée.');
+assertContains(planningUi, /ensurePlanningVersionField_/, 'Interface : le champ de version de la programmation est absent.');
+assertContains(planningUi, /handlePlanningVersionConflict_/, 'Interface : aucun traitement du conflit de version n’est prévu.');
+assertContains(planningUi, /data-version=/, 'Interface : les changements de statut ne transmettent pas la version.');
+
 const recommendations = read('RecommendationEngine.gs');
 assertContains(recommendations, /function\s+getSpeakerRecommendations\s*\(/, 'Recommandations : le point d’entrée est absent.');
 assertContains(recommendations, /scoreSpeakerRecommendation_\(/, 'Recommandations : le calcul du score est absent.');
