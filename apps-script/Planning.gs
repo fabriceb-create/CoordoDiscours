@@ -53,11 +53,14 @@ function savePlanning(payload, confirmWarnings) {
   const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
   const rowIndex = findRowById_(sheet, id);
   if (rowIndex) {
+    const before = listPlannings('', true).find(function (item) { return item.id === id; }) || {};
     sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
-    logAction_('MODIFICATION', 'PROGRAMMATION', id, { data: data, rules: validation.rules });
+    const after = listPlannings('', true).find(function (item) { return item.id === id; }) || data;
+    logAction_('MODIFICATION', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { rules: validation.rules }));
   } else {
     sheet.appendRow(values);
-    logAction_('CREATION', 'PROGRAMMATION', id, { data: data, rules: validation.rules });
+    const created = listPlannings('', true).find(function (item) { return item.id === id; }) || data;
+    logAction_('CREATION', 'PROGRAMMATION', id, buildAuditDetails_({}, created, { rules: validation.rules }));
   }
   return { saved: true, id: id, warnings: validation.warnings, rules: validation.rules };
 }
@@ -70,8 +73,10 @@ function setPlanningStatus_(id, status) {
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
   const rowIndex = findRowById_(sheet, id);
   if (!rowIndex) throw new Error('Programmation introuvable.');
+  const before = listPlannings('', true).find(function (item) { return item.id === String(id); }) || {};
   sheet.getRange(rowIndex, 6).setValue(status);
-  logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, { status: status });
+  const after = listPlannings('', true).find(function (item) { return item.id === String(id); }) || Object.assign({}, before, { status: status });
+  logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, buildAuditDetails_(before, after));
   return { id: id, status: status };
 }
 
