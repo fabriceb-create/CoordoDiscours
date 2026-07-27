@@ -10,6 +10,7 @@
   <?!= include('CommunicationStyles'); ?>
   <?!= include('PrintPlanningStyles'); ?>
   <?!= include('HistoryStyles'); ?>
+  <?!= include('SettingsStyles'); ?>
 </head>
 <body>
   <div class="layout">
@@ -25,6 +26,7 @@
         <button class="nav-button" data-view="congregations">Assemblées</button>
         <button class="nav-button" data-view="talks">Discours</button>
         <button class="nav-button" data-view="history">Historique</button>
+        <button class="nav-button" data-view="settings">Paramètres</button>
       </nav>
       <a id="database-link" class="database-link" href="#" target="_blank" hidden>Ouvrir les données</a>
     </aside>
@@ -96,6 +98,11 @@
         <div class="history-actions-bar"><span id="history-count">0 opération</span><div><button id="history-reset" class="secondary-button" type="button">Réinitialiser</button><button id="history-refresh" class="secondary-button" type="button">Actualiser</button></div></div>
         <div id="history-list" class="cards-list"><div class="empty-state">Ouvre ce module pour charger l’historique.</div></div>
       </section>
+
+      <section id="view-settings" class="view">
+        <div class="section-header"><div><p class="eyebrow">Administration</p><h2>Paramètres</h2></div><button class="secondary-button" type="button" onclick="loadSettings()">Actualiser</button></div>
+        <div id="settings-content"><div class="empty-state">Ouvre ce module pour charger les paramètres.</div></div>
+      </section>
     </main>
   </div>
 
@@ -114,5 +121,6 @@
   <?!= include('CommunicationScripts'); ?>
   <?!= include('PrintPlanningScripts'); ?>
   <?!= include('HistoryScripts'); ?>
+  <?!= include('SettingsScripts'); ?>
 </body>
 </html>
