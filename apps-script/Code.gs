@@ -8,7 +8,9 @@ function doGet() {
 function include(filename) {
   const content = HtmlService.createHtmlOutputFromFile(filename).getContent();
   if (filename === 'Scripts') {
-    return content + '\n' + HtmlService.createHtmlOutputFromFile('I18nScripts').getContent();
+    return content + '\n' +
+      HtmlService.createHtmlOutputFromFile('I18nScripts').getContent() + '\n' +
+      HtmlService.createHtmlOutputFromFile('AccessScripts').getContent();
   }
   return content;
 }
@@ -26,6 +28,7 @@ function getAppBootstrap() {
     version: APP_CONFIG.version,
     congregation: getSetting_('ASSEMBLEE') || 'Basse-Terre',
     language: getInterfaceLanguage(),
+    access: getCurrentUserAccess(),
     spreadsheetUrl: ss.getUrl(),
     installed: Boolean(ss)
   };
