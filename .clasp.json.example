@@ -1,0 +1,13 @@
+{
+  "scriptId": "REMPLACER_PAR_L_ID_DU_PROJET_APPS_SCRIPT",
+  "rootDir": "apps-script",
+  "fileExtension": "gs",
+  "filePushOrder": [
+    "Config.gs",
+    "Database.gs",
+    "Utils.gs",
+    "I18n.gs",
+    "Installation.gs",
+    "Code.gs"
+  ]
+}
