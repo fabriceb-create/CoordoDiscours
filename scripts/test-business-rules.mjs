@@ -41,6 +41,14 @@ assertContains(recommendations, /speaker\.type\s*===\s*['"]EXTERIEUR['"][\s\S]*g
 assertContains(recommendations, /sameMonthCount/, 'Recommandations : la fréquence mensuelle n’est pas prise en compte.');
 assertContains(recommendations, /Math\.min\(100/, 'Recommandations : le score n’est pas plafonné à 100.');
 assertContains(recommendations, /slice\(0,\s*12\)/, 'Recommandations : le nombre de résultats serveur n’est pas limité.');
+assertContains(recommendations, /function\s+getRecommendationWeights_\s*\(/, 'Recommandations : le chargement des pondérations configurables est absent.');
+assertContains(recommendations, /RECO_POIDS_DISCOURS/, 'Recommandations : le poids du discours configuré n’est pas utilisé.');
+assertContains(recommendations, /rawScore\s*\/\s*weights\.total/, 'Recommandations : le score n’est pas normalisé selon le total des pondérations.');
+
+const settings = read('Settings.gs');
+['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE']
+  .forEach(key => assertContains(settings, key, `Paramètres : la pondération ${key} est absente.`));
+assertContains(settings, /validateRecommendationWeights_/, 'Paramètres : la validation du total des pondérations est absente.');
 
 const planningUi = read('PlanningScripts.html');
 assertContains(planningUi, /getSpeakerRecommendations/, 'Interface : les recommandations ne sont pas chargées depuis le serveur.');
