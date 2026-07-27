@@ -52,3 +52,46 @@ function sanitizeEmail_(value) {
   }
   return email;
 }
+
+function buildAuditDetails_(before, after, extra) {
+  const previous = auditPlainObject_(before);
+  const current = auditPlainObject_(after);
+  const ignored = { displayDate: true, fullName: true, congregationName: true, roleLabel: true, updatedAt: true, updatedBy: true };
+  const keys = Array.from(new Set(Object.keys(previous).concat(Object.keys(current))))
+    .filter(function (key) { return !ignored[key] && key.charAt(0) !== '_'; })
+    .sort();
+  const changes = {};
+  const changedFields = [];
+
+  keys.forEach(function (key) {
+    const oldValue = auditComparableValue_(previous[key]);
+    const newValue = auditComparableValue_(current[key]);
+    if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      changes[key] = { before: oldValue, after: newValue };
+      changedFields.push(key);
+    }
+  });
+
+  return Object.assign({}, extra || {}, {
+    before: previous,
+    after: current,
+    changes: changes,
+    changedFields: changedFields
+  });
+}
+
+function auditPlainObject_(value) {
+  if (!value || typeof value !== 'object') return {};
+  return Object.keys(value).reduce(function (result, key) {
+    if (typeof value[key] !== 'function') result[key] = auditComparableValue_(value[key]);
+    return result;
+  }, {});
+}
+
+function auditComparableValue_(value) {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(auditComparableValue_);
+  if (value && typeof value === 'object') return auditPlainObject_(value);
+  if (value === undefined) return null;
+  return value;
+}
