@@ -1,56 +1,89 @@
 # CoordoDiscours
 
-Application de coordination des discours publics pour l'assemblée de Basse-Terre.
+Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en développement : **1.4 Stable**
+Version en préparation de recette : **1.4 Stable**
 
-Cette première base GitHub rassemble :
+Le dépôt contient désormais :
 
-- la documentation fonctionnelle ;
-- l'architecture Apps Script ;
-- le modèle de données ;
-- la feuille de route ;
-- le code source de l'application.
+- le code source Apps Script ;
+- la base de données Google Sheets auto-installable ;
+- les modules fonctionnels ;
+- la gestion Français / Kréyòl Gwadloup ;
+- les migrations de structure ;
+- les tests automatiques ;
+- la documentation d’installation et de recette.
 
-## Principes métier déjà validés
+## Modules disponibles
+
+- Tableau de bord et alertes prioritaires.
+- Programmation des discours.
+- Répertoire des orateurs.
+- Répertoire des assemblées.
+- Référentiel des discours.
+- Discours déclarés par orateur extérieur.
+- Invitations.
+- Hospitalité.
+- Planning imprimable sur 3 ou 6 mois.
+- Historique des opérations.
+- Paramètres généraux.
+- Choix de la langue de l’interface.
+
+## Principes métier validés
 
 - Un orateur local peut présenter tout discours public actif.
 - Un orateur extérieur est limité aux discours déclarés dans sa fiche.
 - Les discours 59, 82, 122 et 123 sont inactifs.
-- Une répétition d'un même discours dans les 12 mois déclenche une alerte non bloquante.
-- Les déplacements, échanges et remplacements doivent conserver un historique complet.
-- L'hospitalité concerne les orateurs extérieurs.
-- L'assistant dispose d'un accès en lecture seule.
+- Une répétition d’un même discours dans les 12 mois déclenche une alerte non bloquante.
+- Les modifications importantes sont historisées.
+- L’hospitalité concerne en priorité les orateurs extérieurs.
 
-## Structure cible
+## Structure principale
 
 ```text
 apps-script/
   Code.gs
   Config.gs
   Database.gs
+  Installation.gs
   Dashboard.gs
   Planning.gs
   Speakers.gs
   Congregations.gs
   Talks.gs
+  HospitalityInvitations.gs
+  PrintPlanning.gs
   History.gs
+  Settings.gs
+  I18n.gs
   Utils.gs
   Index.html
-  Styles.html
-  Scripts.html
   appsscript.json
 
 docs/
+  INSTALLATION.md
+  PLAN_TESTS.md
   ARCHITECTURE.md
   MODELE_DONNEES.md
   REGLES_METIER.md
   ROADMAP.md
-  CHANGELOG.md
 ```
 
-## Installation
+## Installation rapide
 
-La procédure d'installation sera ajoutée lorsque la version 1.4 Stable sera prête à être testée.
+1. Créer un projet Google Apps Script.
+2. Copier tous les fichiers du dossier `apps-script/`.
+3. Exécuter `installCoordoDiscours`.
+4. Vérifier que le résultat contient `success: true`.
+5. Exécuter `runAcceptanceTests`.
+6. Déployer le projet comme application web en accès restreint pour la recette.
+
+La procédure détaillée se trouve dans `docs/INSTALLATION.md`.
+
+## Validation
+
+Le plan complet de vérification fonctionnelle se trouve dans `docs/PLAN_TESTS.md`.
+
+La version ne doit pas encore être considérée comme définitivement stable avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.
