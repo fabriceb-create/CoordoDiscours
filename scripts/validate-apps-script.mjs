@@ -6,7 +6,7 @@ const required = [
   'appsscript.json','Config.gs','Database.gs','Installation.gs','Code.gs','Index.html',
   'Styles.html','Scripts.html','Planning.gs','PlanningScripts.html','Dashboard.gs',
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
-  'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs'
+  'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html'
 ];
 
 const errors = [];
@@ -35,7 +35,14 @@ if (fs.existsSync(indexPath)) {
     }
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
-  if (!index.includes('I18nScripts')) errors.push('Le script multilingue n’est pas inclus dans Index.html.');
+}
+
+const codePath = path.join(root, 'Code.gs');
+if (fs.existsSync(codePath)) {
+  const code = fs.readFileSync(codePath, 'utf8');
+  const directInclude = fs.readFileSync(indexPath, 'utf8').includes('I18nScripts');
+  const bundledInclude = code.includes("createHtmlOutputFromFile('I18nScripts')");
+  if (!directInclude && !bundledInclude) errors.push('Le moteur multilingue n’est pas chargé par l’interface.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
