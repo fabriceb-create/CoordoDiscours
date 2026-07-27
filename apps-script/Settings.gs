@@ -18,28 +18,19 @@ function getApplicationSettings() {
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
   const stored = {};
-  if (sheet && sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().forEach(row => {
-      stored[String(row[0] || '').trim()] = { value: String(row[1] ?? ''), description: String(row[2] || '') };
-    });
-  }
-  return {
-    settings: SETTINGS_DEFINITIONS.map(definition => ({
-      ...definition,
-      value: stored[definition.key] && stored[definition.key].value !== '' ? stored[definition.key].value : definition.defaultValue
-    })),
-    diagnostics: getSettingsDiagnostics_(),
-    spreadsheetUrl: ss.getUrl(),
-    version: APP_CONFIG.version,
-    language: getInterfaceLanguage()
-  };
+  if (sheet && sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().forEach(row => { stored[String(row[0] || '').trim()] = { value: String(row[1] ?? ''), description: String(row[2] || '') }; });
+  return { settings: SETTINGS_DEFINITIONS.map(definition => ({ ...definition, value: stored[definition.key] && stored[definition.key].value !== '' ? stored[definition.key].value : definition.defaultValue })), diagnostics: getSettingsDiagnostics_(), spreadsheetUrl: ss.getUrl(), version: APP_CONFIG.version, language: getInterfaceLanguage() };
+}
+
+function settingsAsMap_() {
+  return getApplicationSettings().settings.reduce(function (map, item) { map[item.key] = item.value; return map; }, {});
 }
 
 function saveApplicationSettings(payload) {
   assertAccess_('ADMIN');
   const values = payload || {};
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
+  const before = settingsAsMap_();
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.settings);
   if (!sheet) throw new Error('La feuille PARAMETRES est introuvable.');
   const saved = {};
   SETTINGS_DEFINITIONS.forEach(definition => {
@@ -54,11 +45,11 @@ function saveApplicationSettings(payload) {
     if (definition.type === 'time' && !/^\d{2}:\d{2}$/.test(value)) throw new Error('Heure de réunion invalide.');
     if (definition.type === 'boolean') value = value === 'NON' ? 'NON' : 'OUI';
     if (definition.type === 'select' && !definition.options.includes(value)) value = definition.defaultValue;
-    upsertSetting_(sheet, definition.key, value, definition.description);
     saved[definition.key] = value;
   });
   validateRecommendationWeights_(saved);
-  logAction_('MODIFICATION', 'PARAMETRES', 'APPLICATION', saved);
+  SETTINGS_DEFINITIONS.forEach(definition => upsertSetting_(sheet, definition.key, saved[definition.key], definition.description));
+  logAction_('MODIFICATION', 'PARAMETRES', 'APPLICATION', buildAuditDetails_(before, saved));
   return getApplicationSettings();
 }
 
@@ -71,38 +62,29 @@ function validateRecommendationWeights_(settings) {
 
 function resetApplicationSettings() {
   assertAccess_('ADMIN');
+  const before = settingsAsMap_();
   const defaults = {};
   SETTINGS_DEFINITIONS.forEach(item => { defaults[item.key] = item.defaultValue; });
-  logAction_('REINITIALISATION', 'PARAMETRES', 'APPLICATION', defaults);
-  return saveApplicationSettings(defaults);
+  const result = saveApplicationSettings(defaults);
+  logAction_('REINITIALISATION', 'PARAMETRES', 'APPLICATION', buildAuditDetails_(before, defaults));
+  return result;
 }
 
 function upsertSetting_(sheet, key, value, description) {
   const row = findSettingRow_(sheet, key);
   const values = [[key, value, description || '']];
-  if (row) sheet.getRange(row, 1, 1, 3).setValues(values);
-  else sheet.appendRow(values[0]);
+  if (row) sheet.getRange(row, 1, 1, 3).setValues(values); else sheet.appendRow(values[0]);
 }
-
 function findSettingRow_(sheet, key) {
   if (sheet.getLastRow() < 2) return 0;
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().flat();
   const index = values.findIndex(value => String(value) === String(key));
   return index < 0 ? 0 : index + 2;
 }
-
 function getSettingsDiagnostics_() {
   const ss = getDatabase_();
   const requiredSheets = Object.values(APP_CONFIG.sheets);
   const missingSheets = requiredSheets.filter(name => !ss.getSheetByName(name));
   const timezone = Session.getScriptTimeZone();
-  return {
-    ok: missingSheets.length === 0,
-    databaseName: ss.getName(),
-    databaseId: ss.getId(),
-    timezone: timezone,
-    missingSheets: missingSheets,
-    sheetCount: requiredSheets.length - missingSheets.length,
-    expectedSheetCount: requiredSheets.length
-  };
+  return { ok: missingSheets.length === 0, databaseName: ss.getName(), databaseId: ss.getId(), timezone: timezone, missingSheets: missingSheets, sheetCount: requiredSheets.length - missingSheets.length, expectedSheetCount: requiredSheets.length };
 }
