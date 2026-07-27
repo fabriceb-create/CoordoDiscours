@@ -6,7 +6,11 @@ function doGet() {
 }
 
 function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  const content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+  if (filename === 'Scripts') {
+    return content + '\n' + HtmlService.createHtmlOutputFromFile('I18nScripts').getContent();
+  }
+  return content;
 }
 
 function setupApplication() {
