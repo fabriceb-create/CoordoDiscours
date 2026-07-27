@@ -65,6 +65,15 @@ assertContains(dashboard, /topPriority/, 'Tableau de bord : l’action prioritai
 assertContains(dashboardUi, /Action recommandée/, 'Interface : la carte d’action recommandée est absente.');
 assertContains(dashboardUi, /metrics\.confirmations/, 'Interface : les confirmations en attente ne sont pas affichées.');
 
+const code = read('Code.gs');
+const history = read('History.gs');
+const historyUi = read('HistoryScripts.html');
+assertContains(code, /function\s+buildAuditDetails_\s*\(/, 'Audit : le générateur de différences avant/après est absent.');
+assertContains(code, /changedFields:\s*Object\.keys\(changes\)/, 'Audit : la liste des champs modifiés n’est pas conservée.');
+assertContains(planning, /buildAuditDetails_\(before,\s*after/, 'Audit : les modifications du planning ne journalisent pas les valeurs avant/après.');
+assertContains(history, /function\s+historyChanges_\s*\(/, 'Audit : les changements ne sont pas exposés par le module historique.');
+assertContains(historyUi, /history-change-head/, 'Audit : le tableau avant/après est absent de l’interface.');
+
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
 assertContains(communication, /Une invitation existe déjà pour cette programmation/, 'Invitations : le contrôle des doublons est absent.');
