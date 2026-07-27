@@ -65,6 +65,7 @@ function saveCongregation(payload) {
 }
 
 function archiveCongregation(id, expectedVersion) {
+  assertAccess_('COORDINATEUR');
   const before = getCongregation(id);
   const saved = saveCongregation(Object.assign({}, before, { active: false, version: expectedVersion || before.version }));
   logAction_('ARCHIVAGE', 'ASSEMBLEE', id, buildAuditDetails_(before, saved));
@@ -72,6 +73,7 @@ function archiveCongregation(id, expectedVersion) {
 }
 
 function restoreCongregation(id, expectedVersion) {
+  assertAccess_('COORDINATEUR');
   const before = getCongregation(id);
   const saved = saveCongregation(Object.assign({}, before, { active: true, version: expectedVersion || before.version }));
   logAction_('RESTAURATION', 'ASSEMBLEE', id, buildAuditDetails_(before, saved));
