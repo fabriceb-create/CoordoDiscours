@@ -10,7 +10,6 @@ function getCurrentUserAccess() {
   const activeUsers = users.filter(user => user.active);
   let user = users.find(item => item.email === email && item.active);
 
-  // Lors d'une première installation, le propriétaire devient administrateur.
   if (!activeUsers.length && email) {
     user = saveAccessUser({ email: email, name: '', role: 'ADMIN', active: true }, true);
   }
@@ -28,12 +27,12 @@ function getCurrentUserAccess() {
 }
 
 function listAccessUsers() {
-  assertAccess_('ADMIN');
+  assertAdminAccess_();
   return listAccessUsers_();
 }
 
 function saveAccessUser(payload, bootstrap) {
-  if (!bootstrap) assertAccess_('ADMIN');
+  if (!bootstrap) assertAdminAccess_();
   const data = payload || {};
   const email = normalizeAccessEmail_(data.email);
   const role = String(data.role || 'CONSULTATION').toUpperCase();
@@ -55,7 +54,7 @@ function saveAccessUser(payload, bootstrap) {
 }
 
 function setAccessUserActive(email, active) {
-  assertAccess_('ADMIN');
+  assertAdminAccess_();
   const normalized = normalizeAccessEmail_(email);
   const current = getCurrentUserAccess();
   if (current.email === normalized && active === false) throw new Error('Tu ne peux pas désactiver ton propre accès administrateur.');
@@ -70,9 +69,29 @@ function assertAccess_(minimumRole) {
   const expected = ACCESS_ROLES[minimumRole] || ACCESS_ROLES.CONSULTATION;
   const actual = ACCESS_ROLES[current.role] || ACCESS_ROLES.CONSULTATION;
   if (!current.active || actual.level < expected.level) {
+    logDeniedAccess_(current, minimumRole);
     throw new Error('Accès insuffisant pour effectuer cette opération.');
   }
   return current;
+}
+
+function assertEditAccess_() {
+  return assertAccess_('COORDINATEUR');
+}
+
+function assertAdminAccess_() {
+  return assertAccess_('ADMIN');
+}
+
+function logDeniedAccess_(current, minimumRole) {
+  try {
+    logAction_('ACCES_REFUSE', 'SECURITE', current.email || 'INCONNU', {
+      role: current.role || 'INCONNU',
+      minimumRole: minimumRole
+    });
+  } catch (error) {
+    console.warn('Impossible de journaliser le refus d’accès : ' + error.message);
+  }
 }
 
 function listAccessUsers_() {
