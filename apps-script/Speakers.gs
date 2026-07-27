@@ -40,15 +40,14 @@ function listSpeakers(searchText, includeArchived) {
 }
 
 function saveSpeaker(payload) {
+  assertEditAccess_();
   payload = payload || {};
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.speakers);
   const id = String(payload.id || '').trim() || newId_();
   const lastName = requiredText_(payload.lastName, 'Le nom');
   const firstName = String(payload.firstName || '').trim();
-  const type = String(payload.type || 'LOCAL').toUpperCase() === 'EXTERIEUR'
-    ? 'EXTERIEUR'
-    : 'LOCAL';
+  const type = String(payload.type || 'LOCAL').toUpperCase() === 'EXTERIEUR' ? 'EXTERIEUR' : 'LOCAL';
   const congregationId = String(payload.congregationId || '').trim();
   const phone = String(payload.phone || '').trim();
   const email = sanitizeEmail_(payload.email);
@@ -64,19 +63,17 @@ function saveSpeaker(payload) {
     sheet.appendRow(row);
     logAction_('CREATION', 'ORATEUR', id, { nom: firstName + ' ' + lastName });
   }
-
   return getSpeaker(id);
 }
 
 function getSpeaker(id) {
-  const item = listSpeakers('', true).find(function (speaker) {
-    return speaker.id === String(id);
-  });
+  const item = listSpeakers('', true).find(function (speaker) { return speaker.id === String(id); });
   if (!item) throw new Error('Orateur introuvable.');
   return item;
 }
 
 function archiveSpeaker(id) {
+  assertEditAccess_();
   const speaker = getSpeaker(id);
   speaker.active = false;
   const saved = saveSpeaker(speaker);
@@ -85,6 +82,7 @@ function archiveSpeaker(id) {
 }
 
 function restoreSpeaker(id) {
+  assertEditAccess_();
   const speaker = getSpeaker(id);
   speaker.active = true;
   const saved = saveSpeaker(speaker);
