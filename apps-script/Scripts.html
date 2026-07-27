@@ -1,0 +1,28 @@
+<script>
+  function showError(error) {
+    document.getElementById('status').textContent =
+      'Erreur : ' + (error && error.message ? error.message : error);
+  }
+
+  function renderApp(data) {
+    document.getElementById('app-title').textContent = data.appName;
+    document.getElementById('version').textContent = data.version;
+    document.getElementById('congregation').textContent = data.congregation;
+    document.getElementById('status').textContent = data.installed
+      ? 'Installation détectée. Le socle de l’application est prêt.'
+      : 'Installation non terminée.';
+
+    const link = document.getElementById('database-link');
+    if (data.spreadsheetUrl) {
+      link.href = data.spreadsheetUrl;
+      link.hidden = false;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    google.script.run
+      .withSuccessHandler(renderApp)
+      .withFailureHandler(showError)
+      .getAppBootstrap();
+  });
+</script>
