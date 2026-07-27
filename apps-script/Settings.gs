@@ -19,7 +19,17 @@ function getApplicationSettings() {
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
   const stored = {};
   if (sheet && sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().forEach(row => { stored[String(row[0] || '').trim()] = { value: String(row[1] ?? ''), description: String(row[2] || '') }; });
-  return { settings: SETTINGS_DEFINITIONS.map(definition => ({ ...definition, value: stored[definition.key] && stored[definition.key].value !== '' ? stored[definition.key].value : definition.defaultValue })), diagnostics: getSettingsDiagnostics_(), spreadsheetUrl: ss.getUrl(), version: APP_CONFIG.version, language: getInterfaceLanguage() };
+  const metadata = getEntityVersion_('PARAMETRES', 'APPLICATION');
+  return {
+    settings: SETTINGS_DEFINITIONS.map(definition => ({ ...definition, value: stored[definition.key] && stored[definition.key].value !== '' ? stored[definition.key].value : definition.defaultValue })),
+    diagnostics: getSettingsDiagnostics_(),
+    spreadsheetUrl: ss.getUrl(),
+    version: APP_CONFIG.version,
+    language: getInterfaceLanguage(),
+    settingsVersion: metadata.version,
+    settingsUpdatedAt: metadata.updatedAt,
+    settingsUpdatedBy: metadata.updatedBy
+  };
 }
 
 function settingsAsMap_() {
@@ -28,29 +38,43 @@ function settingsAsMap_() {
 
 function saveApplicationSettings(payload) {
   assertAccess_('ADMIN');
-  const values = payload || {};
-  const before = settingsAsMap_();
-  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.settings);
-  if (!sheet) throw new Error('La feuille PARAMETRES est introuvable.');
-  const saved = {};
-  SETTINGS_DEFINITIONS.forEach(definition => {
-    let value = String(values[definition.key] ?? definition.defaultValue).trim();
-    if (definition.type === 'number') {
-      const numeric = Number(value);
-      if (!Number.isFinite(numeric)) throw new Error(definition.label + ' doit être un nombre.');
-      if (definition.min != null && numeric < definition.min) throw new Error(definition.label + ' doit être supérieur ou égal à ' + definition.min + '.');
-      if (definition.max != null && numeric > definition.max) throw new Error(definition.label + ' doit être inférieur ou égal à ' + definition.max + '.');
-      value = String(numeric);
-    }
-    if (definition.type === 'time' && !/^\d{2}:\d{2}$/.test(value)) throw new Error('Heure de réunion invalide.');
-    if (definition.type === 'boolean') value = value === 'NON' ? 'NON' : 'OUI';
-    if (definition.type === 'select' && !definition.options.includes(value)) value = definition.defaultValue;
-    saved[definition.key] = value;
-  });
-  validateRecommendationWeights_(saved);
-  SETTINGS_DEFINITIONS.forEach(definition => upsertSetting_(sheet, definition.key, saved[definition.key], definition.description));
-  logAction_('MODIFICATION', 'PARAMETRES', 'APPLICATION', buildAuditDetails_(before, saved));
-  return getApplicationSettings();
+  payload = payload || {};
+  return saveApplicationSettings_(payload, 'MODIFICATION', payload.version);
+}
+
+function saveApplicationSettings_(values, action, expectedVersion) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    assertEntityVersion_('PARAMETRES', 'APPLICATION', expectedVersion);
+    const before = settingsAsMap_();
+    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.settings);
+    if (!sheet) throw new Error('La feuille PARAMETRES est introuvable.');
+    const saved = {};
+    SETTINGS_DEFINITIONS.forEach(definition => {
+      let value = String(values[definition.key] ?? definition.defaultValue).trim();
+      if (definition.type === 'number') {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) throw new Error(definition.label + ' doit être un nombre.');
+        if (definition.min != null && numeric < definition.min) throw new Error(definition.label + ' doit être supérieur ou égal à ' + definition.min + '.');
+        if (definition.max != null && numeric > definition.max) throw new Error(definition.label + ' doit être inférieur ou égal à ' + definition.max + '.');
+        value = String(numeric);
+      }
+      if (definition.type === 'time' && !/^\d{2}:\d{2}$/.test(value)) throw new Error('Heure de réunion invalide.');
+      if (definition.type === 'boolean') value = value === 'NON' ? 'NON' : 'OUI';
+      if (definition.type === 'select' && !definition.options.includes(value)) value = definition.defaultValue;
+      saved[definition.key] = value;
+    });
+    validateRecommendationWeights_(saved);
+    SETTINGS_DEFINITIONS.forEach(definition => upsertSetting_(sheet, definition.key, saved[definition.key], definition.description));
+    advanceEntityVersion_('PARAMETRES', 'APPLICATION');
+    const result = getApplicationSettings();
+    const after = result.settings.reduce(function (map, item) { map[item.key] = item.value; return map; }, {});
+    logAction_(action || 'MODIFICATION', 'PARAMETRES', 'APPLICATION', buildAuditDetails_(before, after));
+    return result;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function validateRecommendationWeights_(settings) {
@@ -60,14 +84,11 @@ function validateRecommendationWeights_(settings) {
   return total;
 }
 
-function resetApplicationSettings() {
+function resetApplicationSettings(expectedVersion) {
   assertAccess_('ADMIN');
-  const before = settingsAsMap_();
   const defaults = {};
   SETTINGS_DEFINITIONS.forEach(item => { defaults[item.key] = item.defaultValue; });
-  const result = saveApplicationSettings(defaults);
-  logAction_('REINITIALISATION', 'PARAMETRES', 'APPLICATION', buildAuditDetails_(before, defaults));
-  return result;
+  return saveApplicationSettings_(defaults, 'REINITIALISATION', expectedVersion);
 }
 
 function upsertSetting_(sheet, key, value, description) {
