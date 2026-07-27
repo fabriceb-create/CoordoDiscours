@@ -8,7 +8,8 @@ const required = [
   'DashboardScripts.html','Speakers.gs','Talks.gs','Congregations.gs','History.gs',
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
-  'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs'
+  'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs',
+  'RecommendationEngine.gs'
 ];
 
 const errors = [];
@@ -139,6 +140,14 @@ if (fs.existsSync(rulesPath)) {
   ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => {
     if (!rules.includes(code)) errors.push(`Règle métier obligatoire absente : ${code}.`);
   });
+}
+
+const recommendationPath = path.join(root, 'RecommendationEngine.gs');
+if (fs.existsSync(recommendationPath)) {
+  const recommendation = fs.readFileSync(recommendationPath, 'utf8');
+  if (!recommendation.includes('getSpeakerRecommendations')) errors.push('Le point d’entrée des recommandations est absent.');
+  if (!recommendation.includes('scoreSpeakerRecommendation_')) errors.push('Le calcul du score de recommandation est absent.');
+  if (!recommendation.includes('getSpeakerTalkNumbers_')) errors.push('Les recommandations doivent contrôler les discours déclarés des orateurs extérieurs.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
