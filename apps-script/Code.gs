@@ -21,6 +21,7 @@ function getAppBootstrap() {
     appName: APP_CONFIG.name,
     version: APP_CONFIG.version,
     congregation: getSetting_('ASSEMBLEE') || 'Basse-Terre',
+    language: getInterfaceLanguage(),
     spreadsheetUrl: ss.getUrl(),
     installed: Boolean(ss)
   };
