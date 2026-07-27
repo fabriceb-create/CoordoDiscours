@@ -11,11 +11,23 @@ function listPlannings(query, includeCancelled) {
       const talk = talks[String(row[4])] || {};
       const status = String(row[5] || 'PROGRAMME').toUpperCase();
       const date = row[1] instanceof Date ? row[1] : new Date(row[1]);
+      const id = String(row[0] || '');
+      const version = getEntityVersion_('PROGRAMMATION', id);
       return {
-        id: String(row[0] || ''), date: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+        id: id,
+        date: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
         displayDate: isNaN(date.getTime()) ? '' : Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd/MM/yyyy'),
-        time: formatTimeValue_(row[2]), speakerId: String(row[3] || ''), speakerName: speaker.fullName || speaker.lastName || 'Orateur à définir',
-        talkNumber: Number(row[4]) || '', talkTitle: talk.title || '', status: status, originCongregationId: String(row[6] || ''), notes: String(row[7] || '')
+        time: formatTimeValue_(row[2]),
+        speakerId: String(row[3] || ''),
+        speakerName: speaker.fullName || speaker.lastName || 'Orateur à définir',
+        talkNumber: Number(row[4]) || '',
+        talkTitle: talk.title || '',
+        status: status,
+        originCongregationId: String(row[6] || ''),
+        notes: String(row[7] || ''),
+        version: version.version,
+        updatedAt: version.updatedAt,
+        updatedBy: version.updatedBy
       };
     })
     .filter(item => includeCancelled || item.status !== 'ANNULE')
@@ -47,37 +59,57 @@ function savePlanning(payload, confirmWarnings) {
   if (validation.warnings.length && !confirmWarnings) {
     return { saved: false, requiresConfirmation: true, warnings: validation.warnings, rules: validation.rules };
   }
+
   const data = validation.data;
-  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
-  const id = data.id || Utilities.getUuid();
-  const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
-  const rowIndex = findRowById_(sheet, id);
-  if (rowIndex) {
-    const before = listPlannings('', true).find(function (item) { return item.id === id; }) || {};
-    sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
-    const after = listPlannings('', true).find(function (item) { return item.id === id; }) || data;
-    logAction_('MODIFICATION', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { rules: validation.rules }));
-  } else {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
+    const id = data.id || Utilities.getUuid();
+    const rowIndex = findRowById_(sheet, id);
+    const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
+
+    if (rowIndex) {
+      assertEntityVersion_('PROGRAMMATION', id, data.version);
+      const before = listPlannings('', true).find(function (item) { return item.id === id; }) || {};
+      sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
+      const version = advanceEntityVersion_('PROGRAMMATION', id);
+      const after = Object.assign({}, data, version);
+      logAction_('MODIFICATION', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { rules: validation.rules, concurrency: version }));
+      return { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
+    }
+
     sheet.appendRow(values);
-    const created = listPlannings('', true).find(function (item) { return item.id === id; }) || data;
-    logAction_('CREATION', 'PROGRAMMATION', id, buildAuditDetails_({}, created, { rules: validation.rules }));
+    const version = advanceEntityVersion_('PROGRAMMATION', id);
+    const created = Object.assign({}, data, { id: id }, version);
+    logAction_('CREATION', 'PROGRAMMATION', id, buildAuditDetails_({}, created, { rules: validation.rules, concurrency: version }));
+    return { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
+  } finally {
+    lock.releaseLock();
   }
-  return { saved: true, id: id, warnings: validation.warnings, rules: validation.rules };
 }
 
-function cancelPlanning(id) { assertEditAccess_(); return setPlanningStatus_(id, 'ANNULE'); }
-function restorePlanning(id) { assertEditAccess_(); return setPlanningStatus_(id, 'PROGRAMME'); }
+function cancelPlanning(id, version) { assertEditAccess_(); return setPlanningStatus_(id, 'ANNULE', version); }
+function restorePlanning(id, version) { assertEditAccess_(); return setPlanningStatus_(id, 'PROGRAMME', version); }
 
-function setPlanningStatus_(id, status) {
+function setPlanningStatus_(id, status, expectedVersion) {
   assertEditAccess_();
-  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
-  const rowIndex = findRowById_(sheet, id);
-  if (!rowIndex) throw new Error('Programmation introuvable.');
-  const before = listPlannings('', true).find(function (item) { return item.id === String(id); }) || {};
-  sheet.getRange(rowIndex, 6).setValue(status);
-  const after = listPlannings('', true).find(function (item) { return item.id === String(id); }) || Object.assign({}, before, { status: status });
-  logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, buildAuditDetails_(before, after));
-  return { id: id, status: status };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
+    const rowIndex = findRowById_(sheet, id);
+    if (!rowIndex) throw new Error('Programmation introuvable.');
+    assertEntityVersion_('PROGRAMMATION', id, expectedVersion);
+    const before = listPlannings('', true).find(function (item) { return item.id === String(id); }) || {};
+    sheet.getRange(rowIndex, 6).setValue(status);
+    const version = advanceEntityVersion_('PROGRAMMATION', id);
+    const after = Object.assign({}, before, { status: status }, version);
+    logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { concurrency: version }));
+    return { id: id, status: status, version: version.version };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function getSpeakerTalkNumbers_(speakerId) {
@@ -96,7 +128,17 @@ function normalizePlanningPayload_(payload) {
   if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('L’heure est obligatoire.');
   if (!speakerId) throw new Error('L’orateur est obligatoire.');
   if (!Number.isFinite(talkNumber)) throw new Error('Le discours est obligatoire.');
-  return { id: String(data.id || ''), date: date, time: time, speakerId: speakerId, talkNumber: talkNumber, status: String(data.status || 'PROGRAMME').toUpperCase(), originCongregationId: String(data.originCongregationId || ''), notes: String(data.notes || '').trim() };
+  return {
+    id: String(data.id || ''),
+    version: String(data.version || ''),
+    date: date,
+    time: time,
+    speakerId: speakerId,
+    talkNumber: talkNumber,
+    status: String(data.status || 'PROGRAMME').toUpperCase(),
+    originCongregationId: String(data.originCongregationId || ''),
+    notes: String(data.notes || '').trim()
+  };
 }
 
 function formatTimeValue_(value) {
