@@ -37,6 +37,10 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 - Actions rapides pour confirmer une hospitalité et marquer une invitation comme envoyée.
 - Blocage des doublons d’hospitalité ou d’invitation pour une même programmation.
 - Actualisation automatique du tableau de bord après une action de communication.
+- Planning imprimable sur une période sélectionnable de 3 ou 6 mois.
+- Aperçu mensuel avec date, heure, orateur, numéro et titre du discours.
+- Mise en page A4 paysage optimisée pour l’impression et l’affichage au tableau.
+- Sélection libre du mois de départ et actualisation de l’aperçu.
 
 ### Décisions figées
 
