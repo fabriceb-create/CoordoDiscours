@@ -1,4 +1,4 @@
-const INSTALLATION_SCHEMA_VERSION = '1.6.0';
+const INSTALLATION_SCHEMA_VERSION = '1.7.0';
 
 function installCoordoDiscours() {
   const startedAt = new Date();
@@ -30,6 +30,8 @@ function runDatabaseMigrations_() {
     DUREE_IMPRESSION_MOIS: '3',
     HORIZON_ACTIONS_JOURS: '14',
     ALERTE_REPETITION_MOIS: '12',
+    AUTO_PLAN_MOIS: '4',
+    AUTO_PLAN_SUIVIS: 'OUI',
     RECO_POIDS_DISCOURS: '40',
     RECO_POIDS_ANCIENNETE: '30',
     RECO_POIDS_MOIS: '15',
@@ -113,7 +115,7 @@ function runAcceptanceTests() {
   });
 
   test('Paramètres essentiels', function () {
-    const required = ['ASSEMBLEE', 'LANGUE_INTERFACE', 'ALERTE_REPETITION_MOIS', 'SCHEMA_VERSION'];
+    const required = ['ASSEMBLEE', 'LANGUE_INTERFACE', 'ALERTE_REPETITION_MOIS', 'AUTO_PLAN_MOIS', 'AUTO_PLAN_SUIVIS', 'SCHEMA_VERSION'];
     const missing = required.filter(function (key) { return !String(getSetting_(key) || '').trim(); });
     if (missing.length) throw new Error('Paramètres manquants : ' + missing.join(', '));
     return required.join(', ');
@@ -123,6 +125,13 @@ function runAcceptanceTests() {
     const weights = getRecommendationWeights_();
     if (!weights || weights.total <= 0) throw new Error('Pondérations de recommandation invalides.');
     return weights;
+  });
+
+  test('Planification automatique disponible', function () {
+    const defaults = getAutomaticPlanningDefaults();
+    if (!defaults || defaults.months < 1 || defaults.months > 6) throw new Error('Paramètres de planification automatique invalides.');
+    if (typeof generateAutomaticPlanningDraft !== 'function' || typeof commitAutomaticPlanningDraft !== 'function') throw new Error('Moteur de planification automatique incomplet.');
+    return defaults.months + ' mois par défaut';
   });
 
   test('Langue configurée', function () {
