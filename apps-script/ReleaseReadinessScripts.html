@@ -38,6 +38,7 @@
       releaseReadinessState.report = releaseReadinessState.bootstrap.report;
       releaseReadinessState.session = releaseReadinessState.bootstrap.session;
       renderReleaseReadiness_();
+      if (typeof renderReleaseDecisions_ === 'function') renderReleaseDecisions_();
       loadRecentReleaseIncidents_();
     } catch (error) {
       showError(error);
@@ -48,14 +49,20 @@
   }
 
   async function refreshReleaseReadiness_(button) {
-    await withBusyElement_(button, async () => {
+    const refresh = async () => {
       try {
         releaseReadinessState.report = await runServer('getReleaseReadinessReport');
         if (releaseReadinessState.bootstrap) releaseReadinessState.bootstrap.report = releaseReadinessState.report;
         renderReleaseReadiness_();
+        if (typeof loadReleaseGovernance_ === 'function') await loadReleaseGovernance_(true);
         toast('Rapport de santé actualisé.');
-      } catch (error) { showError(error); }
-    });
+        return releaseReadinessState.report;
+      } catch (error) {
+        showError(error);
+        return null;
+      }
+    };
+    return button ? withBusyElement_(button, refresh) : refresh();
   }
 
   function renderReleaseReadiness_() {
@@ -146,6 +153,7 @@
           if (releaseReadinessState.bootstrap) releaseReadinessState.bootstrap.report = releaseReadinessState.report;
         }
         renderReleaseReadiness_();
+        if (typeof loadReleaseGovernance_ === 'function') await loadReleaseGovernance_(true);
         toast('Étape de recette terminée.');
       } catch (error) { showError(error); }
     });

@@ -20,6 +20,9 @@ function getDataIntegrityReport_(options) {
   const hospitalities = listHospitalitiesWithPlannings_('', plannings);
   const invitations = listInvitationsWithPlannings_('', plannings);
   const availability = listSpeakerAvailability_(true);
+  const releaseActions = typeof listReleaseCorrectiveActions === 'function' ? listReleaseCorrectiveActions({ limit: 1000 }) : [];
+  const releaseDevices = typeof listReleaseDeviceAcceptanceIntegrityEntries_ === 'function' ? listReleaseDeviceAcceptanceIntegrityEntries_() : [];
+  const releaseDecisions = typeof listReleaseDecisions === 'function' ? listReleaseDecisions(100) : [];
 
   const speakerIds = new Set(speakers.map(item => String(item.id)));
   const congregationIds = new Set(congregations.map(item => String(item.id)));
@@ -70,6 +73,7 @@ function getDataIntegrityReport_(options) {
   });
 
   validateSpeakerAvailabilityIntegrity_(availability, speakerIds, pushIssue);
+  validateReleaseGovernanceIntegrity_(releaseActions, releaseDevices, releaseDecisions, pushIssue);
 
   APP_CONFIG.inactiveTalks.forEach(function (number) {
     const talk = talks.find(item => Number(item.number) === Number(number));
@@ -89,6 +93,9 @@ function getDataIntegrityReport_(options) {
       hospitalities: hospitalities.length,
       invitations: invitations.length,
       speakerAvailability: availability.length,
+      releaseActions: releaseActions.length,
+      releaseDeviceChecks: releaseDevices.length,
+      releaseDecisions: releaseDecisions.length,
       issues: issues.length
     },
     issues: issues
@@ -137,5 +144,65 @@ function validateSpeakerAvailabilityIntegrity_(entries, speakerIds, pushIssue) {
         }
       });
     });
+  });
+}
+
+
+function validateReleaseGovernanceIntegrity_(actions, devices, decisions, pushIssue) {
+  const actionIds = {};
+  (actions || []).forEach(function (item) {
+    if (!item.id || actionIds[item.id]) {
+      pushIssue('ERREUR', 'ACTION_CORRECTIVE_ID_INVALIDE', 'Une action corrective contient un identifiant absent ou dupliqué.', { actionId: item.id || '' });
+    }
+    actionIds[item.id] = true;
+    if (!RELEASE_ACTION_SOURCES[item.source]) {
+      pushIssue('ERREUR', 'ACTION_CORRECTIVE_SOURCE_INVALIDE', 'Une action corrective utilise une source inconnue.', { actionId: item.id, source: item.source });
+    }
+    if (!RELEASE_ACTION_STATUSES[item.status]) {
+      pushIssue('ERREUR', 'ACTION_CORRECTIVE_STATUT_INVALIDE', 'Une action corrective utilise un statut inconnu.', { actionId: item.id, status: item.status });
+    }
+    if (!RELEASE_ACTION_PRIORITIES[item.priority]) {
+      pushIssue('ERREUR', 'ACTION_CORRECTIVE_PRIORITE_INVALIDE', 'Une action corrective utilise une priorité inconnue.', { actionId: item.id, priority: item.priority });
+    }
+    if (!String(item.title || '').trim() || !String(item.description || '').trim()) {
+      pushIssue('ERREUR', 'ACTION_CORRECTIVE_CONTENU_INCOMPLET', 'Une action corrective ne contient pas de titre ou de description.', { actionId: item.id });
+    }
+  });
+
+  const deviceKeys = {};
+  const validTestIds = new Set((RELEASE_DEVICE_TESTS || []).map(function (item) { return item.id; }));
+  (devices || []).forEach(function (item) {
+    const key = [item.device, item.testId].join('|');
+    if (!item.id) {
+      pushIssue('ERREUR', 'RECETTE_MULTI_ECRANS_ID_INVALIDE', 'Un contrôle multi-écrans ne contient pas d’identifiant.', { key: key });
+    }
+    if (deviceKeys[key]) {
+      pushIssue('ERREUR', 'RECETTE_MULTI_ECRANS_DOUBLON', 'Un contrôle multi-écrans est dupliqué.', { key: key });
+    }
+    deviceKeys[key] = true;
+    if (!RELEASE_DEVICE_TYPES[item.device] || !validTestIds.has(item.testId) || !RELEASE_DEVICE_STATUSES[item.status]) {
+      pushIssue('ERREUR', 'RECETTE_MULTI_ECRANS_VALEUR_INVALIDE', 'Un contrôle multi-écrans contient un appareil, un scénario ou un statut inconnu.', { key: key, status: item.status });
+    }
+  });
+  const expectedDeviceChecks = Object.keys(RELEASE_DEVICE_TYPES).length * RELEASE_DEVICE_TESTS.length;
+  if ((devices || []).length && Object.keys(deviceKeys).length !== expectedDeviceChecks) {
+    pushIssue('AVERTISSEMENT', 'RECETTE_MULTI_ECRANS_INCOMPLETE', 'La recette multi-écrans enregistrée ne contient pas tous les scénarios attendus.', { expected: expectedDeviceChecks, actual: Object.keys(deviceKeys).length });
+  }
+
+  const decisionIds = {};
+  (decisions || []).forEach(function (item) {
+    if (!item.id || decisionIds[item.id]) {
+      pushIssue('ERREUR', 'MISE_PRODUCTION_ID_INVALIDE', 'Une décision de mise en production contient un identifiant absent ou dupliqué.', { decisionId: item.id || '' });
+    }
+    decisionIds[item.id] = true;
+    if (!RELEASE_DECISION_TYPES[item.decision]) {
+      pushIssue('ERREUR', 'MISE_PRODUCTION_DECISION_INVALIDE', 'Une décision de mise en production utilise un type inconnu.', { decisionId: item.id, decision: item.decision });
+    }
+    if (!RELEASE_ENVIRONMENTS[item.environment]) {
+      pushIssue('ERREUR', 'MISE_PRODUCTION_ENVIRONNEMENT_INVALIDE', 'Une décision de mise en production utilise un environnement inconnu.', { decisionId: item.id, environment: item.environment });
+    }
+    if (!item.reportFingerprint || !item.manifestSha256) {
+      pushIssue('AVERTISSEMENT', 'MISE_PRODUCTION_PREUVE_INCOMPLETE', 'Une décision de mise en production ne contient pas toutes ses empreintes de contrôle.', { decisionId: item.id });
+    }
   });
 }

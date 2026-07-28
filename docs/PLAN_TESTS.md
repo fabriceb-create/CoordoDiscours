@@ -1,9 +1,9 @@
-# Plan de recette fonctionnelle CoordoDiscours 1.13
+# Plan de recette fonctionnelle CoordoDiscours 1.14
 
 ## Préparation
 
 - Utiliser une base de test.
-- Exécuter `npm run check` et vérifier la réussite des dix suites.
+- Exécuter `npm run check` et vérifier la réussite des onze suites.
 - Exécuter `npm run predeploy:check` et traiter toute erreur bloquante.
 - Envoyer le code dans un projet Apps Script de recette.
 - Exécuter `installCoordoDiscours`.
@@ -207,7 +207,7 @@ Ces essais peuvent être réalisés avec les outils réseau du navigateur ou une
 ### Rapport de santé
 
 - Ouvrir `#release` avec un Administrateur.
-- Vérifier le score, l’état global et les cinq contrôles.
+- Vérifier le score, l’état global et les six contrôles.
 - Vérifier qu’un compte Coordinateur ou Consultation ne voit pas le module.
 - Supprimer ou vieillir la dernière sauvegarde dans une base de recette et vérifier le blocage.
 - Introduire une anomalie contrôlée puis vérifier le blocage d’intégrité.
@@ -216,7 +216,7 @@ Ces essais peuvent être réalisés avec les outils réseau du navigateur ou une
 ### Recette guidée
 
 - Démarrer une recette et vérifier la référence.
-- Exécuter les six étapes dans l’ordre.
+- Exécuter les sept étapes dans l’ordre.
 - Tenter une étape hors ordre et vérifier le refus.
 - Ouvrir une seconde fenêtre, remplacer la session et vérifier le refus de la session périmée.
 - Exporter le rapport JSON et contrôler la version, les étapes et la décision finale.
@@ -228,12 +228,71 @@ Ces essais peuvent être réalisés avec les outils réseau du navigateur ou une
 - Provoquer une erreur d’écriture dans une base de test et vérifier le bandeau de prudence.
 - Retrouver les références dans Mise en production.
 - Vérifier qu’aucune pile technique, jeton ou donnée métier complète n’est enregistrée.
+- Exporter le dossier de support et vérifier l’absence d’identifiant de feuille, d’URL de base et de nom d’orateur.
 
-## 18. Critères de validation
+## 18. Actions correctives
 
-La version 1.13 peut être déclarée testable lorsque :
+- Synchroniser les recommandations du rapport de santé.
+- Vérifier la création d’une action par contrôle non conforme.
+- Modifier le titre, la description, la priorité, le responsable, l’échéance et les notes.
+- Modifier la même action depuis deux fenêtres et vérifier le refus de la version périmée.
+- Terminer une action puis vérifier son classement dans les statuts terminaux.
+- Rendre le contrôle conforme puis resynchroniser et vérifier la clôture automatique de l’action de rapport.
+- Conserver une action bloquante ouverte et vérifier que l’approbation reste impossible.
 
-- les dix suites automatiques réussissent ;
+## 19. Recette multi-écrans
+
+- Vérifier la présence des 15 lignes : 3 appareils × 5 scénarios.
+- Enregistrer un résultat `REUSSI`, `ECHEC` et `A_TESTER`.
+- Vérifier qu’un échec rend le contrôle de santé bloquant.
+- Vérifier qu’un résultat à tester empêche l’état `READY`.
+- Compléter les 15 résultats avec succès puis vérifier le contrôle `PASS`.
+- Modifier la matrice dans une seconde fenêtre puis vérifier le conflit de version.
+- Tester réellement la navigation, le planning, les formulaires, la recherche et l’impression sur chaque format.
+
+## 20. Décisions de mise en production
+
+- Vérifier que le bouton Approuver est désactivé hors `READY` à 100/100.
+- Tenter une approbation sans `AUTORISER` et vérifier le refus.
+- Approuver un rapport conforme puis vérifier l’entrée du registre.
+- Tenter une seconde approbation identique et vérifier le refus.
+- Modifier le rapport entre affichage et décision puis vérifier le refus de l’empreinte périmée.
+- Reporter avec un motif et vérifier l’audit.
+- Tenter `DEPLOYED` sans approbation correspondante, sans identifiant ou sans `DEPLOYE`.
+- Enregistrer l’identifiant réel du déploiement puis exporter le manifeste.
+- Recalculer le checksum SHA-256 du noyau du manifeste.
+- Enregistrer un retour arrière avec motif et confirmation `RETOUR`.
+
+## 21. Capacité annuelle
+
+- Choisir l’année courante et une année antérieure disponible.
+- Vérifier le nombre de programmations non annulées.
+- Vérifier le jour hebdomadaire déduit du planning.
+- Contrôler le taux d’occupation théorique.
+- Vérifier que les orateurs actifs sans affectation participent au calcul d’équilibre.
+- Contrôler la concentration des 20 % les plus sollicités.
+- Vérifier la couverture des discours actifs et la part d’orateurs extérieurs.
+- Vérifier les recommandations déclenchées par des seuils insuffisants.
+
+## 22. Archivage contrôlé de l’historique
+
+À exécuter uniquement sur une copie de recette contenant des données artificielles.
+
+- Vérifier le refus d’un seuil inférieur à 180 jours.
+- Vérifier la conservation minimale de 500 lignes récentes.
+- Calculer un aperçu puis ajouter une ligne et vérifier le refus du nombre attendu périmé.
+- Tenter l’opération sans le mot `ARCHIVER`.
+- Vérifier la création du fichier JSON Google Drive avant la suppression.
+- Vérifier les en-têtes, critères et lignes dans l’archive.
+- Vérifier le nombre de lignes restantes dans la feuille.
+- Vérifier l’action `ARCHIVAGE_HISTORIQUE` dans l’audit.
+- Vérifier le refus d’un lot supérieur à 25 000 lignes.
+
+## 23. Critères de validation
+
+La version 1.14 peut être déclarée testable lorsque :
+
+- les onze suites automatiques réussissent ;
 - `runAcceptanceTests` réussit ;
 - aucun blocage JavaScript n’apparaît ;
 - les droits sont respectés ;
@@ -244,4 +303,8 @@ La version 1.13 peut être déclarée testable lorsque :
 - la programmation, la fusion, les versions, les sauvegardes et l’intégrité restent fonctionnelles ;
 - le rapport de santé ne contient aucun blocage non traité ;
 - la recette guidée est terminée et exportée ;
-- la recette ordinateur, tablette et téléphone est réussie.
+- la recette ordinateur, tablette et téléphone est réussie ;
+- aucune action corrective bloquante ne reste ouverte ;
+- une décision d’approbation ou de report est enregistrée ;
+- le manifeste et le dossier de support ont été vérifiés ;
+- l’archivage a été testé uniquement sur une copie de recette.

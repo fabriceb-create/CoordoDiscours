@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import crypto from 'node:crypto';
 
 const root = path.resolve('apps-script');
 let assertions = 0;
@@ -24,12 +25,12 @@ function isoDaysAgo(days) {
 function resetFixtures() {
   installationStatus = {
     installed: true,
-    appVersion: '1.13 Stable',
-    schemaVersion: '1.8.0',
+    appVersion: '1.14 Stable',
+    schemaVersion: '1.9.0',
     timezone: 'America/Guadeloupe',
     missingSheets: []
   };
-  settingsSnapshot = { VERSION: '1.13 Stable' };
+  settingsSnapshot = { VERSION: '1.14 Stable' };
   integrityReport = { ok: true, counts: { issues: 0 }, issues: [] };
   performanceReport = {
     slowThresholdMs: 1500,
@@ -37,7 +38,7 @@ function resetFixtures() {
     operations: []
   };
   backupEvent = { timestamp: isoDaysAgo(1), displayDate: 'hier', entityId: 'backup.json', details: {} };
-  acceptanceEvent = { timestamp: isoDaysAgo(1), displayDate: 'hier', entityId: '1.13 Stable', details: { success: true, total: 18, passed: 18, failed: 0, blockingFailed: 0 } };
+  acceptanceEvent = { timestamp: isoDaysAgo(1), displayDate: 'hier', entityId: '1.14 Stable', details: { success: true, total: 18, passed: 18, failed: 0, blockingFailed: 0 } };
   acceptanceResult = { success: true, total: 18, passed: 18, failed: 0, blockingFailed: 0, tests: [] };
   auditActions.length = 0;
   properties.clear();
@@ -67,14 +68,17 @@ const context = {
   RegExp,
   Error,
   Set,
-  APP_CONFIG: { name: 'CoordoDiscours', version: '1.13 Stable' },
-  INSTALLATION_SCHEMA_VERSION: '1.8.0',
+  APP_CONFIG: { name: 'CoordoDiscours', version: '1.14 Stable' },
+  INSTALLATION_SCHEMA_VERSION: '1.9.0',
   ACCESS_ROLES: roleDefinitions,
   Session: {
     getScriptTimeZone: () => 'America/Guadeloupe',
     getActiveUser: () => ({ getEmail: () => access().email })
   },
   Utilities: {
+    DigestAlgorithm: { SHA_256: 'SHA_256' },
+    Charset: { UTF_8: 'UTF_8' },
+    computeDigest: (_algorithm, text) => Array.from(crypto.createHash('sha256').update(String(text)).digest()).map(value => value > 127 ? value - 256 : value),
     formatDate: date => {
       const d = new Date(date);
       return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -107,6 +111,7 @@ const context = {
   getSettingsSnapshot_: () => JSON.parse(JSON.stringify(settingsSnapshot)),
   getDataIntegrityReport_: () => JSON.parse(JSON.stringify(integrityReport)),
   getServerPerformanceReport_: () => JSON.parse(JSON.stringify(performanceReport)),
+  getReleaseDeviceAcceptanceSummary_: () => ({ total: 15, passed: 15, failed: 0, pending: 0, complete: true, status: 'PASS', byDevice: [] }),
   listHistory: filters => {
     if (filters.action === 'SAUVEGARDE') return backupEvent ? [JSON.parse(JSON.stringify(backupEvent))] : [];
     if (filters.action === 'TEST_ACCEPTATION') return acceptanceEvent ? [JSON.parse(JSON.stringify(acceptanceEvent))] : [];
@@ -122,7 +127,7 @@ const context = {
     return [];
   },
   runAcceptanceTests: () => {
-    acceptanceEvent = { timestamp: new Date().toISOString(), displayDate: 'maintenant', entityId: '1.13 Stable', details: JSON.parse(JSON.stringify(acceptanceResult)) };
+    acceptanceEvent = { timestamp: new Date().toISOString(), displayDate: 'maintenant', entityId: '1.14 Stable', details: JSON.parse(JSON.stringify(acceptanceResult)) };
     return JSON.parse(JSON.stringify(acceptanceResult));
   },
   logAction_: (actionName, entity, entityId, details) => auditActions.push({ action: actionName, entity, entityId, details })
@@ -210,11 +215,11 @@ resetFixtures();
 // 9. Les six étapes doivent pouvoir aller jusqu’à une décision READY.
 {
   let session = context.getReleaseAcceptanceSession();
-  for (const step of ['installation', 'integrity', 'backup', 'performance', 'acceptance', 'final']) {
+  for (const step of ['installation', 'integrity', 'backup', 'performance', 'acceptance', 'devices', 'final']) {
     session = context.runReleaseAcceptanceStep(session.id, step);
   }
   assert.equal(session.status, 'COMPLETED');
-  assert.equal(session.results.length, 6);
+  assert.equal(session.results.length, 7);
   assert.equal(session.finalReport.status, 'READY');
   assert.equal(session.currentStepId, '');
   check(auditActions.some(item => item.action === 'RECETTE_DEPLOIEMENT_TERMINEE'), 'La fin de recette n’est pas auditée.');

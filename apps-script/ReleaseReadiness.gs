@@ -1,4 +1,4 @@
-const RELEASE_READINESS_ENGINE_VERSION = '1.0.0';
+const RELEASE_READINESS_ENGINE_VERSION = '1.1.0';
 const RELEASE_READINESS_SESSION_PROPERTY = 'COORDODISCOURS_RELEASE_ACCEPTANCE_V1';
 const RELEASE_READINESS_BACKUP_WARNING_DAYS = 7;
 const RELEASE_READINESS_BACKUP_BLOCKING_DAYS = 14;
@@ -13,6 +13,7 @@ const RELEASE_ACCEPTANCE_STEPS = Object.freeze([
   { id: 'backup', label: 'Sauvegarde récente', description: 'Vérifier qu’une sauvegarde exploitable a été créée récemment.' },
   { id: 'performance', label: 'Performance et incidents', description: 'Examiner les erreurs et appels lents observés côté serveur.' },
   { id: 'acceptance', label: 'Recette interne', description: 'Exécuter les tests d’acceptation dans l’environnement Apps Script.' },
+  { id: 'devices', label: 'Recette multi-écrans', description: 'Valider manuellement l’application sur ordinateur, tablette et téléphone.' },
   { id: 'final', label: 'Décision de mise en production', description: 'Consolider le score, les blocages et les recommandations finales.' }
 ]);
 
@@ -173,20 +174,23 @@ function resetReleaseAcceptanceSession() {
 function buildReleaseReadinessReport_() {
   const now = new Date();
   const checks = [
-    safeReleaseReadinessCheck_('installation', 'Installation et structure', 20, function () {
+    safeReleaseReadinessCheck_('installation', 'Installation et structure', 15, function () {
       return assessInstallationReadiness_(getInstallationStatus(), getSettingsSnapshot_());
     }),
     safeReleaseReadinessCheck_('integrity', 'Intégrité des données', 25, function () {
       return assessIntegrityReadiness_(getDataIntegrityReport_({ silent: true }));
     }),
-    safeReleaseReadinessCheck_('backup', 'Sauvegarde récente', 20, function () {
+    safeReleaseReadinessCheck_('backup', 'Sauvegarde récente', 15, function () {
       return assessBackupReadiness_(latestReleaseAuditEvent_('SAUVEGARDE'), now);
     }),
     safeReleaseReadinessCheck_('performance', 'Performance et incidents', 15, function () {
       return assessPerformanceReadiness_(getServerPerformanceReport_());
     }),
-    safeReleaseReadinessCheck_('acceptance', 'Recette interne', 20, function () {
+    safeReleaseReadinessCheck_('acceptance', 'Recette interne', 15, function () {
       return assessAcceptanceReadiness_(latestReleaseAuditEvent_('TEST_ACCEPTATION'), now);
+    }),
+    safeReleaseReadinessCheck_('devices', 'Recette multi-écrans', 15, function () {
+      return assessDeviceAcceptanceReadiness_(getReleaseDeviceAcceptanceSummary_());
     })
   ];
   const score = checks.reduce(function (sum, item) { return sum + Number(item.score || 0); }, 0);
@@ -199,7 +203,7 @@ function buildReleaseReadinessReport_() {
   const recommendations = checks.filter(function (item) { return item.status !== 'PASS' && item.remediation; }).map(function (item) {
     return { checkId: item.id, label: item.label, status: item.status, action: item.remediation };
   });
-  return {
+  const report = {
     reference: buildSupportReference_('SANTE'),
     engineVersion: RELEASE_READINESS_ENGINE_VERSION,
     appVersion: APP_CONFIG.version,
@@ -211,6 +215,8 @@ function buildReleaseReadinessReport_() {
     checks: checks,
     recommendations: recommendations
   };
+  report.fingerprint = releaseReadinessFingerprint_(report);
+  return report;
 }
 
 function safeReleaseReadinessCheck_(id, label, weight, callback) {
@@ -365,6 +371,58 @@ function assessAcceptanceReadiness_(event, now) {
   return { status: 'PASS', message: 'La dernière recette d’acceptation est récente et réussie.', details: details, remediation: '' };
 }
 
+function assessDeviceAcceptanceReadiness_(summary) {
+  summary = summary || { total: 0, passed: 0, failed: 0, pending: 0, complete: false, byDevice: [] };
+  const details = {
+    total: Number(summary.total) || 0,
+    passed: Number(summary.passed) || 0,
+    failed: Number(summary.failed) || 0,
+    pending: Number(summary.pending) || 0,
+    complete: summary.complete === true,
+    byDevice: summary.byDevice || []
+  };
+  if (details.failed > 0) {
+    return {
+      status: 'BLOCKING',
+      message: details.failed + ' contrôle(s) multi-écrans sont en échec.',
+      details: details,
+      remediation: 'Corrige les échecs puis rejoue les contrôles sur les trois formats d’écran.'
+    };
+  }
+  if (!details.complete) {
+    return {
+      status: 'BLOCKING',
+      message: details.pending + ' contrôle(s) multi-écrans restent à exécuter.',
+      details: details,
+      remediation: 'Valide tous les scénarios sur ordinateur, tablette et téléphone avant la production.'
+    };
+  }
+  return { status: 'PASS', message: 'La recette multi-écrans est complète et réussie.', details: details, remediation: '' };
+}
+
+function releaseReadinessFingerprint_(report) {
+  const stable = {
+    appVersion: report && report.appVersion,
+    engineVersion: report && report.engineVersion,
+    status: report && report.status,
+    score: report && report.score,
+    checks: (report && report.checks || []).map(function (item) {
+      return {
+        id: item.id,
+        status: item.status,
+        score: item.score,
+        weight: item.weight,
+        message: item.message
+      };
+    })
+  };
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(stable), Utilities.Charset.UTF_8);
+  return bytes.map(function (value) {
+    const normalized = value < 0 ? value + 256 : value;
+    return ('0' + normalized.toString(16)).slice(-2);
+  }).join('');
+}
+
 function releaseReadinessOverallStatus_(checks) {
   if ((checks || []).some(function (item) { return item.status === 'BLOCKING'; })) return 'BLOCKED';
   if ((checks || []).some(function (item) { return item.status === 'WARNING'; })) return 'ATTENTION';
@@ -412,6 +470,10 @@ function executeReleaseAcceptanceStep_(stepId) {
       ? { status: 'PASS', message: tests.passed + ' test(s) réussis sur ' + tests.total + '.', details: tests, remediation: '' }
       : { status: 'BLOCKING', message: tests.blockingFailed + ' échec(s) bloquant(s) pendant la recette.', details: tests, remediation: 'Corrige les tests en échec avant la mise en production.' };
     return releaseReadinessCheck_('acceptance', 'Recette interne', assessed.status, 0, assessed.message, assessed.details, assessed.remediation);
+  }
+  if (stepId === 'devices') {
+    const assessed = assessDeviceAcceptanceReadiness_(getReleaseDeviceAcceptanceSummary_());
+    return releaseReadinessCheck_('devices', 'Recette multi-écrans', assessed.status, 0, assessed.message, assessed.details, assessed.remediation);
   }
   if (stepId === 'final') {
     const report = buildReleaseReadinessReport_();

@@ -4,7 +4,7 @@ import path from 'node:path';
 const root = path.resolve('apps-script');
 const required = [
   'appsscript.json', 'Config.gs', 'Database.gs', 'Installation.gs', 'Code.gs', 'Utils.gs', 'Tests.gs',
-  'Access.gs', 'Concurrency.gs', 'ServerCache.gs', 'Performance.gs', 'SupportDiagnostics.gs', 'Help.gs', 'ReleaseReadiness.gs',
+  'Access.gs', 'Concurrency.gs', 'ServerCache.gs', 'Performance.gs', 'SupportDiagnostics.gs', 'Help.gs', 'ReleaseReadiness.gs', 'ReleaseGovernance.gs',
   'Planning.gs', 'RulesEngine.gs', 'RecommendationEngine.gs', 'ConflictResolution.gs', 'AutomaticPlanning.gs',
   'MergeEngine.gs', 'VersionHistory.gs', 'Speakers.gs', 'SpeakerTalks.gs', 'SpeakerAvailability.gs',
   'Congregations.gs', 'Talks.gs', 'HospitalityInvitations.gs', 'Dashboard.gs', 'PrintPlanning.gs',
@@ -18,7 +18,7 @@ const required = [
   'CommunicationStyles.html', 'CommunicationScripts.html', 'PrintPlanningStyles.html', 'PrintPlanningScripts.html',
   'HistoryStyles.html', 'HistoryScripts.html', 'BackupStyles.html', 'BackupScripts.html',
   'SettingsStyles.html', 'SettingsScripts.html', 'HelpStyles.html', 'HelpScripts.html',
-  'ReleaseReadinessStyles.html', 'ReleaseReadinessScripts.html'
+  'ReleaseReadinessStyles.html', 'ReleaseReadinessScripts.html', 'ReleaseGovernanceStyles.html', 'ReleaseGovernanceScripts.html'
 ];
 
 const errors = [];
@@ -68,7 +68,9 @@ if (index) {
     ['HelpStyles', 'Les styles du guide intégré ne sont pas inclus.'],
     ['HelpScripts', 'Le script du guide intégré n’est pas inclus.'],
     ['ReleaseReadinessStyles', 'Les styles de préparation au déploiement ne sont pas inclus.'],
-    ['ReleaseReadinessScripts', 'Le script de préparation au déploiement n’est pas inclus.']
+    ['ReleaseReadinessScripts', 'Le script de préparation au déploiement n’est pas inclus.'],
+    ['ReleaseGovernanceStyles', 'Les styles de gouvernance de mise en production ne sont pas inclus.'],
+    ['ReleaseGovernanceScripts', 'Le script de gouvernance de mise en production n’est pas inclus.']
   ].forEach(([needle, message]) => requireText(index, needle, message));
   requireText(index, /id="automatic-planning"[\s\S]*id="automatic-planning-dialog"/, 'L’accès à la planification automatique est absent de l’interface.');
   requireText(index, /data-view="versions"[\s\S]*id="view-versions"/, 'L’historique des versions n’est pas accessible depuis la navigation.');
@@ -95,7 +97,10 @@ const config = read('Config.gs');
 if (config) {
   requireText(config, "users: 'UTILISATEURS'", 'La feuille UTILISATEURS n’est pas déclarée dans Config.gs.');
   requireText(config, "speakerAvailability: 'ORATEUR_DISPONIBILITES'", 'La feuille ORATEUR_DISPONIBILITES n’est pas déclarée dans Config.gs.');
-  requireText(config, /version:\s*['"]1\.13 Stable['"]/, 'Config.gs doit déclarer CoordoDiscours 1.13 Stable.');
+  requireText(config, /version:\s*['"]1\.14 Stable['"]/, 'Config.gs doit déclarer CoordoDiscours 1.14 Stable.');
+  requireText(config, "releaseActions: 'ACTIONS_CORRECTIVES'", 'La feuille ACTIONS_CORRECTIVES n’est pas déclarée.');
+  requireText(config, "releaseDevices: 'RECETTE_MULTI_ECRANS'", 'La feuille RECETTE_MULTI_ECRANS n’est pas déclarée.');
+  requireText(config, "releaseDecisions: 'MISES_EN_PRODUCTION'", 'La feuille MISES_EN_PRODUCTION n’est pas déclarée.');
 }
 
 function functionBody(source, functionName) {
@@ -172,6 +177,20 @@ const protectedFunctions = [
   ['ReleaseReadiness.gs', 'runReleaseAcceptanceStep', 'ADMIN'],
   ['ReleaseReadiness.gs', 'exportReleaseAcceptanceReport', 'ADMIN'],
   ['ReleaseReadiness.gs', 'resetReleaseAcceptanceSession', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'getReleaseGovernanceBootstrap', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'listReleaseCorrectiveActions', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'syncReleaseCorrectiveActions', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'saveReleaseCorrectiveAction', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'setReleaseCorrectiveActionStatus', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'getReleaseDeviceAcceptance', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'saveReleaseDeviceAcceptance', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'listReleaseDecisions', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'registerReleaseDecision', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'exportReleaseManifest', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'exportReleaseSupportBundle', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'getAnnualCapacityReport', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'previewHistoryArchive', 'ADMIN'],
+  ['ReleaseGovernance.gs', 'archiveHistoryRows', 'ADMIN'],
   ['VersionHistory.gs', 'getVersionHistoryBootstrap', 'CONSULTATION']
 ];
 
@@ -232,6 +251,7 @@ if (installation) {
   requireText(installation, 'getHelpBootstrap', 'La recette doit vérifier le guide intégré.');
   requireText(installation, 'measureServerOperation_', 'La recette doit vérifier l’observabilité serveur.');
   requireText(installation, 'getCachedServerValue_', 'La recette doit vérifier le cache serveur.');
+  requireText(installation, 'getReleaseGovernanceBootstrap', 'La recette doit vérifier la gouvernance de mise en production.');
 }
 
 const planning = read('Planning.gs');
@@ -341,7 +361,7 @@ const releaseReadiness = read('ReleaseReadiness.gs');
 const releaseUi = read('ReleaseReadinessScripts.html');
 const supportDiagnostics = read('SupportDiagnostics.gs');
 requireText(releaseReadiness, /function\s+buildReleaseReadinessReport_\s*\(/, 'Mise en production : le rapport global de santé est absent.');
-requireText(releaseReadiness, /RELEASE_ACCEPTANCE_STEPS[\s\S]*installation[\s\S]*integrity[\s\S]*backup[\s\S]*performance[\s\S]*acceptance[\s\S]*final/, 'Mise en production : les six étapes de recette sont incomplètes.');
+requireText(releaseReadiness, /RELEASE_ACCEPTANCE_STEPS[\s\S]*installation[\s\S]*integrity[\s\S]*backup[\s\S]*performance[\s\S]*acceptance[\s\S]*devices[\s\S]*final/, 'Mise en production : les sept étapes de recette sont incomplètes.');
 requireText(releaseReadiness, /PropertiesService\.getScriptProperties\(\)/, 'Mise en production : la recette guidée n’est pas persistée.');
 requireText(releaseReadiness, /exportReleaseAcceptanceReport/, 'Mise en production : l’export du rapport de recette est absent.');
 requireText(releaseUi, /loadReleaseReadiness_/, 'Interface : le chargement du rapport de santé est absent.');
@@ -349,6 +369,21 @@ requireText(releaseUi, /runReleaseAcceptanceStep/, 'Interface : la recette guid�
 requireText(releaseUi, /exportReleaseAcceptanceReport/, 'Interface : le rapport de recette ne peut pas être exporté.');
 requireText(supportDiagnostics, /INCIDENT_CLIENT/, 'Support : les incidents client ne sont pas journalisés.');
 requireText(supportDiagnostics, /sanitizeSupportText_/, 'Support : les informations d’incident ne sont pas assainies.');
+
+
+const releaseGovernance = read('ReleaseGovernance.gs');
+const releaseGovernanceUi = read('ReleaseGovernanceScripts.html');
+requireText(releaseGovernance, /function\s+syncReleaseCorrectiveActions\s*\(/, 'Gouvernance : la synchronisation des actions correctives est absente.');
+requireText(releaseGovernance, /assertEntityVersion_\(['"]ACTION_CORRECTIVE['"]/, 'Gouvernance : les actions correctives ne sont pas protégées par version.');
+requireText(releaseGovernance, /RELEASE_DEVICE_TYPES[\s\S]*ORDINATEUR[\s\S]*TABLETTE[\s\S]*TELEPHONE/, 'Gouvernance : les trois formats de recette sont incomplets.');
+requireText(releaseGovernance, /function\s+registerReleaseDecision\s*\(/, 'Gouvernance : le registre des décisions est absent.');
+requireText(releaseGovernance, /AUTORISER[\s\S]*DEPLOYE[\s\S]*RETOUR/, 'Gouvernance : les confirmations fortes des décisions sont absentes.');
+requireText(releaseGovernance, /function\s+exportReleaseManifest\s*\(/, 'Gouvernance : le manifeste de déploiement est absent.');
+requireText(releaseGovernance, /function\s+getAnnualCapacityReport\s*\(/, 'Gouvernance : le rapport annuel de capacité est absent.');
+requireText(releaseGovernance, /DriveApp\.createFile[\s\S]*ARCHIVAGE_HISTORIQUE/, 'Gouvernance : l’archivage contrôlé de l’historique est absent.');
+requireText(releaseGovernanceUi, /saveReleaseDeviceAcceptance/, 'Interface : la recette multi-écrans ne peut pas être enregistrée.');
+requireText(releaseGovernanceUi, /registerReleaseDecision/, 'Interface : les décisions de mise en production ne peuvent pas être enregistrées.');
+requireText(releaseGovernanceUi, /archiveHistoryRows/, 'Interface : l’archivage contrôlé n’est pas accessible.');
 
 if (errors.length) {
   console.error('\nValidation CoordoDiscours : ÉCHEC\n');

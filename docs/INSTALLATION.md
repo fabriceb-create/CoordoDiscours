@@ -1,4 +1,4 @@
-# Installation de CoordoDiscours 1.13
+# Installation de CoordoDiscours 1.14
 
 ## 1. Préparer les fichiers
 
@@ -10,7 +10,7 @@ npm run check
 npm run predeploy:check
 ```
 
-`npm run check` doit terminer les dix suites sans erreur. `predeploy:check` peut signaler l’absence de `.clasp.json` tant que le projet Apps Script n’a pas encore été associé.
+`npm run check` doit terminer les onze suites sans erreur. `predeploy:check` peut signaler l’absence de `.clasp.json` tant que le projet Apps Script n’a pas encore été associé.
 
 ## 2. Créer le projet Apps Script
 
@@ -65,7 +65,13 @@ L’installation :
 - invalide les caches ;
 - exécute la recette interne.
 
-La version 1.13 n’ajoute aucune feuille : le schéma reste `1.8.0`.
+La version 1.14 porte le schéma à `1.9.0` et ajoute trois feuilles obligatoires :
+
+- `ACTIONS_CORRECTIVES` ;
+- `RECETTE_MULTI_ECRANS` ;
+- `MISES_EN_PRODUCTION`.
+
+L’installation crée uniquement les feuilles manquantes et ne supprime aucune donnée existante.
 
 ## 5. Vérification
 
@@ -90,13 +96,18 @@ Vérifier ensuite manuellement :
 8. intégrité ;
 9. performance serveur ;
 10. affichage mobile ;
-11. rapport de santé et recette guidée.
+11. rapport de santé et recette guidée ;
+12. actions correctives ;
+13. matrice ordinateur, tablette et téléphone ;
+14. registre des décisions ;
+15. rapport annuel de capacité ;
+16. aperçu d’archivage sans exécution.
 
 ## 6. Déployer l’application Web
 
 1. Ouvrir **Déployer > Nouveau déploiement**.
 2. Choisir **Application Web**.
-3. Nommer la version, par exemple `CoordoDiscours 1.13 recette`.
+3. Nommer la version, par exemple `CoordoDiscours 1.14 recette`.
 4. Exécuter l’application avec le compte du propriétaire.
 5. Limiter l’accès aux utilisateurs autorisés.
 6. Déployer et conserver l’URL.
@@ -110,10 +121,14 @@ Le manifeste fourni limite l’accès au propriétaire. Élargir l’accès uniq
 3. Remplacer ou pousser les fichiers.
 4. Exécuter `installCoordoDiscours`.
 5. Exécuter `runAcceptanceTests`.
-6. Ouvrir Mise en production et terminer la recette guidée.
-7. Exporter le rapport de recette.
-8. Créer une nouvelle version du déploiement Web.
-9. Effectuer la recette réelle.
+6. Ouvrir Mise en production et synchroniser les actions correctives.
+7. Compléter la matrice des 15 tests réels.
+8. Terminer la recette guidée en sept étapes.
+9. Exporter le rapport de recette.
+10. Enregistrer une approbation ou un report.
+11. Créer une nouvelle version du déploiement Web.
+12. Enregistrer l’identifiant réel du déploiement.
+13. Exporter le manifeste final.
 
 Les migrations ne suppriment pas les données existantes.
 
@@ -127,4 +142,4 @@ Redéployer la version Apps Script précédente.
 
 Restaurer une sauvegarde uniquement si les données ont été altérées. La restauration crée une copie de sécurité Drive avant toute modification.
 
-Après un retour arrière, relancer les contrôles d’installation et d’intégrité.
+Après un retour arrière, relancer les contrôles d’installation et d’intégrité puis enregistrer la décision `ROLLED_BACK` dans le module Mise en production.

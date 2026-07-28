@@ -47,6 +47,9 @@ jobs:
       - name: Tester la préparation à la mise en production
         run: npm run test:release
 
+      - name: Tester la gouvernance de mise en production
+        run: npm run test:governance
+
       - name: Publier le code testé
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4

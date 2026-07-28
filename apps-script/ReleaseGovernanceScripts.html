@@ -1,0 +1,352 @@
+<script>
+  const releaseGovernanceState = {
+    bootstrap: null,
+    actions: [],
+    actionSummary: null,
+    deviceAcceptance: null,
+    decisions: [],
+    annualCapacity: null,
+    archivePreview: null,
+    loading: false
+  };
+
+  function releaseActionStatusLabel_(status) {
+    return releaseGovernanceState.bootstrap && releaseGovernanceState.bootstrap.actionStatuses && releaseGovernanceState.bootstrap.actionStatuses[status] || status || '';
+  }
+
+  function releaseDecisionLabel_(decision) {
+    return releaseGovernanceState.bootstrap && releaseGovernanceState.bootstrap.decisionTypes && releaseGovernanceState.bootstrap.decisionTypes[decision] || decision || '';
+  }
+
+  function releaseGovernanceYearValue_() {
+    const select = document.getElementById('release-capacity-year');
+    return select ? Number(select.value) || new Date().getFullYear() : new Date().getFullYear();
+  }
+
+  function isReleaseGovernanceVersionConflict_(error) {
+    return typeof isConcurrentVersionConflict_ === 'function'
+      ? isConcurrentVersionConflict_(error)
+      : String(error && (error.message || error)).includes('CONFLIT_VERSION|');
+  }
+
+  async function handleReleaseGovernanceVersionConflict_(error) {
+    if (!isReleaseGovernanceVersionConflict_(error)) return false;
+    toast('La fiche a changé. Les données de gouvernance ont été actualisées.');
+    await loadReleaseGovernance_(true);
+    return true;
+  }
+
+  async function loadReleaseGovernance_(force) {
+    if (releaseGovernanceState.loading) return;
+    if (!document.getElementById('release-governance-actions')) return;
+    releaseGovernanceState.loading = true;
+    try {
+      if (!releaseGovernanceState.bootstrap || force) {
+        releaseGovernanceState.bootstrap = await runServer('getReleaseGovernanceBootstrap', releaseGovernanceYearValue_());
+      }
+      const data = releaseGovernanceState.bootstrap || {};
+      releaseGovernanceState.actions = data.actions || [];
+      releaseGovernanceState.actionSummary = data.actionSummary || {};
+      releaseGovernanceState.deviceAcceptance = data.deviceAcceptance || null;
+      releaseGovernanceState.decisions = data.decisions || [];
+      releaseGovernanceState.annualCapacity = data.annualCapacity || null;
+      releaseGovernanceState.archivePreview = data.archivePreview || null;
+      renderReleaseGovernance_();
+    } catch (error) {
+      showError(error);
+      ['release-governance-actions','release-device-acceptance','release-decisions','release-capacity','release-history-maintenance'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.innerHTML = '<div class="release-empty">Impossible de charger ce volet de gouvernance.</div>';
+      });
+    } finally {
+      releaseGovernanceState.loading = false;
+    }
+  }
+
+  function renderReleaseGovernance_() {
+    renderReleaseCorrectiveActions_();
+    renderReleaseDeviceAcceptance_();
+    renderReleaseDecisions_();
+    renderAnnualCapacity_();
+    renderHistoryMaintenance_();
+  }
+
+  function renderReleaseCorrectiveActions_() {
+    const container = document.getElementById('release-governance-actions');
+    if (!container) return;
+    const summary = releaseGovernanceState.actionSummary || {};
+    const actions = releaseGovernanceState.actions || [];
+    container.innerHTML = `
+      <section class="release-panel">
+        <div class="release-panel-head"><div><p class="eyebrow">Actions correctives</p><h3>Suivi du plan d’action</h3><p class="release-data-note">Les recommandations du rapport peuvent être transformées en actions suivies, attribuées et datées.</p></div><div class="release-toolbar-actions"><button id="release-actions-sync" type="button" class="secondary-button">Synchroniser le rapport</button><button id="release-action-new" type="button" class="primary-button">Nouvelle action</button></div></div>
+        <div class="release-summary-row"><span class="release-summary-chip ${summary.blockingOpen ? 'blocking' : 'pass'}">${escapeHtml(summary.blockingOpen || 0)} bloquante(s)</span><span class="release-summary-chip warning">${escapeHtml(summary.highOpen || 0)} haute(s)</span><span class="release-summary-chip ${summary.overdue ? 'blocking' : ''}">${escapeHtml(summary.overdue || 0)} en retard</span><span class="release-summary-chip">${escapeHtml(summary.active || 0)} active(s)</span></div>
+        <div class="release-action-list" style="margin-top:14px">${actions.length ? actions.slice(0, 40).map(renderReleaseActionCard_).join('') : '<div class="release-empty-compact">Aucune action corrective enregistrée.</div>'}</div>
+      </section>`;
+  }
+
+  function renderReleaseActionCard_(item) {
+    const overdue = item.dueDate && item.dueDate < new Date().toISOString().slice(0,10) && !['TERMINEE','RISQUE_ACCEPTE','ANNULEE'].includes(item.status);
+    return `<article class="release-action-card ${overdue ? 'overdue' : ''}">
+      <div class="release-action-head"><div><span class="release-priority ${escapeHtml(String(item.priority || '').toLowerCase())}">${escapeHtml(item.priority || '')}</span><h4>${escapeHtml(item.title)}</h4></div><span class="release-status ${releaseStatusClass_(item.status === 'TERMINEE' ? 'PASS' : item.status === 'EN_COURS' ? 'WARNING' : item.status === 'A_FAIRE' ? 'PENDING' : 'ATTENTION')}">${escapeHtml(releaseActionStatusLabel_(item.status))}</span></div>
+      <p>${escapeHtml(item.description)}</p>
+      <div class="release-action-meta">${item.responsible ? 'Responsable : ' + escapeHtml(item.responsible) + '<br>' : ''}${item.dueDate ? 'Échéance : ' + escapeHtml(item.dueDate) + (overdue ? ' — en retard' : '') + '<br>' : ''}${item.source === 'RAPPORT' ? 'Source : rapport ' + escapeHtml(item.reportReference || item.sourceId) : 'Source : action manuelle'}</div>
+      <div class="release-action-buttons"><button type="button" class="secondary-button" data-release-action-edit="${escapeHtml(item.id)}">Modifier</button>${!['TERMINEE','RISQUE_ACCEPTE','ANNULEE'].includes(item.status) ? `<button type="button" class="secondary-button" data-release-action-status="TERMINEE" data-action-id="${escapeHtml(item.id)}" data-version="${escapeHtml(item.version || '')}">Terminer</button>` : ''}</div>
+    </article>`;
+  }
+
+  function openReleaseActionDialog_(item) {
+    const dialog = document.getElementById('release-action-dialog');
+    const form = document.getElementById('release-action-form');
+    if (!dialog || !form) return;
+    form.reset();
+    form.elements.id.value = item && item.id || '';
+    form.elements.version.value = item && item.version || '';
+    form.elements.title.value = item && item.title || '';
+    form.elements.description.value = item && item.description || '';
+    form.elements.priority.value = item && item.priority || 'NORMALE';
+    form.elements.status.value = item && item.status || 'A_FAIRE';
+    form.elements.responsible.value = item && item.responsible || '';
+    form.elements.dueDate.value = item && item.dueDate || '';
+    form.elements.notes.value = item && item.notes || '';
+    document.getElementById('release-action-dialog-title').textContent = item ? 'Modifier l’action corrective' : 'Nouvelle action corrective';
+    dialog.showModal();
+  }
+
+  async function saveReleaseAction_(form) {
+    const payload = formToObject(form);
+    try {
+      await runServer('saveReleaseCorrectiveAction', payload);
+      document.getElementById('release-action-dialog').close();
+      toast('Action corrective enregistrée.');
+      await loadReleaseGovernance_(true);
+    } catch (error) {
+      if (!await handleReleaseGovernanceVersionConflict_(error)) showError(error);
+    }
+  }
+
+  async function syncReleaseActions_(button) {
+    await withBusyElement_(button, async () => {
+      try {
+        const result = await runServer('syncReleaseCorrectiveActions');
+        releaseGovernanceState.actions = result.actions || [];
+        releaseGovernanceState.actionSummary = releaseCorrectiveActionSummaryClient_(releaseGovernanceState.actions);
+        if (result.report && typeof releaseReadinessState !== 'undefined') {
+          releaseReadinessState.report = result.report;
+          if (releaseReadinessState.bootstrap) releaseReadinessState.bootstrap.report = result.report;
+          renderReleaseReadiness_();
+        }
+        renderReleaseCorrectiveActions_();
+        toast(`${result.changedCount || 0} action(s) synchronisée(s).`);
+      } catch (error) { showError(error); }
+    });
+  }
+
+  function releaseCorrectiveActionSummaryClient_(actions) {
+    const active = (actions || []).filter(item => !['TERMINEE','RISQUE_ACCEPTE','ANNULEE'].includes(item.status));
+    return {
+      total: (actions || []).length,
+      active: active.length,
+      blockingOpen: active.filter(item => item.priority === 'BLOQUANTE').length,
+      highOpen: active.filter(item => item.priority === 'HAUTE').length,
+      overdue: active.filter(item => item.dueDate && item.dueDate < new Date().toISOString().slice(0,10)).length,
+      completed: (actions || []).filter(item => item.status === 'TERMINEE').length,
+      riskAccepted: (actions || []).filter(item => item.status === 'RISQUE_ACCEPTE').length
+    };
+  }
+
+  function renderReleaseDeviceAcceptance_() {
+    const container = document.getElementById('release-device-acceptance');
+    const acceptance = releaseGovernanceState.deviceAcceptance;
+    if (!container || !acceptance) return;
+    const summary = acceptance.summary || {};
+    container.innerHTML = `
+      <section class="release-panel release-governance-wide">
+        <div class="release-panel-head"><div><p class="eyebrow">Recette réelle</p><h3>Ordinateur, tablette et téléphone</h3><p class="release-data-note">Chaque scénario doit être réellement exécuté sur les trois formats avant une approbation de production.</p></div><div class="release-summary-row"><span class="release-summary-chip ${summary.failed ? 'blocking' : summary.complete ? 'pass' : 'warning'}">${escapeHtml(summary.passed || 0)} / ${escapeHtml(summary.total || 0)} réussis</span><span class="release-summary-chip ${summary.failed ? 'blocking' : ''}">${escapeHtml(summary.failed || 0)} échec(s)</span></div></div>
+        <div class="release-device-table-wrap"><table class="release-device-table"><thead><tr><th>Appareil</th><th>Scénario</th><th>Résultat</th><th>Commentaire</th></tr></thead><tbody>${(acceptance.entries || []).map(entry => `<tr data-release-device-row data-device="${escapeHtml(entry.device)}" data-test-id="${escapeHtml(entry.testId)}"><td><strong>${escapeHtml(entry.deviceLabel)}</strong></td><td>${escapeHtml(entry.label)}</td><td><select data-release-device-status><option value="A_TESTER" ${entry.status === 'A_TESTER' ? 'selected' : ''}>À tester</option><option value="REUSSI" ${entry.status === 'REUSSI' ? 'selected' : ''}>Réussi</option><option value="ECHEC" ${entry.status === 'ECHEC' ? 'selected' : ''}>Échec</option></select></td><td><input data-release-device-comment value="${escapeHtml(entry.comment || '')}" placeholder="Observation facultative"></td></tr>`).join('')}</tbody></table></div>
+        <div class="release-actions"><button id="release-device-save" type="button" class="primary-button" data-version="${escapeHtml(acceptance.version || '')}">Enregistrer la recette multi-écrans</button></div>
+      </section>`;
+  }
+
+  async function saveReleaseDeviceAcceptance_(button) {
+    const entries = Array.from(document.querySelectorAll('[data-release-device-row]')).map(row => ({
+      device: row.dataset.device,
+      testId: row.dataset.testId,
+      status: row.querySelector('[data-release-device-status]').value,
+      comment: row.querySelector('[data-release-device-comment]').value
+    }));
+    await withBusyElement_(button, async () => {
+      try {
+        releaseGovernanceState.deviceAcceptance = await runServer('saveReleaseDeviceAcceptance', { version: button.dataset.version, entries: entries });
+        renderReleaseDeviceAcceptance_();
+        if (typeof refreshReleaseReadiness_ === 'function') await refreshReleaseReadiness_(null);
+        toast('Recette multi-écrans enregistrée.');
+      } catch (error) {
+        if (!await handleReleaseGovernanceVersionConflict_(error)) showError(error);
+      }
+    });
+  }
+
+  function renderReleaseDecisions_() {
+    const container = document.getElementById('release-decisions');
+    if (!container) return;
+    const report = typeof releaseReadinessState !== 'undefined' ? releaseReadinessState.report : null;
+    const summary = releaseGovernanceState.actionSummary || {};
+    const decisions = releaseGovernanceState.decisions || [];
+    const currentFingerprint = report && report.fingerprint || '';
+    const matchingApproval = decisions.find(item => item.appVersion === (releaseGovernanceState.bootstrap && releaseGovernanceState.bootstrap.appVersion) && item.reportFingerprint === currentFingerprint && item.decision === 'APPROVED');
+    const matchingDeployment = decisions.find(item => item.appVersion === (releaseGovernanceState.bootstrap && releaseGovernanceState.bootstrap.appVersion) && item.reportFingerprint === currentFingerprint && item.decision === 'DEPLOYED');
+    const canApprove = report && report.status === 'READY' && Number(report.score) === 100 && !summary.blockingOpen && !matchingApproval && !matchingDeployment;
+    const canDeploy = Boolean(matchingApproval && !matchingDeployment);
+    const canRollback = decisions.some(item => item.decision === 'DEPLOYED');
+    container.innerHTML = `
+      <section class="release-panel">
+        <div class="release-panel-head"><div><p class="eyebrow">Décision humaine</p><h3>Registre de mise en production</h3><p class="release-data-note">Le registre ne déploie rien automatiquement. Il conserve la décision, l’identifiant Apps Script et l’empreinte du rapport.</p></div><div class="release-toolbar-actions"><button type="button" class="primary-button" data-release-decision-open="APPROVED" ${canApprove ? '' : 'disabled'}>Approuver</button><button type="button" class="secondary-button" data-release-decision-open="POSTPONED">Reporter</button><button type="button" class="secondary-button" data-release-decision-open="DEPLOYED" ${canDeploy ? '' : 'disabled'}>Confirmer déployé</button><button type="button" class="danger-button" data-release-decision-open="ROLLED_BACK" ${canRollback ? '' : 'disabled'}>Retour arrière</button></div></div>
+        ${!canApprove ? `<div class="release-decision-guidance">${matchingDeployment ? 'Ce rapport est déjà enregistré comme déployé.' : matchingApproval ? 'Ce rapport est déjà approuvé. Confirme le déploiement uniquement après la publication Apps Script réelle.' : 'L’approbation reste désactivée tant que le rapport n’est pas READY à 100/100 ou qu’une action bloquante reste ouverte.'}</div>` : ''}
+        <div class="release-action-buttons"><button id="release-support-export" type="button" class="secondary-button">Exporter le dossier de support</button></div>
+        <div class="release-decision-list" style="margin-top:14px">${decisions.length ? decisions.map(renderReleaseDecisionCard_).join('') : '<div class="release-empty-compact">Aucune décision enregistrée.</div>'}</div>
+      </section>`;
+  }
+
+  function renderReleaseDecisionCard_(item) {
+    return `<article class="release-decision-card"><div class="release-decision-head"><div><h4>${escapeHtml(releaseDecisionLabel_(item.decision))}</h4><div class="release-decision-meta">${escapeHtml(formatReleaseDate_(item.decidedAt))} — ${escapeHtml(item.appVersion)}<br>Rapport ${escapeHtml(item.reportReference)} — ${escapeHtml(item.score)} / 100${item.deploymentId ? '<br>Déploiement : ' + escapeHtml(item.deploymentId) : ''}</div></div><span class="release-status ${item.decision === 'ROLLED_BACK' ? 'blocking' : item.decision === 'POSTPONED' ? 'warning' : 'pass'}">${escapeHtml(item.environment || 'PRODUCTION')}</span></div>${item.reason ? `<p>${escapeHtml(item.reason)}</p>` : ''}<div class="release-decision-buttons"><button type="button" class="secondary-button" data-release-manifest-export="${escapeHtml(item.id)}">Exporter le manifeste</button></div></article>`;
+  }
+
+  function openReleaseDecisionDialog_(decision) {
+    const dialog = document.getElementById('release-decision-dialog');
+    const form = document.getElementById('release-decision-form');
+    if (!dialog || !form) return;
+    form.reset();
+    form.elements.decision.value = decision;
+    const currentReport = typeof releaseReadinessState !== 'undefined' ? releaseReadinessState.report : null;
+    form.elements.reportFingerprint.value = currentReport && currentReport.fingerprint || '';
+    form.elements.environment.value = 'PRODUCTION';
+    const guidance = {
+      APPROVED: 'Saisis AUTORISER pour enregistrer l’approbation du rapport actuel.',
+      POSTPONED: 'Explique la raison du report. Aucune confirmation spéciale n’est requise.',
+      DEPLOYED: 'Renseigne l’identifiant Apps Script puis saisis DEPLOYE.',
+      ROLLED_BACK: 'Explique la cause du retour arrière puis saisis RETOUR.'
+    };
+    document.getElementById('release-decision-dialog-title').textContent = releaseDecisionLabel_(decision);
+    document.getElementById('release-decision-guidance').textContent = guidance[decision] || '';
+    form.elements.deploymentId.closest('label').hidden = decision !== 'DEPLOYED';
+    form.elements.reason.closest('label').hidden = decision === 'APPROVED';
+    form.elements.confirmation.closest('label').hidden = decision === 'POSTPONED';
+    dialog.showModal();
+  }
+
+  async function saveReleaseDecision_(form) {
+    try {
+      const decision = await runServer('registerReleaseDecision', formToObject(form));
+      document.getElementById('release-decision-dialog').close();
+      toast(releaseDecisionLabel_(decision.decision) + '.');
+      await loadReleaseGovernance_(true);
+    } catch (error) { showError(error); }
+  }
+
+  function downloadReleaseFile_(file, fallbackName) {
+    const blob = new Blob([file.content], { type: file.mimeType || 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.fileName || fallbackName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportReleaseManifest_(button) {
+    await withBusyElement_(button, async () => {
+      try { downloadReleaseFile_(await runServer('exportReleaseManifest', button.dataset.releaseManifestExport), 'CoordoDiscours-manifeste.json'); toast('Manifeste exporté.'); }
+      catch (error) { showError(error); }
+    });
+  }
+
+  async function exportReleaseSupport_(button) {
+    await withBusyElement_(button, async () => {
+      try { downloadReleaseFile_(await runServer('exportReleaseSupportBundle', releaseGovernanceYearValue_()), 'CoordoDiscours-support.json'); toast('Dossier de support exporté.'); }
+      catch (error) { showError(error); }
+    });
+  }
+
+  function renderAnnualCapacity_() {
+    const container = document.getElementById('release-capacity');
+    const report = releaseGovernanceState.annualCapacity;
+    if (!container || !report) return;
+    const m = report.metrics || {};
+    const percent = value => Math.round(Number(value || 0) * 100) + ' %';
+    const years = Array.from({length:8}, (_,index) => new Date().getFullYear() - 5 + index);
+    container.innerHTML = `<section class="release-panel release-governance-wide"><div class="release-panel-head"><div><p class="eyebrow">Capacité annuelle</p><h3>Équilibre et couverture ${escapeHtml(report.year)}</h3><p class="release-data-note">Jour hebdomadaire utilisé : ${escapeHtml(report.meetingWeekday.label)}${report.meetingWeekday.inferredFromPlannings ? ' (déduit du planning)' : ' (valeur de repli)'}. Les formules sont affichées dans le rapport exporté.</p></div><label>Année<select id="release-capacity-year">${years.map(year => `<option value="${year}" ${year === report.year ? 'selected' : ''}>${year}</option>`).join('')}</select></label></div>
+      <div class="release-capacity-cards"><div class="release-capacity-card"><strong>${escapeHtml(m.planned || 0)}</strong><small>programmations actives</small></div><div class="release-capacity-card"><strong>${escapeHtml(percent(m.occupancyRate))}</strong><small>occupation théorique</small></div><div class="release-capacity-card"><strong>${escapeHtml(m.balanceScore || 0)} / 100</strong><small>indice d’équilibre</small></div><div class="release-capacity-card"><strong>${escapeHtml(percent(m.talkCoverageRate))}</strong><small>couverture des discours</small></div><div class="release-capacity-card"><strong>${escapeHtml(m.usedSpeakers || 0)} / ${escapeHtml(m.activeSpeakers || 0)}</strong><small>orateurs utilisés</small></div><div class="release-capacity-card"><strong>${escapeHtml(percent(m.top20Share))}</strong><small>part des 20 % les plus sollicités</small></div><div class="release-capacity-card"><strong>${escapeHtml(m.speakersWithoutAssignment || 0)}</strong><small>orateurs sans affectation</small></div><div class="release-capacity-card"><strong>${escapeHtml(percent(m.externalShare))}</strong><small>part d’orateurs extérieurs</small></div></div>
+      <div class="release-month-grid">${(report.monthly || []).map(item => `<div class="release-month"><strong>${escapeHtml(item.count)}</strong><small>${escapeHtml(item.label)}</small></div>`).join('')}</div>
+      <div class="release-ranking">${(report.speakers || []).slice(0,10).map(item => `<div class="release-ranking-item"><span>${escapeHtml(item.speakerName)}</span><strong>${escapeHtml(item.count)}</strong></div>`).join('')}</div>
+      ${(report.recommendations || []).length ? `<div class="release-capacity-recommendations">${report.recommendations.map(item => `<div>${escapeHtml(item)}</div>`).join('')}</div>` : '<div class="release-final ready"><strong>Aucun signal d’équilibre prioritaire pour cette année.</strong></div>'}
+    </section>`;
+  }
+
+  async function refreshAnnualCapacity_() {
+    try {
+      releaseGovernanceState.annualCapacity = await runServer('getAnnualCapacityReport', releaseGovernanceYearValue_());
+      renderAnnualCapacity_();
+    } catch (error) { showError(error); }
+  }
+
+  function renderHistoryMaintenance_() {
+    const container = document.getElementById('release-history-maintenance');
+    const preview = releaseGovernanceState.archivePreview || {};
+    if (!container) return;
+    container.innerHTML = `<section class="release-panel"><div class="release-panel-head"><div><p class="eyebrow">Maintenance contrôlée</p><h3>Archivage de l’historique</h3><p class="release-data-note">Les lignes sont exportées dans Google Drive avant suppression. Les lignes les plus récentes sont toujours conservées.</p></div></div><div class="release-maintenance-form"><label>Archiver les lignes de plus de<input id="release-archive-days" type="number" min="180" max="3650" value="${escapeHtml(preview.olderThanDays || 730)}"><small>jours</small></label><label>Conserver au minimum<input id="release-archive-keep" type="number" min="500" max="10000" value="${escapeHtml(preview.keepLatestRows || 1000)}"><small>lignes récentes</small></label></div><div id="release-archive-preview" class="release-archive-preview">${escapeHtml(preview.eligibleRows || 0)} ligne(s) seraient archivées sur ${escapeHtml(preview.totalRows || 0)}.</div><div class="release-maintenance-form" style="margin-top:12px"><label>Confirmation<input id="release-archive-confirmation" autocomplete="off" placeholder="Saisir ARCHIVER"></label><div class="release-actions"><button id="release-archive-preview-button" type="button" class="secondary-button">Recalculer</button><button id="release-archive-run" type="button" class="danger-button" data-expected-rows="${escapeHtml(preview.eligibleRows || 0)}" ${preview.eligibleRows ? '' : 'disabled'}>Archiver</button></div></div></section>`;
+  }
+
+  async function previewReleaseArchive_(button) {
+    await withBusyElement_(button, async () => {
+      try {
+        releaseGovernanceState.archivePreview = await runServer('previewHistoryArchive', { olderThanDays: Number(document.getElementById('release-archive-days').value), keepLatestRows: Number(document.getElementById('release-archive-keep').value) });
+        renderHistoryMaintenance_();
+      } catch (error) { showError(error); }
+    });
+  }
+
+  async function runReleaseArchive_(button) {
+    if (!window.confirm('Créer une archive Drive puis supprimer les lignes anciennes sélectionnées ?')) return;
+    await withBusyElement_(button, async () => {
+      try {
+        const result = await runServer('archiveHistoryRows', { olderThanDays: Number(document.getElementById('release-archive-days').value), keepLatestRows: Number(document.getElementById('release-archive-keep').value), expectedRows: Number(button.dataset.expectedRows), confirmation: document.getElementById('release-archive-confirmation').value });
+        toast(`${result.archivedRows} ligne(s) archivées dans ${result.fileName}.`);
+        releaseGovernanceState.archivePreview = await runServer('previewHistoryArchive', {});
+        renderHistoryMaintenance_();
+      } catch (error) { showError(error); }
+    });
+  }
+
+  document.addEventListener('coordodiscours:viewchange', event => {
+    if (event.detail && event.detail.name === 'release') loadReleaseGovernance_(false);
+  });
+
+  document.addEventListener('change', event => {
+    if (event.target.id === 'release-capacity-year') refreshAnnualCapacity_();
+  });
+
+  document.addEventListener('click', async event => {
+    if (event.target.id === 'release-actions-sync') await syncReleaseActions_(event.target);
+    if (event.target.id === 'release-action-new') openReleaseActionDialog_(null);
+    const edit = event.target.closest('[data-release-action-edit]');
+    if (edit) openReleaseActionDialog_((releaseGovernanceState.actions || []).find(item => item.id === edit.dataset.releaseActionEdit));
+    const status = event.target.closest('[data-release-action-status]');
+    if (status) {
+      try { await runServer('setReleaseCorrectiveActionStatus', status.dataset.actionId, status.dataset.releaseActionStatus, status.dataset.version); toast('Statut de l’action mis à jour.'); await loadReleaseGovernance_(true); }
+      catch (error) { if (!await handleReleaseGovernanceVersionConflict_(error)) showError(error); }
+    }
+    const decision = event.target.closest('[data-release-decision-open]');
+    if (decision) openReleaseDecisionDialog_(decision.dataset.releaseDecisionOpen);
+    const manifest = event.target.closest('[data-release-manifest-export]');
+    if (manifest) await exportReleaseManifest_(manifest);
+    if (event.target.id === 'release-support-export') await exportReleaseSupport_(event.target);
+    if (event.target.id === 'release-device-save') await saveReleaseDeviceAcceptance_(event.target);
+    if (event.target.id === 'release-archive-preview-button') await previewReleaseArchive_(event.target);
+    if (event.target.id === 'release-archive-run') await runReleaseArchive_(event.target);
+  });
+
+  document.getElementById('release-action-form').addEventListener('submit', event => { event.preventDefault(); saveReleaseAction_(event.target); });
+  document.getElementById('release-decision-form').addEventListener('submit', event => { event.preventDefault(); saveReleaseDecision_(event.target); });
+</script>
