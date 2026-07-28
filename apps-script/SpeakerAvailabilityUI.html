@@ -1,5 +1,5 @@
 <dialog id="speaker-availability-dialog">
-  <form id="speaker-availability-form" method="dialog" class="form-panel speaker-availability-panel">
+  <form id="speaker-availability-form" method="dialog" class="form-panel speaker-availability-panel" data-merge-entity="ORATEUR_DISPONIBILITES">
     <div class="dialog-header">
       <div><p class="eyebrow">Calendrier personnel</p><h2 id="speaker-availability-title">Disponibilités de l’orateur</h2></div>
       <button type="button" class="icon-button" data-close="speaker-availability-dialog">×</button>
@@ -49,6 +49,23 @@
     actions.prepend(button);
   }
 
+  function speakerAvailabilityCleanEntry_(entry) {
+    return {
+      id: String(entry && entry.id || ''),
+      type: String(entry && entry.type || ''),
+      startDate: String(entry && entry.startDate || ''),
+      endDate: String(entry && entry.endDate || ''),
+      reason: String(entry && entry.reason || ''),
+      active: !entry || entry.active !== false
+    };
+  }
+
+  function speakerAvailabilityLocalPayload_() {
+    return {
+      entries: (state.speakerAvailabilitySchedule && state.speakerAvailabilitySchedule.entries || []).map(speakerAvailabilityCleanEntry_)
+    };
+  }
+
   async function openSpeakerAvailability_(speakerId) {
     if (!speakerId) {
       toast('Enregistre d’abord la fiche de l’orateur.');
@@ -56,12 +73,17 @@
     }
     try {
       const schedule = await runServer('getSpeakerAvailabilitySchedule', speakerId);
-      schedule.entries = (schedule.entries || []).map(entry => Object.assign({}, entry, { _key: entry.id || speakerAvailabilityClientKey_() }));
+      const baseEntries = (schedule.entries || []).map(speakerAvailabilityCleanEntry_);
+      schedule.entries = baseEntries.map(entry => Object.assign({}, entry, {
+        typeLabel: speakerAvailabilityTypeLabelUi_(entry.type),
+        _key: entry.id || speakerAvailabilityClientKey_()
+      }));
       state.speakerAvailabilitySchedule = schedule;
       state.speakerAvailabilityEditingKey = '';
       const form = document.getElementById('speaker-availability-form');
       form.elements.speakerId.value = speakerId;
       form.elements.version.value = schedule.version || '';
+      rememberConcurrentMergeBase_(form, 'ORATEUR_DISPONIBILITES', speakerId, { entries: baseEntries });
       document.getElementById('speaker-availability-title').textContent = 'Disponibilités de ' + (schedule.speaker.fullName || schedule.speaker.lastName);
       resetSpeakerAvailabilityEditor_();
       renderSpeakerAvailabilityEntries_();
@@ -213,23 +235,24 @@
 
   document.getElementById('speaker-availability-form').addEventListener('submit', async event => {
     event.preventDefault();
-    const speakerId = event.target.elements.speakerId.value;
-    const entries = (state.speakerAvailabilitySchedule && state.speakerAvailabilitySchedule.entries || []).map(entry => ({
-      id: entry.id || '',
-      type: entry.type,
-      startDate: entry.startDate,
-      endDate: entry.endDate,
-      reason: entry.reason || '',
-      active: entry.active !== false
-    }));
+    const form = event.target;
+    const speakerId = form.elements.speakerId.value;
+    const local = speakerAvailabilityLocalPayload_();
     try {
-      await runServer('saveSpeakerAvailabilitySchedule', speakerId, entries, event.target.elements.version.value);
+      await runServer('saveSpeakerAvailabilitySchedule', speakerId, local.entries, form.elements.version.value);
       document.getElementById('speaker-availability-dialog').close();
       toast('Disponibilités de l’orateur enregistrées.');
       if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) await openSpeakerAvailability_(speakerId);
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, local, {
+          onSaved: async response => {
+            document.getElementById('speaker-availability-dialog').close();
+            toast(response.message || 'Disponibilités fusionnées et enregistrées.');
+            if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
+          }
+        });
+      } else showError(error);
     }
   });
 
