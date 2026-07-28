@@ -1,113 +1,154 @@
 # Modèle de données
 
+Les feuilles sont créées automatiquement par `setupDatabase_()`. Les identifiants métier restent stables et ne dépendent jamais des numéros de ligne.
+
 ## PARAMETRES
 
-- Cle
-- Valeur
-- Description
+| Colonne | Description |
+|---|---|
+| CLE | Identifiant unique du paramètre. |
+| VALEUR | Valeur enregistrée sous forme de texte. |
+| DESCRIPTION | Aide d’administration. |
 
 ## DISCOURS
 
-- IdDiscours
-- Numero
-- Titre
-- Actif
-- DateMiseAJour
-- Source
+| Colonne | Description |
+|---|---|
+| NUMERO | Numéro officiel du discours. |
+| TITRE | Titre courant. |
+| ACTIF | Disponibilité pour une nouvelle programmation. |
+| DATE_MISE_A_JOUR | Dernière modification du référentiel. |
 
 ## ASSEMBLEES
 
-- IdAssemblee
-- Nom
-- Adresse
-- LieuReunion
-- JourReunion
-- HeureReunion
-- Coordinateur
-- Telephone
-- Email
-- Actif
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID. |
+| NOM | Nom de l’assemblée. |
+| COORDINATEUR | Coordinateur ou contact principal. |
+| TELEPHONE | Téléphone. |
+| EMAIL | Adresse électronique. |
+| ADRESSE | Adresse ou lieu de réunion. |
+| JOUR_REUNION | Jour habituel. |
+| HEURE_REUNION | Heure habituelle. |
+| ACTIF | Assemblée active ou archivée. |
 
 ## ORATEURS
 
-- IdOrateur
-- Nom
-- Prenom
-- TypeOrateur
-- IdAssemblee
-- Telephone
-- Email
-- Actif
-- Notes
-
-Valeurs de `TypeOrateur` :
-
-- LOCAL
-- EXTERIEUR
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID. |
+| NOM | Nom. |
+| PRENOM | Prénom. |
+| TYPE | `LOCAL` ou `EXTERIEUR`. |
+| ASSEMBLEE_ID | Assemblée associée. |
+| TELEPHONE | Téléphone. |
+| EMAIL | Adresse électronique. |
+| ACTIF | Orateur actif ou archivé. |
+| NOTES | Informations complémentaires. |
 
 ## ORATEUR_DISCOURS
 
-- IdAssociation
-- IdOrateur
-- IdDiscours
-- TypeAssociation
-- Actif
+| Colonne | Description |
+|---|---|
+| ORATEUR_ID | Orateur concerné. |
+| DISCOURS_NUMERO | Numéro de discours déclaré. |
+| FAVORI | Indicateur réservé aux évolutions futures. |
+| DATE_AJOUT | Date d’ajout. |
 
-Valeurs de `TypeAssociation` :
+Pour un orateur extérieur, cette feuille limite les discours pouvant être programmés. Pour un orateur local, elle peut servir de préférence ou d’historique sans bloquer les autres discours actifs.
 
-- DECLARE
-- FAVORI
-- HISTORIQUE
+## ORATEUR_DISPONIBILITES
+
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID de la période. |
+| ORATEUR_ID | Orateur concerné. |
+| TYPE | `INDISPONIBLE`, `DISPONIBLE_SEULEMENT`, `PREFEREE` ou `A_EVITER`. |
+| DATE_DEBUT | Premier jour inclus. |
+| DATE_FIN | Dernier jour inclus. |
+| MOTIF | Motif ou précision facultative. |
+| ACTIF | Période prise en compte ou désactivée. |
+| DATE_MISE_A_JOUR | Dernière écriture de la période. |
+
+L’ensemble des périodes d’un même orateur est protégé par une version optimiste unique `ORATEUR_DISPONIBILITES_<ORATEUR_ID>` conservée dans les propriétés du script.
 
 ## PROGRAMMATIONS
 
-- IdProgrammation
-- Date
-- Heure
-- IdOrateur
-- IdAssemblee
-- IdDiscours
-- NumeroHistorique
-- TitreHistorique
-- Statut
-- Notes
-- DateCreation
-- DateModification
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID. |
+| DATE | Date de la réunion. |
+| HEURE | Heure. |
+| ORATEUR_ID | Orateur programmé. |
+| DISCOURS_NUMERO | Numéro du discours. |
+| STATUT | `PROGRAMME` ou `ANNULE`. |
+| ASSEMBLEE_ORIGINE_ID | Assemblée d’origine facultative. |
+| NOTES | Notes du coordinateur ou origine automatique. |
 
 ## HOSPITALITE
 
-- IdHospitalite
-- IdProgrammation
-- Groupe
-- Responsable
-- Telephone
-- Statut
-- DateValidation
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID. |
+| PROGRAMMATION_ID | Programmation liée. |
+| GROUPE | Groupe d’accueil. |
+| STATUT | `A_ATTRIBUER`, `PROPOSE`, `CONFIRME`, `REFUSE` ou `ANNULE`. |
+| CONTACT | Contact du groupe. |
+| NOTES | Informations complémentaires. |
 
 ## INVITATIONS
 
-- IdInvitation
-- IdProgrammation
-- Destinataire
-- DateEnvoi
-- DateRelance
-- Statut
-- Reponse
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID. |
+| PROGRAMMATION_ID | Programmation liée. |
+| DATE_ENVOI | Date d’envoi. |
+| STATUT | `A_ENVOYER`, `ENVOYEE`, `ACCEPTEE`, `REFUSEE`, `RELANCEE` ou `ANNULEE`. |
+| DESTINATAIRE | Adresse ou nom du destinataire. |
+| NOTES | Informations complémentaires. |
+
+## UTILISATEURS
+
+| Colonne | Description |
+|---|---|
+| EMAIL | Identifiant de connexion normalisé. |
+| NOM | Nom affiché. |
+| ROLE | `ADMIN`, `COORDINATEUR` ou `CONSULTATION`. |
+| ACTIF | Accès autorisé ou désactivé. |
+| DATE_MISE_A_JOUR | Date de la dernière modification. |
+| MODIFIE_PAR | Utilisateur ayant effectué la modification. |
 
 ## HISTORIQUE
 
-- IdHistorique
-- Horodatage
-- Utilisateur
-- Action
-- Entite
-- IdEntite
-- AncienneValeur
-- NouvelleValeur
-- Commentaire
+| Colonne | Description |
+|---|---|
+| DATE_HEURE | Horodatage. |
+| UTILISATEUR | Compte ayant effectué l’action. |
+| ACTION | Type d’opération. |
+| ENTITE | Domaine métier. |
+| ENTITE_ID | Identifiant de la fiche. |
+| DETAILS | JSON structuré contenant notamment l’état avant, l’état après et les champs modifiés. |
 
-## Principes d'intégrité
+## Versions collaboratives
 
-- Les suppressions fonctionnelles utilisent un statut inactif ou archivé.
-- Une programmation passée ne dépend pas d'un titre susceptible d'être modifié : son numéro et son titre sont copiés dans les champs historiques.
-- Les relations utilisent des identifiants stables plutôt que les numéros de ligne des feuilles.
+Les versions ne sont pas stockées dans les feuilles. `Concurrency.gs` les conserve dans les propriétés du script sous la forme :
+
+```text
+ENTITY_VERSION_<ENTITE>_<IDENTIFIANT>
+```
+
+Chaque valeur contient :
+
+- `version` ;
+- `updatedAt` ;
+- `updatedBy`.
+
+## Principes d’intégrité
+
+- Les suppressions fonctionnelles utilisent un statut inactif, archivé ou annulé.
+- Les relations utilisent des identifiants stables plutôt que les numéros de ligne.
+- Une période de disponibilité doit référencer un orateur existant et contenir des dates cohérentes.
+- Les doublons stricts de disponibilité sont interdits.
+- Les périodes contradictoires sont signalées par le rapport d’intégrité.
+- Les sauvegardes incluent automatiquement toutes les feuilles déclarées dans `APP_CONFIG.sheets`.
