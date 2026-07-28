@@ -6,7 +6,12 @@
     timeline: null,
     selectedVersionIds: [],
     comparison: null,
-    loading: false
+    loading: false,
+    loadingRecords: false,
+    recordsRequestId: 0,
+    pageLimit: 40,
+    totalCount: 0,
+    hasMore: false
   };
 
   async function loadVersionHistoryView_() {
@@ -39,24 +44,54 @@
     select.value = entities.some(item => item.key === current) ? current : (versionHistoryState.bootstrap.defaultEntity || '');
   }
 
-  async function loadVersionHistoryRecords_() {
+  async function loadVersionHistoryRecords_(append) {
+    const isAppend = Boolean(append);
+    if (isAppend && versionHistoryState.loadingRecords) return;
+    const requestId = ++versionHistoryState.recordsRequestId;
     const entity = document.getElementById('version-history-entity').value;
     const search = document.getElementById('version-history-search').value;
     const container = document.getElementById('version-history-records');
     const detail = document.getElementById('version-history-detail');
-    container.innerHTML = '<div class="version-history-loading">Chargement des fiches...</div>';
-    detail.innerHTML = '<div class="version-history-empty">Sélectionne une fiche pour parcourir ses versions.</div>';
-    versionHistoryState.selectedRecordIndex = -1;
-    versionHistoryState.timeline = null;
-    versionHistoryState.selectedVersionIds = [];
-    versionHistoryState.comparison = null;
+    const offset = isAppend ? versionHistoryState.records.length : 0;
+
+    if (!isAppend) {
+      container.innerHTML = '<div class="version-history-loading">Chargement des fiches...</div>';
+      detail.innerHTML = '<div class="version-history-empty">Sélectionne une fiche pour parcourir ses versions.</div>';
+      versionHistoryState.records = [];
+      versionHistoryState.selectedRecordIndex = -1;
+      versionHistoryState.timeline = null;
+      versionHistoryState.selectedVersionIds = [];
+      versionHistoryState.comparison = null;
+      versionHistoryState.totalCount = 0;
+      versionHistoryState.hasMore = false;
+    } else {
+      const button = document.getElementById('version-history-load-more');
+      if (button) { button.disabled = true; button.textContent = 'Chargement...'; }
+    }
+
+    versionHistoryState.loadingRecords = true;
     try {
-      versionHistoryState.records = await runServer('listVersionHistoryRecords', entity, search);
+      const result = await runServer('listVersionHistoryRecords', entity, search, {
+        offset: offset,
+        limit: versionHistoryState.pageLimit
+      });
+      if (requestId !== versionHistoryState.recordsRequestId) return;
+      const page = Array.isArray(result)
+        ? { records: result, totalCount: result.length, hasMore: false }
+        : (result || { records: [], totalCount: 0, hasMore: false });
+      versionHistoryState.records = isAppend
+        ? versionHistoryState.records.concat(page.records || [])
+        : (page.records || []);
+      versionHistoryState.totalCount = Number(page.totalCount) || versionHistoryState.records.length;
+      versionHistoryState.hasMore = Boolean(page.hasMore);
       renderVersionHistoryRecords_();
     } catch (error) {
+      if (requestId !== versionHistoryState.recordsRequestId) return;
       showError(error);
-      versionHistoryState.records = [];
+      if (!isAppend) versionHistoryState.records = [];
       renderVersionHistoryRecords_();
+    } finally {
+      if (requestId === versionHistoryState.recordsRequestId) versionHistoryState.loadingRecords = false;
     }
   }
 
@@ -64,16 +99,32 @@
     const container = document.getElementById('version-history-records');
     const count = document.getElementById('version-history-record-count');
     const records = versionHistoryState.records || [];
-    count.textContent = records.length + ' fiche' + (records.length > 1 ? 's' : '');
+    const total = Math.max(records.length, Number(versionHistoryState.totalCount) || 0);
+    count.textContent = total > records.length
+      ? records.length + ' / ' + total + ' fiches'
+      : records.length + ' fiche' + (records.length > 1 ? 's' : '');
     if (!records.length) {
       container.innerHTML = '<div class="version-history-empty">Aucune fiche trouvée pour ce module.</div>';
       return;
     }
-    container.innerHTML = records.map((record, index) => `
+    const cards = records.map((record, index) => `
       <button type="button" class="version-history-record ${index === versionHistoryState.selectedRecordIndex ? 'selected' : ''}" data-version-history-record-index="${index}">
         <strong>${escapeHtml(record.label || record.entityId)}</strong>
         <small>${record.versionCount} version${record.versionCount > 1 ? 's' : ''}${record.lastDisplayDate ? '<br>Dernier état : ' + escapeHtml(record.lastDisplayDate) : ''}</small>
       </button>`).join('');
+    const more = versionHistoryState.hasMore
+      ? '<div class="version-history-load-more"><button id="version-history-load-more" type="button" class="secondary-button">Charger plus</button></div>'
+      : '';
+    container.innerHTML = cards + more;
+  }
+
+  async function ensureVersionHistoryRecordLoaded_(entityId) {
+    let index = versionHistoryState.records.findIndex(item => String(item.entityId) === String(entityId));
+    while (index < 0 && versionHistoryState.hasMore) {
+      await loadVersionHistoryRecords_(true);
+      index = versionHistoryState.records.findIndex(item => String(item.entityId) === String(entityId));
+    }
+    return index;
   }
 
   async function openVersionHistoryRecord_(index) {
@@ -240,9 +291,12 @@
   async function handleVersionHistoryRestoreResult_(result, versionId, versionNumber) {
     const message = document.getElementById('version-history-restore-message');
     if (result.saved) {
+      const restoredEntityId = result.timeline && result.timeline.entityId != null
+        ? result.timeline.entityId
+        : (versionHistoryState.timeline ? versionHistoryState.timeline.entityId : '');
       toast(result.message || 'Version restaurée.');
-      await loadVersionHistoryRecords_();
-      const index = versionHistoryState.records.findIndex(item => String(item.entityId) === String(result.timeline && result.timeline.entityId || versionHistoryState.timeline.entityId));
+      await loadVersionHistoryRecords_(false);
+      const index = await ensureVersionHistoryRecordLoaded_(restoredEntityId);
       if (index >= 0) await openVersionHistoryRecord_(index);
       return;
     }
@@ -280,7 +334,8 @@
     const restore = event.target.closest('[data-version-history-restore]');
     if (restore) await restoreSelectedEntityVersion_(restore.dataset.versionHistoryRestore, restore.dataset.versionNumber, false);
 
-    if (event.target.id === 'version-history-refresh') await loadVersionHistoryRecords_();
+    if (event.target.id === 'version-history-refresh') await loadVersionHistoryRecords_(false);
+    if (event.target.id === 'version-history-load-more') await loadVersionHistoryRecords_(true);
     if (event.target.id === 'version-history-compare') await compareSelectedEntityVersions_();
     if (event.target.id === 'version-history-clear-selection') {
       versionHistoryState.selectedVersionIds = [];
@@ -295,7 +350,7 @@
   });
 
   document.addEventListener('change', async event => {
-    if (event.target.id === 'version-history-entity') await loadVersionHistoryRecords_();
+    if (event.target.id === 'version-history-entity') await loadVersionHistoryRecords_(false);
     if (event.target.matches('[data-version-history-select]')) toggleVersionHistorySelection_(event.target.dataset.versionHistorySelect, event.target.checked);
   });
 
@@ -303,6 +358,6 @@
   document.addEventListener('input', event => {
     if (event.target.id !== 'version-history-search') return;
     clearTimeout(versionHistorySearchTimer);
-    versionHistorySearchTimer = setTimeout(loadVersionHistoryRecords_, 300);
+    versionHistorySearchTimer = setTimeout(() => loadVersionHistoryRecords_(false), 300);
   });
 </script>

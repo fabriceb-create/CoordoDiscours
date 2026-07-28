@@ -128,6 +128,13 @@ assertContains(versions, /versionHistorySnapshotHash_/, 'Versions : le hachage d
 assertContains(versions, /RESTAURATION_VERSION/, 'Versions : la restauration n’est pas auditée.');
 assertContains(versionsUi, /compareEntityVersions/, 'Versions UI : la comparaison de deux versions est absente.');
 assertContains(versionsUi, /restoreEntityVersion/, 'Versions UI : la restauration est absente.');
+assertContains(versions, /function\s+normalizeVersionHistoryListRequest_\s*\(/, 'Versions : le bornage de la pagination est absent.');
+assertContains(versions, /summaries\.slice\(request\.offset, request\.offset \+ request\.limit\)/, 'Versions : les chronologies ne sont pas limitées à la page demandée.');
+assertContains(versions, /listSpeakerAvailability_\(true\)/, 'Versions : les disponibilités désactivées ne sont pas conservées dans l’état courant.');
+assertContains(versions, /side === ['"]AFTER['"]/, 'Versions : les champs modifiés ne sont pas rattachés à l’état après.');
+assertContains(versionsUi, /id=\"version-history-load-more\"/, 'Versions UI : le chargement progressif est absent.');
+assertContains(versionsUi, /ensureVersionHistoryRecordLoaded_/, 'Versions UI : le retour à une fiche située sur une page suivante est absent.');
+assertContains(versionsUi, /restoredEntityId[\s\S]*loadVersionHistoryRecords_\(false\)/, 'Versions UI : l’identifiant restauré n’est pas conservé avant l’actualisation.');
 assertContains(indexUi, /VersionHistoryStyles[\s\S]*VersionHistoryScripts/, 'Interface : le module d’historique des versions n’est pas chargé.');
 assertContains(indexUi, /data-view="versions"[\s\S]*id="view-versions"/, 'Interface : le menu Versions ou son espace de travail est absent.');
 

@@ -1,4 +1,6 @@
-const VERSION_HISTORY_ENGINE_VERSION = '1.0.0';
+const VERSION_HISTORY_ENGINE_VERSION = '1.1.0';
+const VERSION_HISTORY_DEFAULT_PAGE_SIZE = 40;
+const VERSION_HISTORY_MAX_PAGE_SIZE = 100;
 const VERSION_HISTORY_ENTITY_KEYS = Object.freeze([
   'ORATEUR', 'ASSEMBLEE', 'DISCOURS', 'PROGRAMMATION', 'HOSPITALITE',
   'INVITATION', 'ORATEUR_DISCOURS', 'ORATEUR_DISPONIBILITES', 'PARAMETRES', 'UTILISATEUR'
@@ -26,9 +28,10 @@ function getVersionHistoryBootstrap() {
   };
 }
 
-function listVersionHistoryRecords(entity, searchText) {
+function listVersionHistoryRecords(entity, searchText, options) {
   const definition = getConcurrentMergeDefinition_(entity);
   assertAccess_(versionHistoryViewRole_(definition), 'listVersionHistoryRecords');
+  const request = normalizeVersionHistoryListRequest_(options);
   const query = normalizeText_(searchText);
   const historyRows = readVersionHistoryRows_(definition.entity);
   const groupedRows = historyRows.reduce(function (map, row) {
@@ -44,27 +47,75 @@ function listVersionHistoryRecords(entity, searchText) {
   }, {});
   const ids = Array.from(new Set(Object.keys(groupedRows).concat(Object.keys(currentMap))));
   const currentAccess = getCurrentUserAccess();
-
-  return ids.map(function (id) {
+  const summaries = ids.map(function (id) {
     const current = currentMap[id] || null;
-    const timeline = buildEntityVersionTimeline_(definition, id, groupedRows[id] || [], current);
-    const label = current ? current.label : versionHistoryHistoricalLabel_(definition, id, timeline);
+    const label = current ? current.label : versionHistoryHistoricalLabelFromRows_(definition, id, groupedRows[id] || []);
+    return { id: id, current: current, label: label };
+  }).filter(function (summary) {
+    return !query || normalizeText_([summary.label, summary.id].join(' ')).includes(query);
+  }).sort(function (a, b) {
+    return String(a.label || '').localeCompare(String(b.label || ''), 'fr');
+  });
+
+  const totalCount = summaries.length;
+  const selected = request.paged
+    ? summaries.slice(request.offset, request.offset + request.limit)
+    : summaries;
+  const records = selected.map(function (summary) {
+    const timeline = buildEntityVersionTimeline_(definition, summary.id, groupedRows[summary.id] || [], summary.current);
     return {
       entity: definition.entity,
-      entityId: versionHistoryEntityIdOutput_(definition, id),
-      label: label,
+      entityId: versionHistoryEntityIdOutput_(definition, summary.id),
+      label: summary.label,
       versionCount: timeline.versions.length,
       currentVersionNumber: timeline.currentVersionNumber,
       currentTechnicalVersion: timeline.currentTechnicalVersion,
       lastVersionAt: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].date : '',
       lastDisplayDate: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].displayDate : '',
-      canRestore: Boolean(current && versionHistoryRoleAllowed_(currentAccess.role, definition.minimumRole))
+      canRestore: Boolean(summary.current && versionHistoryRoleAllowed_(currentAccess.role, definition.minimumRole))
     };
-  }).filter(function (record) {
-    return !query || normalizeText_([record.label, record.entityId].join(' ')).includes(query);
-  }).sort(function (a, b) {
-    return String(a.label || '').localeCompare(String(b.label || ''), 'fr');
   });
+
+  if (!request.paged) return records;
+  const nextOffset = Math.min(totalCount, request.offset + records.length);
+  return {
+    records: records,
+    totalCount: totalCount,
+    offset: request.offset,
+    limit: request.limit,
+    nextOffset: nextOffset,
+    hasMore: nextOffset < totalCount
+  };
+}
+
+function normalizeVersionHistoryListRequest_(options) {
+  const paged = Boolean(options && typeof options === 'object');
+  const source = paged ? options : {};
+  const offset = Math.max(0, Math.floor(Number(source.offset) || 0));
+  const requestedLimit = Math.floor(Number(source.limit) || VERSION_HISTORY_DEFAULT_PAGE_SIZE);
+  const limit = Math.max(1, Math.min(VERSION_HISTORY_MAX_PAGE_SIZE, requestedLimit));
+  return { paged: paged, offset: offset, limit: limit };
+}
+
+function versionHistoryHistoricalLabelFromRows_(definition, entityId, rows) {
+  const snapshot = versionHistoryLatestSnapshotFromRows_(definition, rows);
+  return versionHistoryLabelFromSnapshot_(definition, entityId, snapshot);
+}
+
+function versionHistoryLatestSnapshotFromRows_(definition, rows) {
+  const ordered = (rows || []).slice().sort(function (a, b) {
+    return b.timestamp - a.timestamp || b.rowNumber - a.rowNumber;
+  });
+  for (let index = 0; index < ordered.length; index += 1) {
+    const details = ordered[index].details || {};
+    if (details.after && versionHistoryHasSnapshotData_(details.after)) {
+      return canonicalizeConcurrentMergeData_(definition, details.after);
+    }
+    if (details.before && versionHistoryHasSnapshotData_(details.before)) {
+      return canonicalizeConcurrentMergeData_(definition, details.before);
+    }
+  }
+  return null;
 }
 
 function getEntityVersionTimeline(entity, entityId) {
@@ -254,7 +305,7 @@ function versionHistoryCandidate_(definition, entityId, row, side, rawSnapshot, 
     action: side === 'BEFORE' ? 'État avant ' + row.action : row.action,
     snapshot: snapshot,
     hash: hash,
-    changedFields: Array.isArray(row.details.changedFields) ? row.details.changedFields.slice() : [],
+    changedFields: side === 'AFTER' && Array.isArray(row.details.changedFields) ? row.details.changedFields.slice() : [],
     isCurrent: false,
     technicalVersion: ''
   };
@@ -330,7 +381,13 @@ function listCurrentVersionHistoryRecords_(definition) {
     });
   } else if (definition.entity === 'ORATEUR_DISPONIBILITES') {
     const speakers = listSpeakers('', true);
-    const map = getSpeakerAvailabilityMap_();
+    const map = listSpeakerAvailability_(true).reduce(function (result, entry) {
+      const speakerId = String(entry.speakerId || '');
+      if (!speakerId) return result;
+      if (!result[speakerId]) result[speakerId] = [];
+      result[speakerId].push(entry);
+      return result;
+    }, {});
     speakers.forEach(function (speaker) {
       const metadata = getEntityVersion_('ORATEUR_DISPONIBILITES', speaker.id);
       records.push(versionHistoryCurrentRecord_(definition, speaker.id, 'Disponibilités de ' + (speaker.fullName || speaker.lastName), { entries: map[speaker.id] || [] }, metadata.version));
@@ -418,13 +475,19 @@ function buildVersionHistoryDisplayContext_() {
 }
 
 function versionHistoryHistoricalLabel_(definition, entityId, timeline) {
-  if (timeline && timeline.versions.length) {
-    const snapshot = timeline.versions[timeline.versions.length - 1].snapshot;
-    if (definition.entity === 'ORATEUR') return [snapshot.firstName, snapshot.lastName].filter(Boolean).join(' ') || String(entityId);
-    if (definition.entity === 'ASSEMBLEE') return snapshot.name || String(entityId);
-    if (definition.entity === 'DISCOURS') return 'N° ' + entityId + ' - ' + (snapshot.title || 'Titre à compléter');
-    if (definition.entity === 'UTILISATEUR') return snapshot.name ? snapshot.name + ' - ' + entityId : String(entityId);
-  }
+  const snapshot = timeline && timeline.versions.length
+    ? timeline.versions[timeline.versions.length - 1].snapshot
+    : null;
+  return versionHistoryLabelFromSnapshot_(definition, entityId, snapshot);
+}
+
+function versionHistoryLabelFromSnapshot_(definition, entityId, snapshot) {
+  const data = snapshot || {};
+  if (definition.entity === 'ORATEUR') return [data.firstName, data.lastName].filter(Boolean).join(' ') || String(entityId);
+  if (definition.entity === 'ASSEMBLEE') return data.name || String(entityId);
+  if (definition.entity === 'DISCOURS') return 'N° ' + entityId + ' - ' + (data.title || 'Titre à compléter');
+  if (definition.entity === 'PROGRAMMATION') return [data.date, data.time, data.speakerId, data.talkNumber ? 'n° ' + data.talkNumber : ''].filter(Boolean).join(' - ') || String(entityId);
+  if (definition.entity === 'UTILISATEUR') return data.name ? data.name + ' - ' + entityId : String(entityId);
   return definition.label + ' - ' + entityId;
 }
 
