@@ -8,12 +8,15 @@ function evaluatePlanningRules_(planning, dataset) {
   const context = buildPlanningRuleContext_(planning, dataset);
   const rules = [
     rulePlanningSpeakerActive_,
+    rulePlanningSpeakerAvailability_,
     rulePlanningTalkActive_,
     rulePlanningExternalSpeakerTalk_,
     rulePlanningCongregationActive_,
     rulePlanningSlotAvailable_,
     rulePlanningSpeakerSameDate_,
-    rulePlanningTalkRepetition_
+    rulePlanningTalkRepetition_,
+    rulePlanningSpeakerAvoidDate_,
+    rulePlanningSpeakerPreferredDate_
   ];
   const results = rules.map(function (rule) { return rule(context); }).filter(Boolean);
   const errors = results.filter(function (item) { return item.severity === RULE_SEVERITY.ERROR; });
@@ -32,14 +35,19 @@ function evaluatePlanningRules_(planning, dataset) {
 }
 
 function buildPlanningRuleDataset_() {
+  const speakerAvailability = getSpeakerAvailabilityMap_();
+  const recommendationWeights = getRecommendationWeights_();
+  recommendationWeights._speakerAvailability = speakerAvailability;
+  recommendationWeights._availabilityAdjustments = getAvailabilityRecommendationAdjustments_();
   return {
     speakers: listSpeakers('', true),
     talks: listTalks('', true),
     congregations: listCongregations('', true),
     plannings: listPlannings('', true),
     speakerTalks: getSpeakerTalkNumbersMap_(),
+    speakerAvailability: speakerAvailability,
     repetitionMonths: Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12,
-    recommendationWeights: getRecommendationWeights_()
+    recommendationWeights: recommendationWeights
   };
 }
 
@@ -51,6 +59,9 @@ function buildPlanningRuleContext_(planning, dataset) {
   const existing = (resources.plannings || []).filter(function (item) {
     return item.id !== planning.id && item.status !== 'ANNULE';
   });
+  const availabilityMap = resources.speakerAvailability ||
+    (resources.recommendationWeights && resources.recommendationWeights._speakerAvailability) ||
+    getSpeakerAvailabilityMap_();
   return {
     planning: planning,
     speaker: speakers.find(function (item) { return item.id === planning.speakerId; }) || null,
@@ -58,6 +69,8 @@ function buildPlanningRuleContext_(planning, dataset) {
     congregation: planning.originCongregationId ? congregations.find(function (item) { return item.id === planning.originCongregationId; }) || null : null,
     existing: existing,
     speakerTalks: resources.speakerTalks || getSpeakerTalkNumbersMap_(),
+    speakerAvailability: availabilityMap,
+    availability: evaluateSpeakerAvailability_(planning.speakerId, planning.date, availabilityMap),
     repetitionMonths: Number(resources.repetitionMonths) || 12
   };
 }
@@ -118,6 +131,38 @@ function rulePlanningTalkRepetition_(context) {
   }).sort(function (a, b) { return b.date - a.date; })[0];
   if (!repeated) return null;
   return planningRuleResult_('PLAN_007', RULE_SEVERITY.WARNING, 'Ce discours a déjà été programmé le ' + repeated.item.displayDate + ' avec ' + repeated.item.speakerName + '.', { planningId: repeated.item.id, previousDate: repeated.item.date, talkNumber: context.planning.talkNumber });
+}
+
+function rulePlanningSpeakerAvailability_(context) {
+  if (!context.speaker || !context.speaker.active || !context.availability || !context.availability.blocked) return null;
+  return planningRuleResult_('PLAN_008', RULE_SEVERITY.ERROR, context.availability.message || 'L’orateur n’est pas disponible à cette date.', {
+    speakerId: context.planning.speakerId,
+    date: context.planning.date,
+    status: context.availability.status,
+    availabilityIds: speakerAvailabilityRuleEntryIds_(context.availability.unavailablePeriods)
+  });
+}
+
+function rulePlanningSpeakerAvoidDate_(context) {
+  if (!context.speaker || !context.availability || context.availability.blocked || !context.availability.avoid) return null;
+  return planningRuleResult_('PLAN_009', RULE_SEVERITY.WARNING, context.availability.message || 'Cette date est marquée comme à éviter pour cet orateur.', {
+    speakerId: context.planning.speakerId,
+    date: context.planning.date,
+    availabilityIds: speakerAvailabilityRuleEntryIds_(context.availability.avoidPeriods)
+  });
+}
+
+function rulePlanningSpeakerPreferredDate_(context) {
+  if (!context.speaker || !context.availability || context.availability.blocked || !context.availability.preferred) return null;
+  return planningRuleResult_('PLAN_010', RULE_SEVERITY.INFO, context.availability.message || 'Cette date fait partie des dates préférées de cet orateur.', {
+    speakerId: context.planning.speakerId,
+    date: context.planning.date,
+    availabilityIds: speakerAvailabilityRuleEntryIds_(context.availability.preferredPeriods)
+  });
+}
+
+function speakerAvailabilityRuleEntryIds_(entries) {
+  return (entries || []).map(function (entry) { return entry.id; }).filter(Boolean);
 }
 
 function ruleMessages_(items) {

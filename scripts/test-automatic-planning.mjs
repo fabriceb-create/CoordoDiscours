@@ -5,6 +5,9 @@ import vm from 'node:vm';
 
 let uuidCounter = 0;
 let lockReleased = false;
+const availabilityMap = {
+  S1: [{ id: 'A1', speakerId: 'S1', type: 'INDISPONIBLE', startDate: '2026-08-16', endDate: '2026-08-16', reason: 'Déplacement', active: true }]
+};
 const baseDataset = {
   speakers: [
     { id: 'S1', fullName: 'Alice Local', lastName: 'Local', type: 'LOCAL', active: true, congregationId: 'C1', version: 's1' },
@@ -26,14 +29,29 @@ const baseDataset = {
     { id: 'P-OLD', date: '2025-01-05', displayDate: '05/01/2025', time: '10:00', speakerId: 'S3', speakerName: 'Charles Local', talkNumber: 2, status: 'PROGRAMME', version: 'pold' }
   ],
   speakerTalks: { S2: [2, 4] },
+  speakerAvailability: availabilityMap,
   repetitionMonths: 12,
-  recommendationWeights: { talk: 40, recency: 30, month: 15, local: 10, balance: 5, total: 100 },
+  recommendationWeights: {
+    talk: 40, recency: 30, month: 15, local: 10, balance: 5, total: 100,
+    _speakerAvailability: availabilityMap,
+    _availabilityAdjustments: { preferredBonus: 10, avoidPenalty: 18 }
+  },
   hospitalities: [],
   invitations: []
 };
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function formatIso(date) { return date.toISOString().slice(0, 10); }
+function availabilityEntries(dataset, speakerId) {
+  const map = dataset.speakerAvailability || (dataset.recommendationWeights && dataset.recommendationWeights._speakerAvailability) || {};
+  return map[speakerId] || [];
+}
+function isBlocked(dataset, speakerId, date) {
+  const entries = availabilityEntries(dataset, speakerId).filter(entry => entry.active !== false);
+  if (entries.some(entry => entry.type === 'INDISPONIBLE' && entry.startDate <= date && entry.endDate >= date)) return true;
+  const only = entries.filter(entry => entry.type === 'DISPONIBLE_SEULEMENT');
+  return Boolean(only.length && !only.some(entry => entry.startDate <= date && entry.endDate >= date));
+}
 
 const context = {
   console,
@@ -91,6 +109,7 @@ const context = {
     const speaker = dataset.speakers.find(item => item.id === planning.speakerId);
     const talk = dataset.talks.find(item => Number(item.number) === Number(planning.talkNumber));
     if (!speaker || !speaker.active) errors.push({ id: 'PLAN_001', message: 'Orateur indisponible.' });
+    if (speaker && isBlocked(dataset, speaker.id, planning.date)) errors.push({ id: 'PLAN_008', message: 'Orateur indisponible à cette date.' });
     if (!talk || !talk.active) errors.push({ id: 'PLAN_002', message: 'Discours indisponible.' });
     if (speaker && speaker.type === 'EXTERIEUR' && !(dataset.speakerTalks[speaker.id] || []).includes(Number(planning.talkNumber))) {
       errors.push({ id: 'PLAN_003', message: 'Discours non déclaré.' });
@@ -106,12 +125,15 @@ const context = {
   getSpeakerRecommendationsWithData_: (payload, dataset) => {
     const eventDate = new Date(`${payload.date}T12:00:00Z`);
     const counts = dataset.plannings.reduce((map, item) => { map[item.speakerId] = (map[item.speakerId] || 0) + 1; return map; }, {});
-    const recommendations = dataset.speakers.filter(speaker => speaker.active).filter(speaker => speaker.type !== 'EXTERIEUR' || (dataset.speakerTalks[speaker.id] || []).includes(Number(payload.talkNumber))).map(speaker => {
-      const previousDates = dataset.plannings.filter(item => item.speakerId === speaker.id && item.date).map(item => new Date(`${item.date}T12:00:00Z`)).filter(date => date <= eventDate).sort((a, b) => b - a);
-      const months = previousDates.length ? Math.floor((eventDate - previousDates[0]) / 2629800000) : 24;
-      const score = Math.max(45, Math.min(100, 96 - (counts[speaker.id] || 0) * 8 + Math.min(12, months)));
-      return { speakerId: speaker.id, speakerName: speaker.fullName, type: speaker.type, congregationName: speaker.congregationId, score, reasons: ['Orateur compatible.'], cautions: [], eligible: true };
-    }).sort((a, b) => b.score - a.score);
+    const recommendations = dataset.speakers.filter(speaker => speaker.active)
+      .filter(speaker => !isBlocked(dataset, speaker.id, payload.date))
+      .filter(speaker => speaker.type !== 'EXTERIEUR' || (dataset.speakerTalks[speaker.id] || []).includes(Number(payload.talkNumber)))
+      .map(speaker => {
+        const previousDates = dataset.plannings.filter(item => item.speakerId === speaker.id && item.date).map(item => new Date(`${item.date}T12:00:00Z`)).filter(date => date <= eventDate).sort((a, b) => b - a);
+        const months = previousDates.length ? Math.floor((eventDate - previousDates[0]) / 2629800000) : 24;
+        const score = Math.max(45, Math.min(100, 96 - (counts[speaker.id] || 0) * 8 + Math.min(12, months)));
+        return { speakerId: speaker.id, speakerName: speaker.fullName, type: speaker.type, congregationName: speaker.congregationId, score, reasons: ['Orateur compatible et disponible.'], cautions: [], eligible: true };
+      }).sort((a, b) => b.score - a.score);
     return { ready: true, recommendations };
   },
   getDatabase_: () => { throw new Error('La base ne doit pas être appelée pendant le test de brouillon obsolète.'); },
@@ -138,12 +160,19 @@ for (const scenario of draft.scenarios) {
   assert.equal(slots.size, scenario.items.length, 'Un scénario ne doit contenir aucun doublon de créneau.');
   for (const item of scenario.items) {
     if (item.speakerId === 'S2') assert.ok(baseDataset.speakerTalks.S2.includes(item.talkNumber), 'Un orateur extérieur doit recevoir uniquement un discours déclaré.');
+    assert.ok(!(item.date === '2026-08-16' && item.speakerId === 'S1'), 'La planification automatique ne doit jamais retenir un orateur indisponible.');
   }
 }
 
 const modifiedDataset = clone(baseDataset);
 modifiedDataset.plannings[0].version = 'p0-modified';
 assert.notEqual(context.automaticPlanningDatasetSignature_(baseDataset), context.automaticPlanningDatasetSignature_(modifiedDataset), 'Une modification du planning doit invalider la signature.');
+const modifiedAvailability = clone(baseDataset);
+modifiedAvailability.recommendationWeights._speakerAvailability.S1[0].endDate = '2026-08-23';
+assert.notEqual(context.automaticPlanningDatasetSignature_(baseDataset), context.automaticPlanningDatasetSignature_(modifiedAvailability), 'Une modification des disponibilités doit invalider le brouillon.');
+const modifiedAdjustment = clone(baseDataset);
+modifiedAdjustment.recommendationWeights._availabilityAdjustments.preferredBonus = 12;
+assert.notEqual(context.automaticPlanningDatasetSignature_(baseDataset), context.automaticPlanningDatasetSignature_(modifiedAdjustment), 'Une modification du bonus de disponibilité doit invalider le brouillon.');
 
 const followUps = context.buildAutomaticPlanningFollowUps_([
   { id: 'P1', item: { date: '2026-08-02' }, speaker: baseDataset.speakers[0] },
@@ -166,4 +195,4 @@ assert.throws(() => context.commitAutomaticPlanningDraft({
 }, false), /AUTO_PLAN_OBSOLETE/, 'Un brouillon obsolète doit être refusé.');
 assert.equal(lockReleased, true, 'Le verrou doit toujours être libéré après un refus.');
 
-console.log('Tests de planification automatique réussis : 7 scénarios contrôlés.');
+console.log('Tests de planification automatique réussis : 10 scénarios contrôlés.');
