@@ -38,7 +38,8 @@ function buildPlanningRuleDataset_() {
     congregations: listCongregations('', true),
     plannings: listPlannings('', true),
     speakerTalks: getSpeakerTalkNumbersMap_(),
-    repetitionMonths: Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12
+    repetitionMonths: Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12,
+    recommendationWeights: getRecommendationWeights_()
   };
 }
 
