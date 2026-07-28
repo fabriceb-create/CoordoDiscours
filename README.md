@@ -4,7 +4,7 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.5 Stable**
+Version en préparation de recette : **1.7 Stable**
 
 Le dépôt contient désormais :
 
@@ -22,6 +22,8 @@ Le dépôt contient désormais :
 - Programmation des discours.
 - Recommandation automatique des orateurs.
 - Assistant de résolution des conflits avec propositions d’un autre orateur, d’une autre date, d’un autre discours, d’une autre assemblée ou d’une combinaison de changements.
+- Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
+- Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter de chaque orateur.
 - Répertoire des orateurs.
 - Répertoire des assemblées.
 - Référentiel des discours.
@@ -43,8 +45,12 @@ Le dépôt contient désormais :
 - Un orateur extérieur est limité aux discours déclarés dans sa fiche.
 - Les discours 59, 82, 122 et 123 sont inactifs.
 - Une répétition d’un même discours dans la période configurée déclenche une alerte non bloquante.
+- Une indisponibilité ou une date située hors des fenêtres « Disponible seulement » bloque la programmation.
+- Une date préférée augmente le classement d’un orateur ; une date à éviter produit un avertissement et diminue son score.
 - Une programmation impossible n’est pas enregistrée : l’assistant classe uniquement des propositions qui repassent avec succès dans le moteur central de règles.
 - Les conflits multiples peuvent produire une solution combinée portant sur plusieurs champs.
+- La planification automatique conserve les créneaux existants et exige une validation humaine avant écriture.
+- Un brouillon automatique est refusé lorsque le planning, les référentiels, les disponibilités ou les réglages de classement ont changé depuis sa génération.
 - Une fiche périmée ne peut pas écraser silencieusement la modification d’un autre utilisateur.
 - Les modifications importantes sont historisées.
 - L’hospitalité concerne en priorité les orateurs extérieurs.
@@ -62,9 +68,11 @@ apps-script/
   RulesEngine.gs
   RecommendationEngine.gs
   ConflictResolution.gs
+  AutomaticPlanning.gs
   Concurrency.gs
   Speakers.gs
   SpeakerTalks.gs
+  SpeakerAvailability.gs
   Congregations.gs
   Talks.gs
   HospitalityInvitations.gs
@@ -83,6 +91,8 @@ scripts/
   validate-apps-script.mjs
   test-business-rules.mjs
   test-conflict-resolution.mjs
+  test-automatic-planning.mjs
+  test-speaker-availability.mjs
 
 docs/
   INSTALLATION.md
@@ -109,8 +119,10 @@ La procédure détaillée se trouve dans `docs/INSTALLATION.md`.
 La commande `npm run check` exécute :
 
 1. la validation de la structure Apps Script et des contrôles d’accès ;
-2. les tests des règles métier ;
-3. six scénarios exécutables de résolution des conflits.
+2. les contrôles statiques des règles métier ;
+3. les scénarios exécutables de résolution des conflits ;
+4. les scénarios de planification automatique ;
+5. les scénarios de disponibilité des orateurs.
 
 Le plan complet de vérification fonctionnelle se trouve dans `docs/PLAN_TESTS.md`.
 
