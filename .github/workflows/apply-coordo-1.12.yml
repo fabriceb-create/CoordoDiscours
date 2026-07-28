@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - agent/help-observability-reliability
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.event_name == 'push' || github.head_ref == 'agent/help-observability-reliability'
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer la branche
