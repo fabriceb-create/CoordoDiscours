@@ -6,6 +6,7 @@
   let currentLanguage = 'fr';
   let currentTranslations = {};
   let translationObserver;
+  let currentSettingsData = null;
 
   function t(text) {
     return currentTranslations[String(text || '')] || String(text || '');
@@ -71,12 +72,21 @@
     }
   }
 
+  function settingsMapFromData_(data) {
+    return (data.settings || []).reduce((map, item) => { map[item.key] = String(item.value ?? ''); return map; }, {});
+  }
+
+  function settingsDefaultsFromData_(data) {
+    return (data.settings || []).reduce((map, item) => { map[item.key] = String(item.defaultValue ?? ''); return map; }, {});
+  }
+
   function renderSettings(data) {
+    currentSettingsData = cloneConcurrentMergeValue_(data);
     const container = document.getElementById('settings-content');
     const diagnostic = data.diagnostics || {};
     const canAdminister = typeof currentAccess === 'undefined' || !currentAccess ? true : Boolean(currentAccess.canAdminister);
     container.innerHTML = `
-      <form id="settings-form" class="settings-layout">
+      <form id="settings-form" class="settings-layout" data-merge-entity="PARAMETRES">
         <input type="hidden" name="version" value="${escapeHtml(data.settingsVersion || '')}">
         <section class="settings-panel">
           <div class="panel-heading"><div><p class="eyebrow">${t('Configuration')}</p><h2>${t('Réglages généraux')}</h2></div><span class="version-badge">${escapeHtml(data.version || '')}</span></div>
@@ -99,7 +109,10 @@
         </aside>
       </form>`;
 
-    document.getElementById('settings-form').addEventListener('submit', saveSettings_);
+    const form = document.getElementById('settings-form');
+    form._settingsDefaults = settingsDefaultsFromData_(data);
+    rememberConcurrentMergeBase_(form, 'PARAMETRES', 'APPLICATION', settingsMapFromData_(data));
+    form.addEventListener('submit', saveSettings_);
     document.getElementById('settings-reset').addEventListener('click', resetSettings_);
     const integrityButton = document.getElementById('run-integrity-check');
     if (integrityButton) integrityButton.addEventListener('click', runIntegrityCheck_);
@@ -143,37 +156,49 @@
     }
   }
 
+  async function applySettingsSaveResult_(data, requestedLanguage, message) {
+    const nextLanguage = requestedLanguage || data.language || 'fr';
+    if (nextLanguage !== currentLanguage) { window.location.reload(); return; }
+    renderSettings(data);
+    const map = settingsMapFromData_(data);
+    document.getElementById('congregation').textContent = map.ASSEMBLEE || 'Basse-Terre';
+    toast(t(message || 'Paramètres enregistrés.'));
+    if (typeof loadDashboard === 'function') loadDashboard();
+  }
+
   async function saveSettings_(event) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    const requestedLanguage = payload.LANGUE_INTERFACE || 'fr';
     try {
-      const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-      const previousLanguage = currentLanguage;
       const data = await runServer('saveApplicationSettings', payload);
-      const nextLanguage = payload.LANGUE_INTERFACE || 'fr';
-      if (nextLanguage !== previousLanguage) { window.location.reload(); return; }
-      renderSettings(data);
-      document.getElementById('congregation').textContent = payload.ASSEMBLEE || 'Basse-Terre';
-      toast(t('Paramètres enregistrés.'));
-      if (typeof loadDashboard === 'function') loadDashboard();
+      await applySettingsSaveResult_(data, requestedLanguage, 'Paramètres enregistrés.');
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) await loadSettings();
+      if (isConcurrentVersionConflict_(error)) {
+        const local = Object.assign({}, payload);
+        delete local.version;
+        await handleConcurrentFormConflict_(form, local, {
+          onSaved: async response => { await applySettingsSaveResult_(response.result, requestedLanguage, 'Paramètres fusionnés et enregistrés.'); }
+        });
+      } else showError(error);
     }
   }
 
   async function resetSettings_() {
     if (!confirm(t('Rétablir toutes les valeurs par défaut ?'))) return;
+    const form = document.getElementById('settings-form');
+    const expectedVersion = form && form.elements.version ? form.elements.version.value : '';
+    const defaults = cloneConcurrentMergeValue_(form && form._settingsDefaults || {});
     try {
-      const previousLanguage = currentLanguage;
-      const form = document.getElementById('settings-form');
-      const expectedVersion = form && form.elements.version ? form.elements.version.value : '';
       const data = await runServer('resetApplicationSettings', expectedVersion);
-      if ((data.language || 'fr') !== previousLanguage) { window.location.reload(); return; }
-      renderSettings(data);
-      toast(t('Valeurs par défaut restaurées.'));
+      await applySettingsSaveResult_(data, data.language || 'fr', 'Valeurs par défaut restaurées.');
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) await loadSettings();
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, defaults, {
+          onSaved: async response => { await applySettingsSaveResult_(response.result, response.result.language || 'fr', 'Valeurs par défaut fusionnées et restaurées.'); }
+        }, { operation: 'RESET' });
+      } else showError(error);
     }
   }
 

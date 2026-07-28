@@ -69,17 +69,7 @@
   }
 
   function isPlanningVersionConflict_(error) {
-    return String(error && (error.message || error)).includes('CONFLIT_VERSION');
-  }
-
-  async function handlePlanningVersionConflict_(error) {
-    const message = String(error && (error.message || error)).replace(/^.*CONFLIT_VERSION\|/, '');
-    const warning = document.getElementById('planning-warning');
-    warning.innerHTML = '<strong>Modification concurrente</strong><p>' + escapeHtml(message || 'Cette fiche a changé depuis son ouverture.') + '</p>';
-    warning.hidden = false;
-    if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
-    await loadPlannings();
-    toast('La fiche a été actualisée. Ouvre-la de nouveau pour reprendre la modification.');
+    return isConcurrentVersionConflict_(error);
   }
 
   function ensureRecommendationPanel_() {
@@ -156,33 +146,49 @@
     } catch (error) { showError(error); }
   }
 
-  async function submitPlanning(form, confirmWarnings) {
-    try {
-      const result = await runServer('savePlanning', formToObject(form), Boolean(confirmWarnings));
-      if (result.blocked) {
-        const warning = document.getElementById('planning-warning');
-        warning.innerHTML = '<strong>Programmation impossible</strong><ul>' + (result.errors || []).map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
-        warning.hidden = false;
-        if (typeof renderPlanningConflictResolution_ === 'function') renderPlanningConflictResolution_(result.resolution || {});
-        return;
-      }
-      if (result.requiresConfirmation) {
-        if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
-        const warning = document.getElementById('planning-warning');
-        warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
-        warning.hidden = false;
-        if (window.confirm(result.warnings.join('\n') + '\n\nSouhaites-tu quand même enregistrer cette programmation ?')) {
-          return submitPlanning(form, true);
-        }
-        return;
-      }
+  async function handlePlanningServerResult_(form, result, confirmWarnings) {
+    if (result.blocked) {
+      const warning = document.getElementById('planning-warning');
+      warning.innerHTML = '<strong>Programmation impossible</strong><ul>' + (result.errors || []).map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
+      warning.hidden = false;
+      if (typeof renderPlanningConflictResolution_ === 'function') renderPlanningConflictResolution_(result.resolution || {});
+      return result;
+    }
+    if (result.requiresConfirmation) {
       if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
-      document.getElementById('planning-dialog').close();
-      toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
-      await loadPlannings();
+      const warning = document.getElementById('planning-warning');
+      warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
+      warning.hidden = false;
+      if (window.confirm(result.warnings.join('\n') + '\n\nSouhaites-tu quand même enregistrer cette programmation ?')) {
+        return submitPlanning(form, true);
+      }
+      return result;
+    }
+    if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
+    document.getElementById('planning-dialog').close();
+    toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
+    await loadPlannings();
+    return result;
+  }
+
+  async function submitPlanning(form, confirmWarnings) {
+    const payload = formToObject(form);
+    try {
+      const result = await runServer('savePlanning', payload, Boolean(confirmWarnings));
+      return handlePlanningServerResult_(form, result, confirmWarnings);
     } catch (error) {
-      if (isPlanningVersionConflict_(error)) return handlePlanningVersionConflict_(error);
-      throw error;
+      if (!isPlanningVersionConflict_(error)) throw error;
+      return handleConcurrentFormConflict_(form, payload, {
+        onSaved: async () => {
+          document.getElementById('planning-dialog').close();
+          await loadPlannings();
+        },
+        onValidation: async response => {
+          applyConcurrentMergeCandidateToForm_(form, response.candidate || {}, response.remote || {}, response.remoteVersion || '');
+          await refreshSpeakerRecommendations_();
+          await handlePlanningServerResult_(form, response.validation, confirmWarnings);
+        }
+      }, { confirmWarnings: Boolean(confirmWarnings) });
     }
   }
 
@@ -207,13 +213,20 @@
 
     const toggle = event.target.closest('[data-toggle-planning]');
     if (toggle) {
+      const item = state.plannings.find(entry => entry.id === toggle.dataset.togglePlanning);
+      const nextStatus = toggle.dataset.status === 'ANNULE' ? 'PROGRAMME' : 'ANNULE';
       try {
-        await runServer(toggle.dataset.status === 'ANNULE' ? 'restorePlanning' : 'cancelPlanning', toggle.dataset.togglePlanning, toggle.dataset.version);
-        toast(toggle.dataset.status === 'ANNULE' ? 'Programmation restaurée.' : 'Programmation annulée.');
+        await runServer(nextStatus === 'PROGRAMME' ? 'restorePlanning' : 'cancelPlanning', item.id, toggle.dataset.version);
+        toast(nextStatus === 'PROGRAMME' ? 'Programmation restaurée.' : 'Programmation annulée.');
         await loadPlannings();
       } catch (error) {
-        if (isPlanningVersionConflict_(error)) await handlePlanningVersionConflict_(error);
-        else showError(error);
+        if (isPlanningVersionConflict_(error) && item) {
+          await handleConcurrentMerge_({
+            entity: 'PROGRAMMATION', entityId: item.id, base: item,
+            local: Object.assign({}, item, { status: nextStatus }), operation: 'STATUS',
+            onSaved: loadPlannings
+          });
+        } else showError(error);
       }
     }
   });

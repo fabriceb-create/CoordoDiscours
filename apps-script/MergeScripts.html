@@ -1,0 +1,258 @@
+<dialog id="concurrent-merge-dialog">
+  <form id="concurrent-merge-form" method="dialog" class="form-panel concurrent-merge-panel">
+    <div class="dialog-header">
+      <div><p class="eyebrow">Travail collaboratif</p><h2 id="concurrent-merge-title">Fusion des modifications</h2></div>
+      <button type="button" class="icon-button" data-close="concurrent-merge-dialog">×</button>
+    </div>
+    <p id="concurrent-merge-intro" class="concurrent-merge-intro">La fiche a changé depuis son ouverture.</p>
+    <div id="concurrent-merge-auto" class="concurrent-merge-auto" hidden></div>
+    <div id="concurrent-merge-summary" class="concurrent-merge-summary"></div>
+    <div id="concurrent-merge-conflicts" class="concurrent-merge-conflicts"></div>
+    <div class="form-actions">
+      <span class="concurrent-merge-actions-note">Aucune valeur conflictuelle n’est choisie sans ton accord.</span>
+      <button id="concurrent-merge-recalculate" type="button" class="secondary-button">Recalculer</button>
+      <button type="button" class="secondary-button" data-close="concurrent-merge-dialog">Annuler</button>
+      <button id="concurrent-merge-apply" type="submit" class="primary-button">Appliquer mes choix</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  const concurrentMergeUiState = {
+    request: null,
+    response: null,
+    onSaved: null,
+    onValidation: null,
+    onCancelled: null,
+    processing: false
+  };
+
+  function cloneConcurrentMergeValue_(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function rememberConcurrentMergeBase_(form, entity, entityId, base) {
+    if (!form) return;
+    form._concurrentMerge = {
+      entity: String(entity || '').toUpperCase(),
+      entityId: entityId,
+      base: cloneConcurrentMergeValue_(base || {})
+    };
+  }
+
+  function concurrentMergeContextFromForm_(form) {
+    return form && form._concurrentMerge ? cloneConcurrentMergeValue_(form._concurrentMerge) : null;
+  }
+
+  function isConcurrentVersionConflict_(error) {
+    return String(error && (error.message || error)).includes('CONFLIT_VERSION|');
+  }
+
+  async function handleConcurrentMerge_(options) {
+    options = options || {};
+    const request = {
+      entity: String(options.entity || '').toUpperCase(),
+      entityId: options.entityId,
+      base: cloneConcurrentMergeValue_(options.base || {}),
+      local: cloneConcurrentMergeValue_(options.local || {}),
+      operation: String(options.operation || ''),
+      confirmWarnings: options.confirmWarnings === true,
+      context: cloneConcurrentMergeValue_(options.context || {})
+    };
+    concurrentMergeUiState.request = request;
+    concurrentMergeUiState.onSaved = typeof options.onSaved === 'function' ? options.onSaved : null;
+    concurrentMergeUiState.onValidation = typeof options.onValidation === 'function' ? options.onValidation : null;
+    concurrentMergeUiState.onCancelled = typeof options.onCancelled === 'function' ? options.onCancelled : null;
+    return requestConcurrentMergePlan_();
+  }
+
+  async function handleConcurrentFormConflict_(form, local, handlers, extra) {
+    const context = concurrentMergeContextFromForm_(form);
+    if (!context || !context.entity || context.entityId == null || context.entityId === '') {
+      toast('La fiche a changé. Recharge-la avant de reprendre la modification.');
+      return null;
+    }
+    return handleConcurrentMerge_(Object.assign({}, extra || {}, handlers || {}, {
+      entity: context.entity,
+      entityId: context.entityId,
+      base: context.base,
+      local: local
+    }));
+  }
+
+  async function requestConcurrentMergePlan_() {
+    if (!concurrentMergeUiState.request || concurrentMergeUiState.processing) return null;
+    setConcurrentMergeProcessing_(true);
+    try {
+      const response = await runServer('prepareConcurrentMerge', concurrentMergeUiState.request);
+      return processConcurrentMergeResponse_(response);
+    } catch (error) {
+      showError(error);
+      return null;
+    } finally {
+      setConcurrentMergeProcessing_(false);
+    }
+  }
+
+  async function processConcurrentMergeResponse_(response) {
+    concurrentMergeUiState.response = response || {};
+    if (response && response.saved) {
+      closeConcurrentMergeDialog_();
+      toast(response.message || 'Modifications fusionnées et enregistrées.');
+      if (concurrentMergeUiState.onSaved) await concurrentMergeUiState.onSaved(response);
+      return response;
+    }
+    if (response && response.validation) {
+      closeConcurrentMergeDialog_();
+      if (concurrentMergeUiState.onValidation) {
+        await concurrentMergeUiState.onValidation(response);
+      } else {
+        toast(response.message || 'La fusion nécessite une nouvelle validation métier.');
+      }
+      return response;
+    }
+    if (response && response.stale && !response.requiresResolution) {
+      return requestConcurrentMergePlan_();
+    }
+    if (response && response.requiresResolution) {
+      renderConcurrentMergeDialog_(response);
+      const dialog = document.getElementById('concurrent-merge-dialog');
+      if (!dialog.open) dialog.showModal();
+      return response;
+    }
+    showError(new Error(response && response.message ? response.message : 'La fusion intelligente n’a pas pu être préparée.'));
+    return response;
+  }
+
+  function renderConcurrentMergeDialog_(response) {
+    const conflicts = response.conflicts || [];
+    const fieldStates = response.mergeSummary && response.mergeSummary.fieldStates || [];
+    const autoFields = fieldStates.filter(item => ['LOCAL_ONLY', 'REMOTE_ONLY', 'SAME_CHANGE', 'AUTO_MERGED'].includes(item.status));
+    document.getElementById('concurrent-merge-title').textContent = response.entityLabel || 'Fusion des modifications';
+    document.getElementById('concurrent-merge-intro').textContent = response.message || 'La fiche a changé depuis son ouverture. Compare les valeurs et choisis celles à conserver.';
+
+    const auto = document.getElementById('concurrent-merge-auto');
+    if (autoFields.length) {
+      auto.hidden = false;
+      auto.innerHTML = '<strong>Déjà fusionné automatiquement</strong><ul>' + autoFields.map(item => '<li>' + escapeHtml(item.label || item.field) + '</li>').join('') + '</ul>';
+    } else {
+      auto.hidden = true;
+      auto.innerHTML = '';
+    }
+
+    const summary = document.getElementById('concurrent-merge-summary');
+    summary.innerHTML = '<span class="warning">' + conflicts.length + ' conflit' + (conflicts.length > 1 ? 's' : '') + '</span>' +
+      (autoFields.length ? '<span class="success">' + autoFields.length + ' champ' + (autoFields.length > 1 ? 's' : '') + ' fusionné' + (autoFields.length > 1 ? 's' : '') + '</span>' : '');
+
+    document.getElementById('concurrent-merge-conflicts').innerHTML = conflicts.map((conflict, index) => `
+      <article class="concurrent-merge-card" data-merge-conflict-row="${index}">
+        <h3>${escapeHtml(conflict.label || conflict.field)}</h3>
+        <div class="concurrent-merge-base"><strong>Valeur à l’ouverture</strong><div class="concurrent-merge-value">${escapeHtml(concurrentMergeValueText_(conflict.base))}</div></div>
+        <div class="concurrent-merge-options">
+          <label class="concurrent-merge-option">
+            <input type="radio" name="merge-choice-${index}" value="LOCAL" data-merge-choice data-conflict-id="${escapeHtml(conflict.id)}">
+            <span><strong>Conserver ma modification</strong><span class="concurrent-merge-value">${escapeHtml(concurrentMergeValueText_(conflict.local))}</span></span>
+          </label>
+          <label class="concurrent-merge-option">
+            <input type="radio" name="merge-choice-${index}" value="REMOTE" data-merge-choice data-conflict-id="${escapeHtml(conflict.id)}">
+            <span><strong>Conserver la version enregistrée</strong><span class="concurrent-merge-value">${escapeHtml(concurrentMergeValueText_(conflict.remote))}</span></span>
+          </label>
+        </div>
+      </article>`).join('');
+  }
+
+  function concurrentMergeValueText_(value) {
+    if (value == null) return 'Valeur supprimée';
+    if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+    if (Array.isArray(value)) {
+      if (!value.length) return 'Liste vide';
+      if (value.every(item => typeof item !== 'object')) return value.join(', ');
+      return value.map(concurrentMergeCollectionItemText_).join('\n');
+    }
+    if (typeof value === 'object') return concurrentMergeCollectionItemText_(value);
+    const text = String(value);
+    return text || 'Valeur vide';
+  }
+
+  function concurrentMergeCollectionItemText_(item) {
+    if (!item) return 'Élément supprimé';
+    if (item.startDate) {
+      const range = item.startDate === item.endDate ? formatConcurrentMergeDateUi_(item.startDate) : 'Du ' + formatConcurrentMergeDateUi_(item.startDate) + ' au ' + formatConcurrentMergeDateUi_(item.endDate);
+      return [String(item.type || '').replace(/_/g, ' '), range, item.reason || '', item.active === false ? 'Désactivée' : 'Active'].filter(Boolean).join(' — ');
+    }
+    return Object.keys(item).filter(key => !['version', 'updatedAt', 'updatedBy'].includes(key)).map(key => key + ' : ' + concurrentMergeValueText_(item[key])).join('\n');
+  }
+
+  function formatConcurrentMergeDateUi_(value) {
+    const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? match[3] + '/' + match[2] + '/' + match[1] : String(value || '');
+  }
+
+  async function submitConcurrentMergeChoices_(event) {
+    event.preventDefault();
+    if (concurrentMergeUiState.processing || !concurrentMergeUiState.response) return;
+    const choices = {};
+    let missing = 0;
+    document.querySelectorAll('#concurrent-merge-conflicts [data-merge-conflict-row]').forEach(row => {
+      const selected = row.querySelector('[data-merge-choice]:checked');
+      if (!selected) {
+        missing += 1;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      choices[selected.dataset.conflictId] = selected.value;
+    });
+    if (missing) {
+      toast('Choisis une valeur pour chaque champ en conflit.');
+      return;
+    }
+
+    setConcurrentMergeProcessing_(true);
+    try {
+      const response = await runServer('applyConcurrentMergeResolution', Object.assign({}, concurrentMergeUiState.request, {
+        remoteVersion: concurrentMergeUiState.response.remoteVersion,
+        choices: choices
+      }));
+      await processConcurrentMergeResponse_(response);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setConcurrentMergeProcessing_(false);
+    }
+  }
+
+  function applyConcurrentMergeCandidateToForm_(form, candidate, remote, remoteVersion) {
+    if (!form) return;
+    Object.keys(candidate || {}).forEach(key => {
+      const field = form.elements[key];
+      if (!field) return;
+      if (field.type === 'checkbox') field.checked = Boolean(candidate[key]);
+      else field.value = candidate[key] == null ? '' : candidate[key];
+    });
+    if (form.elements.version) form.elements.version.value = remoteVersion || '';
+    const context = concurrentMergeContextFromForm_(form);
+    if (context) rememberConcurrentMergeBase_(form, context.entity, context.entityId, Object.assign({}, remote || {}, { version: remoteVersion || '' }));
+  }
+
+  function setConcurrentMergeProcessing_(processing) {
+    concurrentMergeUiState.processing = Boolean(processing);
+    ['concurrent-merge-apply', 'concurrent-merge-recalculate'].forEach(id => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = Boolean(processing);
+    });
+  }
+
+  function closeConcurrentMergeDialog_() {
+    const dialog = document.getElementById('concurrent-merge-dialog');
+    if (dialog && dialog.open) dialog.close();
+  }
+
+  document.getElementById('concurrent-merge-form').addEventListener('submit', submitConcurrentMergeChoices_);
+  document.getElementById('concurrent-merge-recalculate').addEventListener('click', requestConcurrentMergePlan_);
+  document.getElementById('concurrent-merge-dialog').addEventListener('close', () => {
+    if (concurrentMergeUiState.onCancelled && concurrentMergeUiState.response && concurrentMergeUiState.response.requiresResolution) {
+      concurrentMergeUiState.onCancelled(concurrentMergeUiState.response);
+    }
+  });
+</script>

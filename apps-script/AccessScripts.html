@@ -44,7 +44,7 @@
       panel.innerHTML = `
         <div class="access-head"><div><p class="eyebrow">Sécurité</p><h2>Utilisateurs et droits d’accès</h2></div><span class="version-badge">${users.length} utilisateur${users.length > 1 ? 's' : ''}</span></div>
         <p class="access-banner">Administrateur : tous les droits. Coordinateur : modification des données métier. Consultation seule : lecture et impression.</p>
-        <form id="access-form" class="access-grid">
+        <form id="access-form" class="access-grid" data-merge-entity="UTILISATEUR">
           <input type="hidden" name="version">
           <label>Adresse e-mail<input name="email" type="email" required></label>
           <label>Nom<input name="name"></label>
@@ -61,7 +61,9 @@
             </div>
           </article>`).join('')}</div>`;
       panel._users = users;
-      document.getElementById('access-form').addEventListener('submit', saveAccessUser_);
+      const form = document.getElementById('access-form');
+      form._concurrentMerge = null;
+      form.addEventListener('submit', saveAccessUser_);
     } catch (error) {
       showError(error);
       panel.innerHTML = '<div class="empty-state">Impossible de charger les utilisateurs.</div>';
@@ -70,13 +72,18 @@
 
   async function saveAccessUser_(event) {
     event.preventDefault();
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
     try {
-      await runServer('saveAccessUser', Object.fromEntries(new FormData(event.currentTarget).entries()));
+      await runServer('saveAccessUser', payload);
       toast('Utilisateur enregistré.');
       await renderAccessManagement_();
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) await renderAccessManagement_();
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, payload, {
+          onSaved: renderAccessManagement_
+        });
+      } else showError(error);
     }
   }
 
@@ -92,6 +99,7 @@
         form.elements.name.value = user.name || '';
         form.elements.role.value = user.role;
         form.elements.version.value = user.version || '';
+        rememberConcurrentMergeBase_(form, 'UTILISATEUR', user.email, user);
         const submit = form.querySelector('[type="submit"]');
         if (submit) submit.textContent = 'Enregistrer';
         form.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -99,13 +107,21 @@
     }
     const toggle = event.target.closest('[data-access-toggle]');
     if (toggle) {
+      const panel = document.getElementById('access-management');
+      const user = (panel._users || []).find(item => item.email === toggle.dataset.accessToggle);
+      const active = toggle.dataset.active !== 'true';
       try {
-        await runServer('setAccessUserActive', toggle.dataset.accessToggle, toggle.dataset.active !== 'true', toggle.dataset.version);
+        await runServer('setAccessUserActive', user.email, active, toggle.dataset.version);
         toast('Accès utilisateur mis à jour.');
         await renderAccessManagement_();
       } catch (error) {
-        showError(error);
-        if (String(error.message || error).includes('CONFLIT_VERSION|')) await renderAccessManagement_();
+        if (isConcurrentVersionConflict_(error) && user) {
+          await handleConcurrentMerge_({
+            entity: 'UTILISATEUR', entityId: user.email, base: user,
+            local: Object.assign({}, user, { active: active }), operation: 'STATUS',
+            onSaved: renderAccessManagement_
+          });
+        } else showError(error);
       }
     }
   });
