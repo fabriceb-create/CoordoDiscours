@@ -35,15 +35,18 @@ function evaluatePlanningRules_(planning, dataset) {
 }
 
 function buildPlanningRuleDataset_() {
+  const speakerAvailability = getSpeakerAvailabilityMap_();
+  const recommendationWeights = getRecommendationWeights_();
+  recommendationWeights._speakerAvailability = speakerAvailability;
   return {
     speakers: listSpeakers('', true),
     talks: listTalks('', true),
     congregations: listCongregations('', true),
     plannings: listPlannings('', true),
     speakerTalks: getSpeakerTalkNumbersMap_(),
-    speakerAvailability: getSpeakerAvailabilityMap_(),
+    speakerAvailability: speakerAvailability,
     repetitionMonths: Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12,
-    recommendationWeights: getRecommendationWeights_()
+    recommendationWeights: recommendationWeights
   };
 }
 
@@ -55,7 +58,9 @@ function buildPlanningRuleContext_(planning, dataset) {
   const existing = (resources.plannings || []).filter(function (item) {
     return item.id !== planning.id && item.status !== 'ANNULE';
   });
-  const availabilityMap = resources.speakerAvailability || getSpeakerAvailabilityMap_();
+  const availabilityMap = resources.speakerAvailability ||
+    (resources.recommendationWeights && resources.recommendationWeights._speakerAvailability) ||
+    getSpeakerAvailabilityMap_();
   return {
     planning: planning,
     speaker: speakers.find(function (item) { return item.id === planning.speakerId; }) || null,
