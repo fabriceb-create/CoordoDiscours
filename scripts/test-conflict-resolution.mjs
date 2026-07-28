@@ -3,12 +3,13 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 const root = path.resolve('apps-script');
-const source = ['RulesEngine.gs', 'RecommendationEngine.gs', 'ConflictResolution.gs']
+const source = ['SpeakerAvailability.gs', 'RulesEngine.gs', 'RecommendationEngine.gs', 'ConflictResolution.gs']
   .map(file => fs.readFileSync(path.join(root, file), 'utf8'))
   .join('\n');
 
 const context = {
   console,
+  Date,
   Session: { getScriptTimeZone: () => 'America/Guadeloupe' },
   Utilities: {
     formatDate(date, timezone, pattern) {
@@ -23,10 +24,13 @@ const context = {
     RECO_POIDS_ANCIENNETE: '30',
     RECO_POIDS_MOIS: '15',
     RECO_POIDS_LOCAL: '10',
-    RECO_POIDS_EQUILIBRE: '5'
+    RECO_POIDS_EQUILIBRE: '5',
+    RECO_BONUS_DATE_PREFEREE: '10',
+    RECO_MALUS_DATE_A_EVITER: '18'
   }[key] || ''),
   getSpeakerTalkNumbers_: (speakerId, map) => (map && map[speakerId]) || [],
   getSpeakerTalkNumbersMap_: () => ({}),
+  getSpeakerAvailabilityMap_: () => ({}),
   listSpeakers: () => [],
   listTalks: () => [],
   listCongregations: () => [],
@@ -60,6 +64,10 @@ const dataset = {
     { id: 'p2', date: '2098-01-05', displayDate: '05/01/2098', time: '10:00', speakerId: 's2', speakerName: 'Paul Extérieur', talkNumber: 2, status: 'PROGRAMME' }
   ],
   speakerTalks: { s2: [2, 3] },
+  speakerAvailability: {
+    s1: [{ id: 'a1', speakerId: 's1', type: 'INDISPONIBLE', startDate: '2099-08-16', endDate: '2099-08-16', reason: 'Déplacement', active: true }],
+    s3: [{ id: 'a2', speakerId: 's3', type: 'PREFEREE', startDate: '2099-08-16', endDate: '2099-08-16', reason: 'Disponible ce jour', active: true }]
+  },
   repetitionMonths: 12
 };
 
@@ -92,7 +100,12 @@ assert(congregation.suggestions.some(item => item.type === 'CONGREGATION'), 'Une
 const fourWay = resolve({ id: '', date: '2099-08-02', time: '10:00', speakerId: 'archived', talkNumber: 59, originCongregationId: 'old', status: 'PROGRAMME' });
 assert(fourWay.suggestions.some(item => item.type === 'COMBINATION' && item.changeCount === 4), 'Une combinaison à quatre ajustements doit résoudre quatre blocages indépendants.');
 
+const availabilityConflict = resolve({ id: '', date: '2099-08-16', time: '10:00', speakerId: 's1', talkNumber: 2, originCongregationId: 'c1', status: 'PROGRAMME' });
+assert(availabilityConflict.blocked, 'Une indisponibilité déclarée doit bloquer.');
+assert(availabilityConflict.errorRules.includes('PLAN_008'), 'Le blocage doit utiliser PLAN_008.');
+assert(availabilityConflict.suggestions.some(item => item.type === 'SPEAKER' && item.changes.speakerId === 's3'), 'Un orateur disponible doit être proposé.');
+
 const valid = resolve({ id: '', date: '2099-08-09', time: '10:00', speakerId: 's1', talkNumber: 2, originCongregationId: 'c1', status: 'PROGRAMME' });
 assert(!valid.blocked && valid.suggestions.length === 0, 'Une programmation valide ne doit pas déclencher de correction.');
 
-console.log('Tests de résolution des conflits réussis : 6 scénarios exécutés.');
+console.log('Tests de résolution des conflits réussis : 7 scénarios exécutés.');
