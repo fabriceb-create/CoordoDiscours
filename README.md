@@ -4,7 +4,7 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.12 Stable**
+Version en préparation de recette : **1.13 Stable**
 
 Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques, un guide intégré et la documentation d’installation, d’administration et de recette.
 
@@ -27,7 +27,24 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Gestion des rôles et des accès.
 - Guide utilisateur intégré et aide contextuelle.
 - Diagnostic temporaire des durées serveur.
+- Rapport de santé avant déploiement et recette guidée exportable.
+- Références de support non sensibles pour les erreurs.
 - Interface Français / Kréyòl Gwadloup.
+
+
+## Préparation à la mise en production
+
+La version 1.13 ajoute un module administrateur **Mise en production**. Il consolide cinq contrôles pondérés :
+
+- installation, schéma, version et fuseau horaire ;
+- intégrité des relations et des référentiels ;
+- présence d’une sauvegarde récente ;
+- erreurs et lenteurs observées côté serveur ;
+- résultat et ancienneté de la dernière recette d’acceptation.
+
+Le rapport fournit un score sur 100 et un état `Prêt`, `À vérifier` ou `Bloqué`. Une recette guidée de six étapes peut être exécutée dans l’application puis exportée au format JSON. La session est protégée par un verrou, compactée avant stockage et associée à une référence de recette.
+
+Les erreurs visibles reçoivent également une référence de support non sensible. Le message, le module et le type d’opération sont journalisés sous une forme bornée, sans pile technique ni objet arbitraire.
 
 ## Guide intégré et aide contextuelle
 
@@ -127,7 +144,9 @@ apps-script/
   Installation.gs
   ServerCache.gs
   Performance.gs
+  SupportDiagnostics.gs
   Help.gs
+  ReleaseReadiness.gs
   Dashboard.gs
   Planning.gs
   RulesEngine.gs
@@ -164,6 +183,7 @@ scripts/
   test-version-history.mjs
   test-responsive-accessibility.mjs
   test-help-observability.mjs
+  test-release-readiness.mjs
 ```
 
 ## Installation rapide
@@ -179,7 +199,7 @@ La procédure détaillée se trouve dans `docs/INSTALLATION.md`. Les guides comp
 
 ## Validation
 
-La commande `npm run check` exécute neuf niveaux de contrôle :
+La commande `npm run check` exécute dix niveaux de contrôle :
 
 1. structure Apps Script, syntaxe et droits d’accès ;
 2. contrats statiques des règles métier ;
@@ -189,6 +209,7 @@ La commande `npm run check` exécute neuf niveaux de contrôle :
 6. fusion intelligente ;
 7. reconstruction, comparaison et restauration des versions ;
 8. responsive, accessibilité, syntaxe JavaScript et caches client ;
-9. guide intégré, cache serveur et observabilité.
+9. guide intégré, cache serveur et observabilité ;
+10. préparation à la mise en production, recette guidée et références de support.
 
 La version ne doit pas être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.

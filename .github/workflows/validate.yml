@@ -44,6 +44,9 @@ jobs:
       - name: Tester l’aide, les caches serveur et l’observabilité
         run: npm run test:ops
 
+      - name: Tester la préparation à la mise en production
+        run: npm run test:release
+
       - name: Publier le code testé
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4

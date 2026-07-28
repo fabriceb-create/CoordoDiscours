@@ -4,7 +4,7 @@ import path from 'node:path';
 const root = path.resolve('apps-script');
 const required = [
   'appsscript.json', 'Config.gs', 'Database.gs', 'Installation.gs', 'Code.gs', 'Utils.gs', 'Tests.gs',
-  'Access.gs', 'Concurrency.gs', 'ServerCache.gs', 'Performance.gs', 'Help.gs',
+  'Access.gs', 'Concurrency.gs', 'ServerCache.gs', 'Performance.gs', 'SupportDiagnostics.gs', 'Help.gs', 'ReleaseReadiness.gs',
   'Planning.gs', 'RulesEngine.gs', 'RecommendationEngine.gs', 'ConflictResolution.gs', 'AutomaticPlanning.gs',
   'MergeEngine.gs', 'VersionHistory.gs', 'Speakers.gs', 'SpeakerTalks.gs', 'SpeakerAvailability.gs',
   'Congregations.gs', 'Talks.gs', 'HospitalityInvitations.gs', 'Dashboard.gs', 'PrintPlanning.gs',
@@ -17,7 +17,8 @@ const required = [
   'SpeakerTalkStyles.html', 'SpeakerTalkUI.html', 'SpeakerAvailabilityStyles.html', 'SpeakerAvailabilityUI.html',
   'CommunicationStyles.html', 'CommunicationScripts.html', 'PrintPlanningStyles.html', 'PrintPlanningScripts.html',
   'HistoryStyles.html', 'HistoryScripts.html', 'BackupStyles.html', 'BackupScripts.html',
-  'SettingsStyles.html', 'SettingsScripts.html', 'HelpStyles.html', 'HelpScripts.html'
+  'SettingsStyles.html', 'SettingsScripts.html', 'HelpStyles.html', 'HelpScripts.html',
+  'ReleaseReadinessStyles.html', 'ReleaseReadinessScripts.html'
 ];
 
 const errors = [];
@@ -65,11 +66,14 @@ if (index) {
     ['VersionHistoryStyles', 'Les styles d’historique des versions ne sont pas inclus.'],
     ['VersionHistoryScripts', 'Le script d’historique des versions n’est pas inclus.'],
     ['HelpStyles', 'Les styles du guide intégré ne sont pas inclus.'],
-    ['HelpScripts', 'Le script du guide intégré n’est pas inclus.']
+    ['HelpScripts', 'Le script du guide intégré n’est pas inclus.'],
+    ['ReleaseReadinessStyles', 'Les styles de préparation au déploiement ne sont pas inclus.'],
+    ['ReleaseReadinessScripts', 'Le script de préparation au déploiement n’est pas inclus.']
   ].forEach(([needle, message]) => requireText(index, needle, message));
   requireText(index, /id="automatic-planning"[\s\S]*id="automatic-planning-dialog"/, 'L’accès à la planification automatique est absent de l’interface.');
   requireText(index, /data-view="versions"[\s\S]*id="view-versions"/, 'L’historique des versions n’est pas accessible depuis la navigation.');
   requireText(index, /data-view="help"[\s\S]*id="view-help"/, 'Le guide intégré n’est pas accessible depuis la navigation.');
+  requireText(index, /data-view="release"[\s\S]*id="view-release"/, 'Le rapport de préparation au déploiement n’est pas accessible depuis la navigation.');
   requireText(index, /id="global-help-button"[\s\S]*id="help-dialog"/, 'L’aide contextuelle globale est incomplète.');
   requireText(index, /id="network-recovery"[\s\S]*id="network-retry"/, 'Le panneau de reprise après erreur réseau est absent.');
   ['PROGRAMMATION', 'HOSPITALITE', 'INVITATION', 'ORATEUR', 'ASSEMBLEE', 'DISCOURS'].forEach(entity => {
@@ -91,7 +95,7 @@ const config = read('Config.gs');
 if (config) {
   requireText(config, "users: 'UTILISATEURS'", 'La feuille UTILISATEURS n’est pas déclarée dans Config.gs.');
   requireText(config, "speakerAvailability: 'ORATEUR_DISPONIBILITES'", 'La feuille ORATEUR_DISPONIBILITES n’est pas déclarée dans Config.gs.');
-  requireText(config, /version:\s*['"]1\.12 Stable['"]/, 'Config.gs doit déclarer CoordoDiscours 1.12 Stable.');
+  requireText(config, /version:\s*['"]1\.13 Stable['"]/, 'Config.gs doit déclarer CoordoDiscours 1.13 Stable.');
 }
 
 function functionBody(source, functionName) {
@@ -160,6 +164,14 @@ const protectedFunctions = [
   ['Help.gs', 'getHelpBootstrap', 'CONSULTATION'],
   ['Performance.gs', 'getServerPerformanceReport', 'ADMIN'],
   ['Performance.gs', 'resetServerPerformanceReport', 'ADMIN'],
+  ['SupportDiagnostics.gs', 'registerClientIncident', 'CONSULTATION'],
+  ['SupportDiagnostics.gs', 'getRecentSupportIncidents', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'getReleaseReadinessBootstrap', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'getReleaseReadinessReport', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'startReleaseAcceptance', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'runReleaseAcceptanceStep', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'exportReleaseAcceptanceReport', 'ADMIN'],
+  ['ReleaseReadiness.gs', 'resetReleaseAcceptanceSession', 'ADMIN'],
   ['VersionHistory.gs', 'getVersionHistoryBootstrap', 'CONSULTATION']
 ];
 
@@ -323,6 +335,20 @@ for (const file of allFiles.filter(name => name.endsWith('.gs'))) {
   try { new Function(source); }
   catch (error) { errors.push(`Syntaxe Apps Script invalide dans ${file} : ${error.message}`); }
 }
+
+
+const releaseReadiness = read('ReleaseReadiness.gs');
+const releaseUi = read('ReleaseReadinessScripts.html');
+const supportDiagnostics = read('SupportDiagnostics.gs');
+requireText(releaseReadiness, /function\s+buildReleaseReadinessReport_\s*\(/, 'Mise en production : le rapport global de santé est absent.');
+requireText(releaseReadiness, /RELEASE_ACCEPTANCE_STEPS[\s\S]*installation[\s\S]*integrity[\s\S]*backup[\s\S]*performance[\s\S]*acceptance[\s\S]*final/, 'Mise en production : les six étapes de recette sont incomplètes.');
+requireText(releaseReadiness, /PropertiesService\.getScriptProperties\(\)/, 'Mise en production : la recette guidée n’est pas persistée.');
+requireText(releaseReadiness, /exportReleaseAcceptanceReport/, 'Mise en production : l’export du rapport de recette est absent.');
+requireText(releaseUi, /loadReleaseReadiness_/, 'Interface : le chargement du rapport de santé est absent.');
+requireText(releaseUi, /runReleaseAcceptanceStep/, 'Interface : la recette guidée ne peut pas exécuter ses étapes.');
+requireText(releaseUi, /exportReleaseAcceptanceReport/, 'Interface : le rapport de recette ne peut pas être exporté.');
+requireText(supportDiagnostics, /INCIDENT_CLIENT/, 'Support : les incidents client ne sont pas journalisés.');
+requireText(supportDiagnostics, /sanitizeSupportText_/, 'Support : les informations d’incident ne sont pas assainies.');
 
 if (errors.length) {
   console.error('\nValidation CoordoDiscours : ÉCHEC\n');

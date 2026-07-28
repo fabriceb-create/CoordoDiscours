@@ -1,4 +1,4 @@
-const HELP_CONTENT_VERSION = '1.0.0';
+const HELP_CONTENT_VERSION = '1.1.0';
 const HELP_VIEW_TOPICS = Object.freeze({
   dashboard: 'dashboard',
   planning: 'planning',
@@ -12,7 +12,8 @@ const HELP_VIEW_TOPICS = Object.freeze({
   versions: 'versions',
   backup: 'sauvegardes',
   settings: 'administration',
-  help: 'demarrage'
+  help: 'demarrage',
+  release: 'mise-en-production'
 });
 
 const HELP_TOPICS = Object.freeze([
@@ -190,6 +191,19 @@ const HELP_TOPICS = Object.freeze([
     ],
     tips: ['Un coordinateur ne peut pas modifier les paramètres ni les utilisateurs.', 'Ne désactive jamais le dernier administrateur actif.'],
     keywords: ['admin', 'paramètres', 'utilisateurs', 'rôle', 'intégrité', 'performance']
+  },
+  {
+    id: 'mise-en-production', category: 'Administration', title: 'Vérifier la préparation à la mise en production', minimumRole: 'ADMIN', view: 'release',
+    summary: 'Obtenir un score global, exécuter une recette guidée et conserver un rapport exportable avant le déploiement.',
+    steps: [
+      'Ouvre Mise en production puis actualise le rapport de santé.',
+      'Traite en priorité chaque contrôle Bloquant : installation, intégrité, sauvegarde ou recette.',
+      'Démarre la recette guidée et exécute les six étapes dans l’ordre.',
+      'Consulte les incidents récents à l’aide de leurs références non sensibles.',
+      'Exporte le rapport JSON et conserve-le avec la sauvegarde et la version déployée.'
+    ],
+    tips: ['Un score élevé ne remplace pas la décision de l’administrateur.', 'La mise en production reste bloquée tant qu’un contrôle est classé Bloquant.'],
+    keywords: ['mise en production', 'santé', 'score', 'recette', 'rapport', 'incident', 'référence']
   },
   {
     id: 'deploiement', category: 'Administration', title: 'Déployer une nouvelle version', minimumRole: 'ADMIN', view: 'settings',

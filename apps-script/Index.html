@@ -8,6 +8,7 @@
   <?!= include('MergeStyles'); ?>
   <?!= include('VersionHistoryStyles'); ?>
   <?!= include('HelpStyles'); ?>
+  <?!= include('ReleaseReadinessStyles'); ?>
   <?!= include('DashboardStyles'); ?>
   <?!= include('ConflictResolutionStyles'); ?>
   <?!= include('AutomaticPlanningStyles'); ?>
@@ -39,6 +40,7 @@
         <button class="nav-button" type="button" data-view="history">Historique</button>
         <button class="nav-button" type="button" data-view="versions">Versions</button>
         <button class="nav-button" type="button" data-view="help">Aide</button>
+        <button class="nav-button" type="button" data-view="release">Mise en production</button>
         <button class="nav-button" type="button" data-view="backup">Sauvegardes</button>
         <button class="nav-button" type="button" data-view="settings">Paramètres</button>
       </nav>
@@ -155,6 +157,16 @@
         </div>
       </section>
 
+      <section id="view-release" class="view">
+        <div class="section-header"><div><p class="eyebrow">Administration</p><h2>Préparation à la mise en production</h2></div></div>
+        <div class="release-layout">
+          <div id="release-readiness-summary"><div class="release-empty">Ouvre ce module pour analyser la préparation au déploiement.</div></div>
+          <div id="release-readiness-checks"></div>
+          <div id="release-acceptance-panel"></div>
+          <section class="release-panel"><div class="release-panel-head"><div><p class="eyebrow">Support</p><h3>Incidents récents</h3></div><span class="release-status pending">Références non sensibles</span></div><div id="release-incidents"><div class="release-empty">Les incidents récents seront chargés avec le rapport.</div></div></section>
+        </div>
+      </section>
+
       <section id="view-backup" class="view">
         <div class="section-header"><div><p class="eyebrow">Sécurité des données</p><h2>Sauvegardes et restauration</h2></div><button id="backup-refresh" class="secondary-button" type="button">Actualiser</button></div>
         <div class="backup-grid">
@@ -216,6 +228,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <?!= include('Scripts'); ?>
   <?!= include('HelpScripts'); ?>
+  <?!= include('ReleaseReadinessScripts'); ?>
   <?!= include('MergeScripts'); ?>
   <?!= include('VersionHistoryScripts'); ?>
   <?!= include('PlanningScripts'); ?>

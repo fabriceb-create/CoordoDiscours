@@ -1,4 +1,4 @@
-# Installation de CoordoDiscours 1.12
+# Installation de CoordoDiscours 1.13
 
 ## 1. Préparer les fichiers
 
@@ -10,7 +10,7 @@ npm run check
 npm run predeploy:check
 ```
 
-`npm run check` doit terminer les neuf suites sans erreur. `predeploy:check` peut signaler l’absence de `.clasp.json` tant que le projet Apps Script n’a pas encore été associé.
+`npm run check` doit terminer les dix suites sans erreur. `predeploy:check` peut signaler l’absence de `.clasp.json` tant que le projet Apps Script n’a pas encore été associé.
 
 ## 2. Créer le projet Apps Script
 
@@ -65,7 +65,7 @@ L’installation :
 - invalide les caches ;
 - exécute la recette interne.
 
-La version 1.12 n’ajoute aucune feuille : le schéma reste `1.8.0`.
+La version 1.13 n’ajoute aucune feuille : le schéma reste `1.8.0`.
 
 ## 5. Vérification
 
@@ -89,13 +89,14 @@ Vérifier ensuite manuellement :
 7. sauvegarde ;
 8. intégrité ;
 9. performance serveur ;
-10. affichage mobile.
+10. affichage mobile ;
+11. rapport de santé et recette guidée.
 
 ## 6. Déployer l’application Web
 
 1. Ouvrir **Déployer > Nouveau déploiement**.
 2. Choisir **Application Web**.
-3. Nommer la version, par exemple `CoordoDiscours 1.12 recette`.
+3. Nommer la version, par exemple `CoordoDiscours 1.13 recette`.
 4. Exécuter l’application avec le compte du propriétaire.
 5. Limiter l’accès aux utilisateurs autorisés.
 6. Déployer et conserver l’URL.
@@ -109,8 +110,10 @@ Le manifeste fourni limite l’accès au propriétaire. Élargir l’accès uniq
 3. Remplacer ou pousser les fichiers.
 4. Exécuter `installCoordoDiscours`.
 5. Exécuter `runAcceptanceTests`.
-6. Créer une nouvelle version du déploiement Web.
-7. Effectuer la recette.
+6. Ouvrir Mise en production et terminer la recette guidée.
+7. Exporter le rapport de recette.
+8. Créer une nouvelle version du déploiement Web.
+9. Effectuer la recette réelle.
 
 Les migrations ne suppriment pas les données existantes.
 

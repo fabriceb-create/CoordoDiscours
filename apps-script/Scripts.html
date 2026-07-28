@@ -15,7 +15,9 @@
     'getBackupSummary', 'inspectApplicationBackup', 'getApplicationSettings',
     'getDataIntegrityReport', 'getInstallationStatus', 'getHelpBootstrap',
     'getServerPerformanceReport', 'listAccessUsers', 'getSpeakerTalkSelection',
-    'getSpeakerAvailabilitySchedule', 'getLanguagePack'
+    'getSpeakerAvailabilitySchedule', 'getLanguagePack', 'getReleaseReadinessBootstrap',
+    'getReleaseReadinessReport', 'getReleaseAcceptanceSession', 'exportReleaseAcceptanceReport',
+    'getRecentSupportIncidents'
   ]);
   const SERVER_READ_RETRY_DELAYS_MS = [500];
 
@@ -64,6 +66,29 @@
     }
   }
 
+  function createClientSupportReference_() {
+    const stamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, '0');
+    return 'CD-ERR-' + stamp + '-' + random;
+  }
+
+  function activeViewName_() {
+    const active = document.querySelector('.view.active-view');
+    return active && active.id ? active.id.replace(/^view-/, '') : 'inconnue';
+  }
+
+  function registerClientIncidentBestEffort_(error, cleanMessage, reference) {
+    const payload = {
+      reference: reference,
+      operation: error && error.coordoOperation || '',
+      view: activeViewName_(),
+      message: cleanMessage,
+      transient: Boolean(error && error.coordoTransient),
+      readOnly: Boolean(error && error.coordoReadOnly)
+    };
+    invokeServer_('registerClientIncident', [payload]).catch(() => null);
+  }
+
   function toast(message, tone) {
     const el = document.getElementById('toast');
     if (!el) return;
@@ -79,14 +104,20 @@
   function showError(error) {
     const message = error && error.message ? error.message : String(error);
     const cleanMessage = message.replace('CONFLIT_VERSION|', '');
-    toast('Erreur : ' + cleanMessage, 'error');
+    const reference = error && error.coordoReference ? error.coordoReference : createClientSupportReference_();
+    if (error && typeof error === 'object') error.coordoReference = reference;
+    toast('Erreur : ' + cleanMessage + ' — Réf. ' + reference, 'error');
     const status = document.getElementById('status');
-    if (status) status.textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
+    if (status) {
+      status.textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
+      status.title = 'Référence de support : ' + reference;
+    }
+    registerClientIncidentBestEffort_(error, cleanMessage, reference);
     const transient = Boolean(error && error.coordoTransient) || isTransientServerError_(error);
-    if (transient) showNetworkRecovery_(cleanMessage, Boolean(error && error.coordoReadOnly));
+    if (transient) showNetworkRecovery_(cleanMessage, Boolean(error && error.coordoReadOnly), reference);
   }
 
-  function showNetworkRecovery_(message, readOnly) {
+  function showNetworkRecovery_(message, readOnly, reference) {
     const panel = document.getElementById('network-recovery');
     if (!panel) return;
     panel.hidden = false;
@@ -95,9 +126,9 @@
     const detail = document.getElementById('network-recovery-message');
     const retry = document.getElementById('network-retry');
     if (title) title.textContent = readOnly ? 'Lecture interrompue' : 'État de l’enregistrement à vérifier';
-    if (detail) detail.textContent = readOnly
+    if (detail) detail.textContent = (readOnly
       ? 'La lecture a déjà été retentée automatiquement. Recharge l’application pour reprendre.'
-      : 'La connexion s’est interrompue pendant une écriture. Recharge avant de recommencer afin d’éviter un doublon.';
+      : 'La connexion s’est interrompue pendant une écriture. Recharge avant de recommencer afin d’éviter un doublon.') + (reference ? ' Référence : ' + reference + '.' : '');
     if (message && detail) detail.title = message;
     if (retry) retry.textContent = readOnly ? 'Réessayer' : 'Vérifier l’état';
   }

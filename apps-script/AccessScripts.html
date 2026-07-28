@@ -21,11 +21,11 @@
     document.querySelectorAll('#new-planning,#new-hospitality,#new-invitation,#new-speaker,#new-congregation,#new-talk,#backup-confirm,#settings-reset').forEach(button => {
       if (button) button.hidden = !access.canEdit;
     });
-    document.querySelectorAll('[data-view="backup"],[data-view="settings"]').forEach(button => {
+    document.querySelectorAll('[data-view="backup"],[data-view="settings"],[data-view="release"]').forEach(button => {
       if (button) button.hidden = !access.canAdminister;
     });
     const activeView = document.querySelector('.view.active-view');
-    if (!access.canAdminister && activeView && ['view-backup', 'view-settings'].includes(activeView.id)) {
+    if (!access.canAdminister && activeView && ['view-backup', 'view-settings', 'view-release'].includes(activeView.id)) {
       showView('dashboard');
     }
     const status = document.getElementById('status');

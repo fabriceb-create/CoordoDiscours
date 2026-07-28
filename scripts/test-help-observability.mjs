@@ -65,7 +65,7 @@ const context = {
   Error,
   Set,
   ACCESS_ROLES: roleDefinitions,
-  APP_CONFIG: { name: 'CoordoDiscours', version: '1.12 Stable', sheets: { settings: 'PARAMETRES' } },
+  APP_CONFIG: { name: 'CoordoDiscours', version: '1.13 Stable', sheets: { settings: 'PARAMETRES' } },
   CacheService: { getScriptCache: () => cache },
   getDatabase_: () => ({ getSheetByName: name => name === 'PARAMETRES' ? settingsSheet : null }),
   getCurrentUserAccess: () => accessSnapshot(),
@@ -136,7 +136,7 @@ function check(condition, message) {
   context.getCachedServerValue_('COMMUNICATION_OPTIONS_V1', () => 'communication', 60);
   context.getCachedServerValue_('VERSION_DISPLAY_CONTEXT_V1', () => 'versions', 60);
   context.invalidateReferenceServerCaches_();
-  const prefix = 'CoordoDiscours:1.12 Stable:';
+  const prefix = 'CoordoDiscours:1.13 Stable:';
   assert.equal(cache.get(prefix + 'PLANNING_OPTIONS_V1'), null);
   assert.equal(cache.get(prefix + 'COMMUNICATION_OPTIONS_V1'), null);
   assert.equal(cache.get(prefix + 'VERSION_DISPLAY_CONTEXT_V1'), null);
