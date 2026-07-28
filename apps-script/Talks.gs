@@ -45,6 +45,7 @@ function saveTalk(payload) {
     advanceEntityVersion_('DISCOURS', number);
     const after = getTalk(number);
     logAction_(existing ? 'MODIFICATION' : 'CREATION', 'DISCOURS', number, buildAuditDetails_(before, after));
+    invalidateReferenceServerCaches_();
     return after;
   } finally {
     lock.releaseLock();

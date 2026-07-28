@@ -3,10 +3,65 @@
   const state = { speakers: [], congregations: [], talks: [] };
   let mobileNavigationReturnFocus = null;
 
-  function runServer(functionName, ...args) {
+  const READ_ONLY_SERVER_FUNCTIONS = new Set([
+    'getAppBootstrap', 'getCurrentUserAccess', 'getDashboardData',
+    'listSpeakers', 'listCongregations', 'listTalks', 'listPlannings',
+    'getPlanningOptions', 'validatePlanning', 'getSpeakerRecommendations',
+    'getAutomaticPlanningDefaults', 'generateAutomaticPlanningDraft',
+    'getPlanningConflictResolutions', 'getCommunicationOptions',
+    'listHospitalities', 'listInvitations', 'getPrintablePlanning',
+    'listHistory', 'getHistoryFilterOptions', 'getVersionHistoryBootstrap',
+    'listVersionHistoryRecords', 'getEntityVersionTimeline', 'compareEntityVersions',
+    'getBackupSummary', 'inspectApplicationBackup', 'getApplicationSettings',
+    'getDataIntegrityReport', 'getInstallationStatus', 'getHelpBootstrap',
+    'getServerPerformanceReport', 'listAccessUsers', 'getSpeakerTalkSelection',
+    'getSpeakerAvailabilitySchedule', 'getLanguagePack'
+  ]);
+  const SERVER_READ_RETRY_DELAYS_MS = [500];
+
+  function invokeServer_(functionName, args) {
     return new Promise((resolve, reject) => {
       google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[functionName](...args);
     });
+  }
+
+  function waitClient_(durationMs) {
+    return new Promise(resolve => window.setTimeout(resolve, durationMs));
+  }
+
+  function isTransientServerError_(error) {
+    const message = String(error && (error.message || error) || '');
+    return /network|failed to fetch|service unavailable|temporar(?:y|ily)|timeout|timed out|internal error|server error|connexion|hors ligne/i.test(message);
+  }
+
+  function normalizeClientServerError_(rawError, functionName, readOnly) {
+    const message = rawError && rawError.message ? rawError.message : String(rawError || 'Erreur serveur inconnue.');
+    const error = new Error(message);
+    error.coordoOperation = String(functionName || '');
+    error.coordoReadOnly = Boolean(readOnly);
+    error.coordoTransient = isTransientServerError_(rawError);
+    error.coordoOriginal = rawError;
+    return error;
+  }
+
+  async function runServer(functionName, ...args) {
+    const readOnly = READ_ONLY_SERVER_FUNCTIONS.has(functionName);
+    let attempt = 0;
+    while (true) {
+      try {
+        const result = await invokeServer_(functionName, args);
+        hideNetworkRecovery_();
+        return result;
+      } catch (rawError) {
+        const error = normalizeClientServerError_(rawError, functionName, readOnly);
+        if (readOnly && error.coordoTransient && attempt < SERVER_READ_RETRY_DELAYS_MS.length) {
+          await waitClient_(SERVER_READ_RETRY_DELAYS_MS[attempt]);
+          attempt += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 
   function toast(message, tone) {
@@ -23,9 +78,40 @@
 
   function showError(error) {
     const message = error && error.message ? error.message : String(error);
-    toast('Erreur : ' + message.replace('CONFLIT_VERSION|', ''), 'error');
+    const cleanMessage = message.replace('CONFLIT_VERSION|', '');
+    toast('Erreur : ' + cleanMessage, 'error');
     const status = document.getElementById('status');
     if (status) status.textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
+    const transient = Boolean(error && error.coordoTransient) || isTransientServerError_(error);
+    if (transient) showNetworkRecovery_(cleanMessage, Boolean(error && error.coordoReadOnly));
+  }
+
+  function showNetworkRecovery_(message, readOnly) {
+    const panel = document.getElementById('network-recovery');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.dataset.mode = readOnly ? 'retry' : 'uncertain';
+    const title = document.getElementById('network-recovery-title');
+    const detail = document.getElementById('network-recovery-message');
+    const retry = document.getElementById('network-retry');
+    if (title) title.textContent = readOnly ? 'Lecture interrompue' : 'État de l’enregistrement à vérifier';
+    if (detail) detail.textContent = readOnly
+      ? 'La lecture a déjà été retentée automatiquement. Recharge l’application pour reprendre.'
+      : 'La connexion s’est interrompue pendant une écriture. Recharge avant de recommencer afin d’éviter un doublon.';
+    if (message && detail) detail.title = message;
+    if (retry) retry.textContent = readOnly ? 'Réessayer' : 'Vérifier l’état';
+  }
+
+  function hideNetworkRecovery_(force) {
+    const panel = document.getElementById('network-recovery');
+    if (!panel) return;
+    if (!force && panel.dataset.mode === 'uncertain') return;
+    panel.hidden = true;
+    delete panel.dataset.mode;
+  }
+
+  function retryAfterNetworkFailure_() {
+    window.location.reload();
   }
 
   function isMobileNavigation_() {
@@ -420,6 +506,11 @@
   document.getElementById('speaker-archived').addEventListener('change', loadSpeakers);
   document.getElementById('congregation-archived').addEventListener('change', loadCongregations);
   document.getElementById('talk-inactive').addEventListener('change', loadTalks);
+
+  const networkRetryButton = document.getElementById('network-retry');
+  if (networkRetryButton) networkRetryButton.addEventListener('click', retryAfterNetworkFailure_);
+  const networkDismissButton = document.getElementById('network-dismiss');
+  if (networkDismissButton) networkDismissButton.addEventListener('click', () => hideNetworkRecovery_(true));
 
   document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.view').forEach(view => view.setAttribute('aria-hidden', view.classList.contains('active-view') ? 'false' : 'true'));

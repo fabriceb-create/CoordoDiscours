@@ -7,6 +7,7 @@
   <?!= include('Styles'); ?>
   <?!= include('MergeStyles'); ?>
   <?!= include('VersionHistoryStyles'); ?>
+  <?!= include('HelpStyles'); ?>
   <?!= include('DashboardStyles'); ?>
   <?!= include('ConflictResolutionStyles'); ?>
   <?!= include('AutomaticPlanningStyles'); ?>
@@ -37,6 +38,7 @@
         <button class="nav-button" type="button" data-view="talks">Discours</button>
         <button class="nav-button" type="button" data-view="history">Historique</button>
         <button class="nav-button" type="button" data-view="versions">Versions</button>
+        <button class="nav-button" type="button" data-view="help">Aide</button>
         <button class="nav-button" type="button" data-view="backup">Sauvegardes</button>
         <button class="nav-button" type="button" data-view="settings">Paramètres</button>
       </nav>
@@ -50,8 +52,12 @@
           <button id="mobile-menu-toggle" class="icon-button mobile-menu-toggle" type="button" aria-label="Ouvrir le menu" aria-controls="app-sidebar" aria-expanded="false"><span aria-hidden="true">☰</span></button>
           <div><p class="eyebrow">Assemblée</p><h1 id="congregation">Basse-Terre</h1></div>
         </div>
-        <span id="status" class="status-pill" role="status" aria-live="polite">Initialisation...</span>
+        <div class="topbar-actions"><button id="global-help-button" class="secondary-button global-help-button" type="button" aria-label="Ouvrir l’aide contextuelle" title="Aide contextuelle">?</button><span id="status" class="status-pill" role="status" aria-live="polite">Initialisation...</span></div>
       </header>
+      <div id="network-recovery" class="network-recovery" role="alert" aria-live="assertive" hidden>
+        <div><strong id="network-recovery-title">Connexion interrompue</strong><span id="network-recovery-message"></span></div>
+        <div class="record-actions"><button id="network-retry" class="primary-button" type="button">Réessayer</button><button id="network-dismiss" class="secondary-button" type="button">Ignorer</button></div>
+      </div>
 
       <section id="view-dashboard" class="view active-view">
         <div class="section-header"><div><p class="eyebrow">Aujourd’hui</p><h2>Tableau de bord</h2></div><button class="secondary-button" type="button" onclick="loadDashboard()">Actualiser</button></div>
@@ -136,6 +142,19 @@
         </div>
       </section>
 
+      <section id="view-help" class="view">
+        <div class="section-header"><div><p class="eyebrow">Assistance intégrée</p><h2>Guide CoordoDiscours</h2></div><button id="help-refresh" class="secondary-button" type="button">Actualiser le guide</button></div>
+        <div class="help-toolbar">
+          <label>Rechercher dans l’aide<input id="help-search" type="search" placeholder="Ex. programmation, sauvegarde, indisponibilité..." autocomplete="off"></label>
+          <span id="help-search-count" class="help-search-count" role="status" aria-live="polite">0 sujet</span>
+          <span class="help-shortcut">Raccourci : touche ?</span>
+        </div>
+        <div class="help-layout">
+          <aside class="help-panel" aria-label="Sujets d’aide"><div id="help-topic-list" class="help-topic-list"><div class="help-empty">Ouvre ce module pour charger le guide.</div></div></aside>
+          <section id="help-detail" class="help-panel" aria-live="polite"><div class="help-empty">Sélectionne un sujet pour afficher les explications.</div></section>
+        </div>
+      </section>
+
       <section id="view-backup" class="view">
         <div class="section-header"><div><p class="eyebrow">Sécurité des données</p><h2>Sauvegardes et restauration</h2></div><button id="backup-refresh" class="secondary-button" type="button">Actualiser</button></div>
         <div class="backup-grid">
@@ -187,8 +206,16 @@
   <dialog id="congregation-dialog"><form id="congregation-form" method="dialog" class="form-panel" data-merge-entity="ASSEMBLEE"><div class="dialog-header"><h2>Fiche assemblée</h2><button type="button" class="icon-button" data-close="congregation-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="name" required></label><label>Coordinateur<input name="coordinator"></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Adresse<textarea name="address" rows="2"></textarea></label><label>Jour de réunion<input name="meetingDay"></label><label>Heure<input name="meetingTime" type="time"></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Active</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="congregation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
   <dialog id="talk-dialog"><form id="talk-form" method="dialog" class="form-panel" data-merge-entity="DISCOURS"><div class="dialog-header"><h2>Fiche discours</h2><button type="button" class="icon-button" data-close="talk-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div><div class="form-grid"><label>Numéro*<input name="number" type="number" min="1" required></label><label class="full-width">Titre*<textarea name="title" rows="3" required></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="talk-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
+  <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-dialog-heading">
+    <div class="form-panel">
+      <div class="dialog-header"><div><p class="eyebrow">Aide contextuelle</p><h2 id="help-dialog-heading">Guide CoordoDiscours</h2></div><button type="button" class="icon-button" data-close="help-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div>
+      <div id="help-dialog-content" class="help-dialog-content"><div class="help-empty">Chargement du sujet...</div></div>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
   <?!= include('Scripts'); ?>
+  <?!= include('HelpScripts'); ?>
   <?!= include('MergeScripts'); ?>
   <?!= include('VersionHistoryScripts'); ?>
   <?!= include('PlanningScripts'); ?>

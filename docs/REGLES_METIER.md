@@ -119,3 +119,37 @@
 3. Il contient la date, le numéro, le titre, l’orateur, l’assemblée et le groupe d’hospitalité.
 4. Un seul verset aléatoire est proposé par tableau généré.
 5. Les textes utilisent le tiret simple « - » et non le tiret long.
+
+## Aide intégrée
+
+1. Le guide doit être consultable par tous les utilisateurs autorisés.
+2. Chaque sujet possède un rôle minimal et le serveur filtre le contenu avant de le transmettre.
+3. Un rôle Consultation ne reçoit aucun sujet Coordinateur ou Administrateur.
+4. L’aide contextuelle dépend de la vue réellement ouverte.
+5. Le guide ne doit jamais fournir un moyen de contourner les droits de l’application.
+
+## Cache serveur
+
+1. Un cache est une optimisation temporaire et non la source de vérité.
+2. Une indisponibilité du cache ne doit pas bloquer une lecture Google Sheets.
+3. Les paramètres et options partagées peuvent être conservés au maximum 60 secondes.
+4. Toute écriture susceptible de rendre une valeur obsolète invalide le cache concerné.
+5. Une installation ou restauration complète invalide tous les caches.
+6. Les validations définitives continuent à appliquer les règles métier et les verrous habituels.
+
+## Fiabilité réseau
+
+1. Une lecture interrompue par une erreur transitoire peut être relancée automatiquement une seule fois.
+2. Une écriture n’est jamais relancée automatiquement.
+3. Après une coupure pendant une écriture, l’utilisateur doit vérifier l’état actuel avant de recommencer.
+4. Le message de reprise doit distinguer une lecture échouée d’une écriture au résultat incertain.
+5. La reprise réseau ne remplace ni le contrôle des doublons, ni le verrouillage optimiste, ni la fusion intelligente.
+
+## Observabilité
+
+1. Les mesures de performance sont agrégées, temporaires et de type meilleur effort.
+2. L’échec de la mesure ne doit jamais faire échouer l’opération métier.
+3. Seuls des contextes simples, bornés et non sensibles peuvent être conservés.
+4. Le rapport et sa réinitialisation sont réservés aux administrateurs.
+5. La réinitialisation des mesures est historisée.
+6. Une durée élevée isolée ne suffit pas à conclure à un défaut permanent.

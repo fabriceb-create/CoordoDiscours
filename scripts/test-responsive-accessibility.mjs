@@ -40,6 +40,8 @@ const backup = read('BackupScripts.html');
 const settings = read('SettingsScripts.html');
 const access = read('AccessScripts.html');
 const i18n = read('I18nScripts.html');
+const help = read('HelpScripts.html');
+const helpStyles = read('HelpStyles.html');
 
 assertContains(index, /class="skip-link"\s+href="#main-content"/, 'Accessibilité : le lien d’évitement vers le contenu principal est absent.');
 assertContains(index, /id="app-sidebar"[\s\S]*aria-label="Navigation principale"/, 'Accessibilité : la navigation principale n’est pas nommée.');
@@ -51,12 +53,21 @@ assertContains(index, /id="toast"[\s\S]*role="status"[\s\S]*aria-live="polite"/,
 assertContains(index, /id="status"[\s\S]*role="status"[\s\S]*aria-live="polite"/, 'Accessibilité : l’état de l’application n’est pas annoncé.');
 assertContains(index, /data-close="planning-dialog"[\s\S]*aria-label="Fermer la fenêtre"/, 'Accessibilité : les boutons de fermeture des fenêtres ne sont pas nommés.');
 
+assertContains(index, /data-view="help"[\s\S]*id="view-help"/, 'Guide : le menu et l’espace de travail sont absents.');
+assertContains(index, /id="global-help-button"[\s\S]*aria-label="Ouvrir l’aide contextuelle"/, 'Guide : le bouton d’aide global n’est pas accessible.');
+assertContains(index, /id="help-dialog"[\s\S]*aria-labelledby="help-dialog-heading"/, 'Guide : la fenêtre d’aide contextuelle n’est pas correctement nommée.');
+assertContains(index, /id="network-recovery"[\s\S]*role="alert"[\s\S]*id="network-retry"/, 'Réseau : le panneau de reprise accessible est absent.');
+
 assertContains(styles, /:focus-visible/, 'Accessibilité : aucun style de focus clavier visible n’est défini.');
 assertContains(styles, /body\.navigation-open \.sidebar/, 'Mobile : le tiroir ne possède pas d’état ouvert.');
 assertContains(styles, /\.sidebar-backdrop/, 'Mobile : le voile de fond du tiroir n’est pas stylé.');
 assertContains(styles, /100dvh/, 'Mobile : la hauteur dynamique de la fenêtre n’est pas prise en compte.');
 assertContains(styles, /@media \(max-width: 820px\)/, 'Mobile : le point de rupture principal est absent.');
 assertContains(styles, /@media \(prefers-reduced-motion: reduce\)/, 'Accessibilité : la préférence de réduction des animations n’est pas respectée.');
+
+assertContains(helpStyles, /help-layout/, 'Guide : l’espace de travail n’est pas stylé.');
+assertContains(helpStyles, /help-dialog/, 'Guide : la fenêtre contextuelle n’est pas stylée.');
+assertContains(helpStyles, /@media\(max-width:900px\)/, 'Guide : l’affichage ne s’adapte pas aux petits écrans.');
 
 assertContains(scripts, /const MOBILE_NAV_BREAKPOINT = 820/, 'Mobile : la largeur de bascule du tiroir n’est pas centralisée.');
 assertContains(scripts, /function\s+setMobileNavigationOpen_\s*\(/, 'Mobile : le contrôleur du tiroir est absent.');
@@ -69,6 +80,15 @@ assertContains(scripts, /coordodiscours:viewchange/, 'Navigation : l’événeme
 assertContains(scripts, /function\s+withBusyElement_\s*\(/, 'Fiabilité : la protection contre les doubles actions est absente.');
 assertContains(scripts, /function\s+invalidatePlanningDependentCaches_\s*\(/, 'Performance : l’invalidation des caches dépendants du planning est absente.');
 assertContains(scripts, /toast\(message, tone\)/, 'Accessibilité : les messages d’erreur ne peuvent pas utiliser un canal assertif.');
+
+assertContains(scripts, /READ_ONLY_SERVER_FUNCTIONS/, 'Réseau : les lectures ne sont pas distinguées des écritures.');
+assertContains(scripts, /SERVER_READ_RETRY_DELAYS_MS\s*=\s*\[500\]/, 'Réseau : la reprise automatique unique des lectures est absente.');
+assertContains(scripts, /readOnly\s*&&\s*error\.coordoTransient/, 'Réseau : la reprise automatique n’est pas limitée aux lectures transitoires.');
+assertContains(scripts, /function\s+showNetworkRecovery_\s*\(/, 'Réseau : le panneau de reprise ne peut pas être affiché.');
+assertContains(scripts, /panel\.dataset\.mode === ['"]uncertain['"][\s\S]*return/, 'Réseau : une écriture incertaine peut être masquée par une lecture ultérieure.');
+assertContains(scripts, /['"]listAccessUsers['"]/, 'Réseau : la lecture des utilisateurs n’est pas classée comme lecture réessayable.');
+assertContains(scripts, /function\s+retryAfterNetworkFailure_\s*\([\s\S]*window\.location\.reload/, 'Réseau : la reprise ne recharge pas l’état avant une nouvelle action.');
+assertNotContains(scripts.match(/const READ_ONLY_SERVER_FUNCTIONS = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '', /savePlanning|commitAutomaticPlanningDraft|restoreApplicationBackup|saveSpeaker|saveInvitation/, 'Réseau : une écriture est classée à tort comme lecture réessayable.');
 
 assertContains(planning, /PLANNING_OPTIONS_CACHE_TTL_MS = 60000/, 'Performance : le cache court des options de programmation est absent.');
 assertContains(planning, /state\.planningOptionsRequest/, 'Performance : les demandes simultanées d’options de programmation ne sont pas mutualisées.');
@@ -95,6 +115,17 @@ assertContains(backup, /state\.speakers = \[\][\s\S]*invalidatePlanningDependent
 assertContains(settings, /state\.automaticPlanningDraft/, 'Fiabilité : un changement de paramètres ne rend pas le brouillon automatique obsolète côté interface.');
 assertContains(access, /\['view-backup', 'view-settings'\]/, 'Sécurité UI : une vue administrateur ouverte par lien n’est pas refermée pour un rôle insuffisant.');
 assertContains(i18n, /\[aria-label\]/, 'Traduction : les libellés accessibles ne sont pas traduits.');
+
+assertContains(help, /runServer\(['"]getHelpBootstrap['"]\)/, 'Guide : le contenu serveur n’est pas chargé.');
+assertContains(help, /data-help-topic-id/, 'Guide : les sujets ne sont pas navigables.');
+assertContains(help, /aria-current="true"/, 'Guide : le sujet sélectionné n’est pas exposé.');
+assertContains(help, /function\s+openContextualHelp_\s*\(/, 'Guide : l’aide contextuelle est absente.');
+assertContains(help, /data-context-help/, 'Guide : les boutons contextuels par module sont absents.');
+assertContains(help, /event\.key === ['"]\?['"]/, 'Guide : le raccourci clavier ? est absent.');
+assertContains(help, /dialogReturnFocus[\s\S]*\.focus\(\)/, 'Guide : le focus n’est pas rendu après fermeture de la fenêtre.');
+assertContains(help, /coordodiscours:viewchange/, 'Guide : la vue Aide ne se charge pas depuis la navigation centrale.');
+assertContains(settings, /getServerPerformanceReport[\s\S]*resetServerPerformanceReport/, 'Observabilité : le diagnostic de performance serveur est absent des paramètres.');
+assertContains(settings, /server-performance-refresh[\s\S]*server-performance-reset/, 'Observabilité : les actions actualiser et réinitialiser sont absentes.');
 
 const scriptFiles = fs.readdirSync(root).filter(file => file.endsWith('.html'));
 for (const file of scriptFiles) {

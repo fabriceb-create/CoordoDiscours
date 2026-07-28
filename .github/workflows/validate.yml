@@ -41,6 +41,9 @@ jobs:
       - name: Tester le responsive, l’accessibilité et les caches
         run: npm run test:ui
 
+      - name: Tester l’aide, les caches serveur et l’observabilité
+        run: npm run test:ops
+
       - name: Publier le code testé
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4

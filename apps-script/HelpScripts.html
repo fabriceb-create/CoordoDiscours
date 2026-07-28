@@ -1,0 +1,205 @@
+<script>
+  const helpState = {
+    bootstrap: null,
+    loadingPromise: null,
+    selectedTopicId: '',
+    currentView: 'dashboard',
+    query: '',
+    dialogReturnFocus: null
+  };
+
+  async function loadHelpBootstrap_(force) {
+    if (!force && helpState.bootstrap) return helpState.bootstrap;
+    if (!force && helpState.loadingPromise) return helpState.loadingPromise;
+    const request = runServer('getHelpBootstrap').then(data => {
+      helpState.bootstrap = data || { topics: [], viewTopics: {} };
+      if (!helpState.selectedTopicId) helpState.selectedTopicId = helpState.bootstrap.defaultTopic || '';
+      installContextHelpButtons_();
+      return helpState.bootstrap;
+    }).finally(() => {
+      if (helpState.loadingPromise === request) helpState.loadingPromise = null;
+    });
+    helpState.loadingPromise = request;
+    return request;
+  }
+
+  function normalizeHelpSearch_(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  }
+
+  function helpTopics_() {
+    return helpState.bootstrap && helpState.bootstrap.topics || [];
+  }
+
+  function findHelpTopic_(topicId) {
+    return helpTopics_().find(item => item.id === String(topicId || '')) || null;
+  }
+
+  function contextualHelpTopicId_(viewName) {
+    const map = helpState.bootstrap && helpState.bootstrap.viewTopics || {};
+    return map[String(viewName || helpState.currentView || '')] || helpState.bootstrap && helpState.bootstrap.defaultTopic || '';
+  }
+
+  function filteredHelpTopics_() {
+    const query = normalizeHelpSearch_(helpState.query);
+    if (!query) return helpTopics_();
+    return helpTopics_().filter(topic => normalizeHelpSearch_([
+      topic.title, topic.summary, topic.category,
+      (topic.keywords || []).join(' '),
+      (topic.steps || []).join(' '),
+      (topic.tips || []).join(' ')
+    ].join(' ')).includes(query));
+  }
+
+  async function loadHelpView_() {
+    const list = document.getElementById('help-topic-list');
+    const detail = document.getElementById('help-detail');
+    if (!list || !detail) return;
+    list.innerHTML = '<div class="help-empty">Chargement du guide...</div>';
+    try {
+      await loadHelpBootstrap_(false);
+      if (!findHelpTopic_(helpState.selectedTopicId)) helpState.selectedTopicId = contextualHelpTopicId_(helpState.currentView);
+      renderHelpWorkspace_();
+    } catch (error) {
+      showError(error);
+      list.innerHTML = '<div class="help-empty">Impossible de charger le guide.</div>';
+      detail.innerHTML = '<div class="help-empty">Réessaie après avoir vérifié la connexion.</div>';
+    }
+  }
+
+  function renderHelpWorkspace_() {
+    const topics = filteredHelpTopics_();
+    const list = document.getElementById('help-topic-list');
+    const count = document.getElementById('help-search-count');
+    if (!list) return;
+    if (count) count.textContent = topics.length + ' sujet' + (topics.length > 1 ? 's' : '');
+    if (!topics.length) {
+      list.innerHTML = '<div class="help-empty">Aucun sujet ne correspond à cette recherche.</div>';
+      document.getElementById('help-detail').innerHTML = '<div class="help-empty">Modifie les mots recherchés.</div>';
+      return;
+    }
+    if (!topics.some(topic => topic.id === helpState.selectedTopicId)) helpState.selectedTopicId = topics[0].id;
+    let previousCategory = '';
+    list.innerHTML = topics.map(topic => {
+      const category = topic.category !== previousCategory ? '<div class="help-category-label">' + escapeHtml(topic.category) + '</div>' : '';
+      previousCategory = topic.category;
+      return category + '<button type="button" class="help-topic-button ' + (topic.id === helpState.selectedTopicId ? 'selected' : '') + '" data-help-topic-id="' + escapeHtml(topic.id) + '"' + (topic.id === helpState.selectedTopicId ? ' aria-current="true"' : '') + '><strong>' + escapeHtml(topic.title) + '</strong><small>' + escapeHtml(topic.summary) + '</small></button>';
+    }).join('');
+    renderHelpDetail_(findHelpTopic_(helpState.selectedTopicId), document.getElementById('help-detail'), false);
+  }
+
+  function renderHelpDetail_(topic, container, compact) {
+    if (!container) return;
+    if (!topic) {
+      container.innerHTML = '<div class="help-empty">Sujet d’aide introuvable.</div>';
+      return;
+    }
+    const languageNotice = helpState.bootstrap && helpState.bootstrap.languageNotice;
+    container.innerHTML = '<article class="help-detail">' +
+      (languageNotice ? '<div class="help-language-notice">' + escapeHtml(languageNotice) + '</div>' : '') +
+      '<div class="help-detail-head"><div><p class="eyebrow">' + escapeHtml(topic.category) + '</p><h3>' + escapeHtml(topic.title) + '</h3></div><span class="help-role-badge">' + escapeHtml(helpRoleLabel_(topic.minimumRole)) + '</span></div>' +
+      '<p class="help-summary">' + escapeHtml(topic.summary) + '</p>' +
+      '<ol class="help-steps">' + (topic.steps || []).map(step => '<li>' + escapeHtml(step) + '</li>').join('') + '</ol>' +
+      ((topic.tips || []).length ? '<aside class="help-tips"><h4>À retenir</h4><ul>' + topic.tips.map(tip => '<li>' + escapeHtml(tip) + '</li>').join('') + '</ul></aside>' : '') +
+      (compact ? '<div class="form-actions"><button id="help-dialog-open-full" type="button" class="secondary-button">Ouvrir tout le guide</button></div>' : '') +
+      '</article>';
+  }
+
+  function helpRoleLabel_(role) {
+    return { ADMIN: 'Administrateur', COORDINATEUR: 'Coordinateur', CONSULTATION: 'Tous les utilisateurs' }[role] || role || '';
+  }
+
+  function selectHelpTopic_(topicId) {
+    if (!findHelpTopic_(topicId)) return;
+    helpState.selectedTopicId = topicId;
+    renderHelpWorkspace_();
+    const detail = document.getElementById('help-detail');
+    if (detail && window.matchMedia('(max-width: 900px)').matches) detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function openContextualHelp_(topicId, trigger) {
+    try {
+      await loadHelpBootstrap_(false);
+      const resolved = findHelpTopic_(topicId) || findHelpTopic_(contextualHelpTopicId_(helpState.currentView)) || helpTopics_()[0];
+      if (!resolved) throw new Error('Aucun sujet d’aide n’est disponible.');
+      helpState.dialogReturnFocus = trigger || document.activeElement;
+      helpState.selectedTopicId = resolved.id;
+      renderHelpDetail_(resolved, document.getElementById('help-dialog-content'), true);
+      const dialog = document.getElementById('help-dialog');
+      if (!dialog.open) dialog.showModal();
+      const heading = dialog.querySelector('h3');
+      if (heading) {
+        heading.tabIndex = -1;
+        window.setTimeout(() => heading.focus(), 0);
+      }
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  function installContextHelpButtons_() {
+    const map = helpState.bootstrap && helpState.bootstrap.viewTopics || {};
+    Object.keys(map).forEach(view => {
+      if (view === 'help') return;
+      const header = document.querySelector('#view-' + view + ' .section-header');
+      if (!header || header.querySelector('[data-context-help]')) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary-button context-help-button';
+      button.dataset.contextHelp = map[view];
+      button.setAttribute('aria-label', 'Ouvrir l’aide pour ce module');
+      button.title = 'Aide contextuelle';
+      button.textContent = '?';
+      header.appendChild(button);
+    });
+  }
+
+  document.addEventListener('coordodiscours:viewchange', event => {
+    const view = event.detail && event.detail.name || 'dashboard';
+    helpState.currentView = view;
+    if (view === 'help') loadHelpView_();
+  });
+
+  document.addEventListener('click', async event => {
+    const topicButton = event.target.closest('[data-help-topic-id]');
+    if (topicButton) selectHelpTopic_(topicButton.dataset.helpTopicId);
+
+    const contextButton = event.target.closest('[data-context-help]');
+    if (contextButton) await openContextualHelp_(contextButton.dataset.contextHelp, contextButton);
+
+    if (event.target.closest('#global-help-button')) await openContextualHelp_('', event.target.closest('#global-help-button'));
+
+    if (event.target.id === 'help-refresh') {
+      helpState.bootstrap = null;
+      helpState.selectedTopicId = '';
+      await loadHelpBootstrap_(true);
+      renderHelpWorkspace_();
+    }
+
+    if (event.target.id === 'help-dialog-open-full') {
+      const dialog = document.getElementById('help-dialog');
+      if (dialog.open) dialog.close();
+      showView('help');
+    }
+  });
+
+  document.addEventListener('input', event => {
+    if (event.target.id !== 'help-search') return;
+    helpState.query = event.target.value;
+    renderHelpWorkspace_();
+  });
+
+  document.addEventListener('keydown', event => {
+    const target = event.target;
+    const editable = target && (target.matches('input,textarea,select') || target.isContentEditable);
+    if (event.key === '?' && !editable && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      openContextualHelp_('', document.activeElement);
+    }
+  });
+
+  document.getElementById('help-dialog').addEventListener('close', () => {
+    if (helpState.dialogReturnFocus && typeof helpState.dialogReturnFocus.focus === 'function') helpState.dialogReturnFocus.focus();
+    helpState.dialogReturnFocus = null;
+  });
+</script>

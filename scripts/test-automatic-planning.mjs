@@ -82,6 +82,7 @@ const context = {
   },
   APP_CONFIG: { sheets: { events: 'PROGRAMMATIONS', invitations: 'INVITATIONS', hospitality: 'HOSPITALITE' } },
   assertEditAccess_: () => true,
+  measureServerOperation_: (_operation, callback) => callback(),
   requiredText_: (value, label) => {
     const text = String(value || '').trim();
     if (!text) throw new Error(`${label} est obligatoire.`);
@@ -92,6 +93,8 @@ const context = {
   buildPlanningRuleDataset_: () => clone(baseDataset),
   listHospitalities: () => clone(baseDataset.hospitalities),
   listInvitations: () => clone(baseDataset.invitations),
+  listHospitalitiesWithPlannings_: () => clone(baseDataset.hospitalities),
+  listInvitationsWithPlannings_: () => clone(baseDataset.invitations),
   normalizeText_: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(),
   normalizePlanningPayload_: payload => {
     const talkNumber = Number(payload.talkNumber);
@@ -137,6 +140,7 @@ const context = {
     return { ready: true, recommendations };
   },
   getDatabase_: () => { throw new Error('La base ne doit pas être appelée pendant le test de brouillon obsolète.'); },
+  invalidatePlanningServerCaches_: () => {},
   removeEntityVersion_: () => {},
   advanceEntityVersion_: () => ({ version: 'v' }),
   logAction_: () => {},

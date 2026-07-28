@@ -37,13 +37,16 @@ function evaluatePlanningRules_(planning, dataset) {
 function buildPlanningRuleDataset_() {
   const speakerAvailability = getSpeakerAvailabilityMap_();
   const recommendationWeights = getRecommendationWeights_();
+  const congregations = listCongregations('', true);
+  const speakers = listSpeakersWithCongregations_('', true, congregations);
+  const talks = listTalks('', true);
   recommendationWeights._speakerAvailability = speakerAvailability;
   recommendationWeights._availabilityAdjustments = getAvailabilityRecommendationAdjustments_();
   return {
-    speakers: listSpeakers('', true),
-    talks: listTalks('', true),
-    congregations: listCongregations('', true),
-    plannings: listPlannings('', true),
+    speakers: speakers,
+    talks: talks,
+    congregations: congregations,
+    plannings: listPlanningsWithResources_('', true, speakers, talks),
     speakerTalks: getSpeakerTalkNumbersMap_(),
     speakerAvailability: speakerAvailability,
     repetitionMonths: Number(getSetting_('ALERTE_REPETITION_MOIS')) || 12,

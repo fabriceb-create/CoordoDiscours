@@ -58,6 +58,7 @@ function saveCongregation(payload) {
     const metadata = advanceEntityVersion_('ASSEMBLEE', id);
     const after = Object.assign({}, getCongregation(id), metadata);
     logAction_(existingRow ? 'MODIFICATION' : 'CREATION', 'ASSEMBLEE', id, buildAuditDetails_(before, after));
+    invalidateReferenceServerCaches_();
     return after;
   } finally {
     lock.releaseLock();

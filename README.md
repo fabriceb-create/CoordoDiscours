@@ -4,9 +4,9 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.11 Stable**
+Version en préparation de recette : **1.12 Stable**
 
-Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques et la documentation d’installation et de recette.
+Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques, un guide intégré et la documentation d’installation, d’administration et de recette.
 
 ## Modules disponibles
 
@@ -17,8 +17,7 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
 - Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter.
 - Fusion intelligente des modifications concurrentes.
-- Historique navigable des versions par fiche, avec chargement progressif.
-- Comparaison et restauration contrôlée des versions.
+- Historique navigable, comparaison et restauration contrôlée des versions.
 - Répertoire des orateurs et des assemblées.
 - Référentiel des discours et discours déclarés par orateur extérieur.
 - Invitations et hospitalité.
@@ -26,11 +25,59 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Historique détaillé avant/après.
 - Contrôle d’intégrité, sauvegarde et restauration sécurisées.
 - Gestion des rôles et des accès.
+- Guide utilisateur intégré et aide contextuelle.
+- Diagnostic temporaire des durées serveur.
 - Interface Français / Kréyòl Gwadloup.
+
+## Guide intégré et aide contextuelle
+
+La version 1.12 ajoute un véritable module **Aide**. Son contenu est filtré selon le rôle de l’utilisateur :
+
+- Consultation : démarrage, tableau de bord, impression, historique, versions et dépannage ;
+- Coordinateur : programmation, recommandations, planification automatique, orateurs, disponibilités et communication ;
+- Administrateur : paramètres, utilisateurs, intégrité, déploiement et diagnostic de performance.
+
+Le guide peut être ouvert de trois façons :
+
+1. depuis le menu **Aide** ;
+2. avec le bouton `?` de l’en-tête ou du module affiché ;
+3. avec la touche `?`, lorsque le curseur n’est pas dans un champ de saisie.
+
+L’aide contextuelle restitue le focus à l’élément d’origine après fermeture. Lorsque l’interface est en Kréyòl Gwadloup, les commandes restent traduites et un message précise que le guide détaillé est actuellement rédigé en français.
+
+## Fiabilité réseau
+
+Les appels serveur sont maintenant classés entre lectures et écritures.
+
+- Une lecture interrompue par une erreur transitoire est relancée automatiquement une seule fois après 500 ms.
+- Une écriture n’est jamais répétée automatiquement, car son résultat peut déjà avoir été enregistré côté serveur.
+- Un bandeau de reprise explique l’action adaptée : recharger une lecture ou vérifier l’état d’une écriture avant de la recommencer.
+
+Cette stratégie réduit les erreurs visibles sans risquer de créer silencieusement une programmation, une invitation ou une autre fiche en double.
+
+## Cache et observabilité serveur
+
+Un cache serveur court de 60 secondes limite certaines lectures Google Sheets répétitives :
+
+- paramètres généraux ;
+- options de programmation ;
+- options d’invitation et d’hospitalité ;
+- libellés utilisés dans la comparaison des versions.
+
+Les caches sont invalidés après les écritures qui peuvent rendre les données obsolètes. Une indisponibilité du cache n’empêche jamais l’application de fonctionner : la lecture directe reste la solution de repli.
+
+Les opérations les plus coûteuses sont chronométrées de manière agrégée. Un administrateur peut consulter dans **Paramètres > Performance serveur** :
+
+- le nombre d’appels ;
+- la durée moyenne, minimale, maximale et la dernière durée ;
+- le nombre d’appels dépassant le seuil de 1 500 ms ;
+- le nombre d’erreurs observées.
+
+Ces mesures sont temporaires, conservées dans le cache du script pendant six heures et ne constituent pas un engagement de temps de réponse.
 
 ## Ergonomie mobile et accessibilité
 
-La version 1.11 remplace la navigation mobile statique par un tiroir adapté aux téléphones et tablettes. Le menu :
+La navigation mobile utilise un tiroir adapté aux téléphones et tablettes. Le menu :
 
 - s’ouvre depuis l’en-tête ;
 - se ferme avec son bouton, le voile de fond ou la touche Échap ;
@@ -38,32 +85,13 @@ La version 1.11 remplace la navigation mobile statique par un tiroir adapté aux
 - restitue le focus au bouton d’ouverture après fermeture ;
 - retire du parcours clavier la navigation placée hors écran.
 
-L’interface ajoute également :
-
-- un lien d’évitement vers le contenu principal ;
-- un focus clavier visible ;
-- `aria-current` sur la section active ;
-- des libellés accessibles sur les boutons icônes ;
-- des annonces adaptées pour les confirmations et les erreurs ;
-- le respect de la préférence système de réduction des animations ;
-- une navigation par ancre permettant d’ouvrir directement une section.
-
-## Réduction des chargements inutiles
-
-Les données partagées entre plusieurs écrans utilisent maintenant un cache client court de 60 secondes :
-
-- options de programmation : orateurs, discours et assemblées ;
-- programmations proposées dans les formulaires d’invitation et d’hospitalité.
-
-Les demandes simultanées sont mutualisées. Les caches sont invalidés après toute modification susceptible de les rendre obsolètes, notamment après une programmation, une modification de référentiel, une planification automatique, un changement de paramètres ou une restauration complète.
-
-Les listes sensibles aux recherches utilisent des identifiants de requête afin qu’une réponse ancienne ne remplace pas une recherche plus récente.
+L’interface comporte également un lien d’évitement, un focus visible, `aria-current` sur la section active, des annonces adaptées pour les messages et le respect de la réduction des animations demandée par le système.
 
 ## Historique des versions
 
-Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` déjà enregistrés dans la feuille `HISTORIQUE`.
+Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` enregistrés dans la feuille `HISTORIQUE`.
 
-Les fiches sont chargées par pages de 40 afin de limiter les calculs et les transferts. Pour chaque fiche, le module permet de :
+Les fiches sont chargées par pages de 40. Pour chaque fiche, le module permet de :
 
 - parcourir les versions numérotées ;
 - identifier l’état actuel ;
@@ -71,17 +99,7 @@ Les fiches sont chargées par pages de 40 afin de limiter les calculs et les tra
 - comparer leurs champs avec des libellés lisibles ;
 - restaurer une ancienne version lorsque le rôle de l’utilisateur l’autorise.
 
-La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations, les règles de disponibilité et l’audit. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
-
-## Fusion intelligente
-
-Lorsqu’une fiche change entre son ouverture et son enregistrement, CoordoDiscours compare :
-
-1. la valeur au moment de l’ouverture ;
-2. la modification locale ;
-3. la dernière valeur enregistrée.
-
-Les champs modifiés d’un seul côté sont fusionnés automatiquement. Lorsque le même champ contient deux modifications différentes, l’utilisateur choisit explicitement la valeur à conserver.
+La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations et l’audit. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
 
 ## Principes métier validés
 
@@ -96,6 +114,7 @@ Les champs modifiés d’un seul côté sont fusionnés automatiquement. Lorsque
 - Un brouillon devenu obsolète est refusé.
 - Une fiche périmée ne peut pas écraser silencieusement une version plus récente.
 - Une ancienne version n’est restaurée qu’après contrôle des droits, de la version actuelle et des règles métier.
+- Une écriture incertaine après coupure réseau n’est jamais répétée automatiquement.
 - Les modifications importantes sont historisées.
 
 ## Structure principale
@@ -106,6 +125,9 @@ apps-script/
   Config.gs
   Database.gs
   Installation.gs
+  ServerCache.gs
+  Performance.gs
+  Help.gs
   Dashboard.gs
   Planning.gs
   RulesEngine.gs
@@ -141,6 +163,7 @@ scripts/
   test-merge-engine.mjs
   test-version-history.mjs
   test-responsive-accessibility.mjs
+  test-help-observability.mjs
 ```
 
 ## Installation rapide
@@ -152,19 +175,20 @@ scripts/
 5. Exécuter `runAcceptanceTests`.
 6. Déployer le projet comme application web en accès restreint pour la recette.
 
-La procédure détaillée se trouve dans `docs/INSTALLATION.md`.
+La procédure détaillée se trouve dans `docs/INSTALLATION.md`. Les guides complets se trouvent dans `docs/GUIDE_UTILISATEUR.md` et `docs/GUIDE_ADMINISTRATEUR.md`.
 
 ## Validation
 
-La commande `npm run check` exécute huit niveaux de contrôle :
+La commande `npm run check` exécute neuf niveaux de contrôle :
 
-1. structure Apps Script et droits d’accès ;
+1. structure Apps Script, syntaxe et droits d’accès ;
 2. contrats statiques des règles métier ;
 3. résolution des conflits ;
 4. planification automatique ;
 5. disponibilités des orateurs ;
 6. fusion intelligente ;
 7. reconstruction, comparaison et restauration des versions ;
-8. responsive, accessibilité, syntaxe JavaScript et caches client.
+8. responsive, accessibilité, syntaxe JavaScript et caches client ;
+9. guide intégré, cache serveur et observabilité.
 
 La version ne doit pas être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.

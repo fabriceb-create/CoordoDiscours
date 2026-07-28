@@ -84,6 +84,7 @@ function setupDatabase_() {
 
   seedSettings_(ss);
   seedInactiveTalks_(ss);
+  invalidateAllServerCaches_();
 
   return {
     spreadsheetId: ss.getId(),
@@ -103,6 +104,7 @@ function seedSettings_(ss) {
     ['ALERTE_REPETITION_MOIS', '12', 'Délai d’alerte de répétition'],
     ['ASSISTANT_LECTURE_SEULE', 'OUI', 'Droits de l’assistant']
   ]);
+  invalidateSettingsCache_();
 }
 
 function seedInactiveTalks_(ss) {
