@@ -1,15 +1,16 @@
 name: Appliquer le lot de durcissement 1.10
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/version-history-hardening
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.head_ref == 'agent/version-history-hardening'
     runs-on: ubuntu-latest
     steps:
       - name: Récupérer la branche
