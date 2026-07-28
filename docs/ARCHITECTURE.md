@@ -18,7 +18,9 @@ apps-script/
   Installation.gs
   ServerCache.gs
   Performance.gs
+  SupportDiagnostics.gs
   Help.gs
+  ReleaseReadiness.gs
 
   Planning.gs
   RulesEngine.gs
@@ -51,6 +53,8 @@ apps-script/
   Scripts.html
   HelpScripts.html
   HelpStyles.html
+  ReleaseReadinessScripts.html
+  ReleaseReadinessStyles.html
   ...
 ```
 
@@ -70,6 +74,8 @@ apps-script/
 12. Une écriture groupée doit pouvoir revenir à l’état précédent lorsqu’une étape échoue.
 13. Un cache est toujours une optimisation facultative, jamais la source de vérité.
 14. Une écriture au résultat réseau incertain ne doit pas être répétée automatiquement.
+15. Une décision de mise en production doit agréger des contrôles explicites et exportables.
+16. Les références de support ne doivent contenir aucune donnée métier sensible.
 
 ## Pipeline de programmation
 
@@ -213,6 +219,14 @@ La liste des fiches est paginée par défaut à 40 éléments. Le contexte lisib
 
 Les périodes sont consommées par `RulesEngine`, `RecommendationEngine`, `ConflictResolution`, `AutomaticPlanning`, `Integrity`, `MergeEngine` et `VersionHistory`.
 
+## Préparation à la mise en production
+
+`ReleaseReadiness.gs` agrège cinq contrôles pondérés : installation, intégrité, sauvegarde, performance et recette interne. Chaque contrôle renvoie un statut `PASS`, `WARNING` ou `BLOCKING`, un score et une action recommandée.
+
+La recette guidée conserve une seule session courante dans `PropertiesService`. La progression est protégée par `ScriptLock`. Les résultats détaillés sont compactés avant stockage afin de rester sous la limite des propriétés Apps Script. Le rapport exporté contient la version, les étapes, la décision et les recommandations.
+
+`SupportDiagnostics.gs` génère ou valide une référence non sensible. Seuls le module, l’opération, le type de lecture ou d’écriture et un message borné sont journalisés. Les piles, objets imbriqués et données arbitraires sont ignorés.
+
 ## Installation et migrations
 
 `installCoordoDiscours()` :
@@ -225,8 +239,8 @@ Les périodes sont consommées par `RulesEngine`, `RecommendationEngine`, `Confl
 6. exécute la recette interne ;
 7. journalise le résultat.
 
-Le schéma reste en version `1.8.0`, car la version 1.12 n’ajoute aucune feuille obligatoire.
+Le schéma reste en version `1.8.0`, car la version 1.13 n’ajoute aucune feuille obligatoire.
 
 ## Validation automatique
 
-`npm run check` exécute neuf suites. Le validateur contrôle notamment 64 fichiers essentiels, 35 fonctions sensibles, la syntaxe des fichiers Apps Script, les protections d’accès, le guide, le cache serveur, l’observabilité et la stratégie réseau.
+`npm run check` exécute dix suites. Le validateur contrôle notamment les fichiers essentiels, les fonctions sensibles, la syntaxe Apps Script, les protections d’accès, le guide, les caches, l’observabilité, la stratégie réseau et la préparation à la mise en production.

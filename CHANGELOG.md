@@ -4,6 +4,29 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 
 ## [En développement]
 
+## [1.13.0] — en préparation de recette
+
+### Ajouté
+
+- Module administrateur Mise en production avec score global de santé.
+- Recette guidée en six étapes, persistée et exportable en JSON.
+- Références non sensibles pour les erreurs visibles et journal des incidents récents.
+- Suite automatique `test-release-readiness.mjs`.
+- Guides de recette et statut de développement 1.13.
+
+### Amélioré
+
+- Rapport d’intégrité exécutable silencieusement dans un contrôle composite.
+- Rapport de performance réutilisable par les diagnostics internes.
+- Guide intégré complété par la procédure de mise en production.
+- Validation automatique portée à dix suites.
+
+### Sécurité
+
+- Verrou serveur sur la progression de recette.
+- Compactage de la session avant stockage dans `PropertiesService`.
+- Assainissement et limitation des messages d’incident avant journalisation.
+
 ## [1.12.0] — en préparation de recette
 
 ### Ajouté

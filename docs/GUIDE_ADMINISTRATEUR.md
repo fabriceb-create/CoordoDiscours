@@ -1,4 +1,4 @@
-# Guide administrateur CoordoDiscours 1.12
+# Guide administrateur CoordoDiscours 1.13
 
 ## 1. Responsabilités
 
@@ -9,6 +9,7 @@ L’administrateur gère :
 - les sauvegardes ;
 - le contrôle d’intégrité ;
 - les diagnostics de performance ;
+- le rapport de santé et la recette guidée ;
 - l’installation, la mise à jour et le retour arrière.
 
 Maintiens toujours au moins un administrateur actif.
@@ -57,7 +58,19 @@ Lorsqu’un utilisateur signale une coupure pendant un enregistrement :
 4. contrôler les doublons et l’intégrité ;
 5. reprendre l’action uniquement si l’état attendu est absent.
 
-## 6. Préparer une mise à jour
+## 6. Utiliser le rapport de santé
+
+Ouvre **Mise en production** avant chaque déploiement important.
+
+- `Prêt` : aucun blocage ni avertissement.
+- `À vérifier` : une décision administrateur reste nécessaire.
+- `Bloqué` : la mise en production ne doit pas être proposée.
+
+Exécute les six étapes de recette puis exporte le rapport JSON. Conserve-le avec la sauvegarde, le commit GitHub et le numéro de déploiement.
+
+Les incidents récents utilisent une référence non sensible. Recherche cette référence plutôt que de demander à l’utilisateur de transmettre des données confidentielles.
+
+## 7. Préparer une mise à jour
 
 1. Crée une sauvegarde depuis l’application.
 2. Note la version Apps Script actuellement déployée.
@@ -74,12 +87,13 @@ npm run predeploy:check
 6. Envoie le code avec `npm run clasp:push`.
 7. Exécute `installCoordoDiscours`.
 8. Exécute `runAcceptanceTests`.
-9. Crée une nouvelle version du déploiement Web.
-10. Effectue la recette sur ordinateur, tablette et téléphone.
+9. Ouvre Mise en production, exécute la recette guidée et exporte le rapport.
+10. Crée une nouvelle version du déploiement Web.
+11. Effectue la recette sur ordinateur, tablette et téléphone.
 
-## 7. Contrôles après déploiement
+## 8. Contrôles après déploiement
 
-- version affichée : `1.12 Stable` ;
+- version affichée : `1.13 Stable` ;
 - application prête ;
 - accès des trois rôles ;
 - ouverture de l’aide ;
@@ -92,7 +106,7 @@ npm run predeploy:check
 - intégrité ;
 - performance serveur.
 
-## 8. Retour arrière
+## 9. Retour arrière
 
 ### Code
 
@@ -109,7 +123,7 @@ Après un retour arrière :
 - vérifie l’intégrité ;
 - informe les utilisateurs de l’état retenu.
 
-## 9. Sécurité
+## 10. Sécurité
 
 - ne publie jamais `.clasp.json` ou `.clasprc.json` ;
 - limite l’application aux utilisateurs autorisés ;

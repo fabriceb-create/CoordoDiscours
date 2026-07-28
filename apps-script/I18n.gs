@@ -231,7 +231,25 @@ const INTERFACE_TRANSLATIONS = Object.freeze({
     'Mesures de performance réinitialisées.': 'Sé mézi pèfòmans-la rimété kon avan.',
     'Les mesures sont temporaires et servent à repérer les appels à examiner, pas à établir un engagement de temps de réponse.': 'Sé mézi-la tanporè é yo ka édé vwè ki apèl pou gadé ; yo pa on pwomès anlè tan répons.',
     'Charger plus': 'Chajé plis',
-    'Chargement des fiches...': 'Ka chajé sé fich-la...'
+    'Chargement des fiches...': 'Ka chajé sé fich-la...',
+    'Mise en production': 'Mété vèsyon-la an sèvis',
+    'Préparation à la mise en production': 'Préparasyon pou mété vèsyon-la an sèvis',
+    'Santé avant déploiement': 'Léta avan déplwaman',
+    'Prêt': 'Paré',
+    'À vérifier': 'Pou vérifyé',
+    'Bloqué': 'Bloké',
+    'Conforme': 'An règ',
+    'Bloquant': 'Ka bloké',
+    'Recette guidée': 'Tès gidé',
+    'Démarrer la recette': 'Koumansé tès-la',
+    'Recommencer la recette': 'Rikoumansé tès-la',
+    'Exporter le rapport': 'Ekspòté rapò-la',
+    'Effacer la recette': 'Éfasé tès-la',
+    'Incidents récents': 'Dènyé ensidan-la',
+    'Rapport de santé actualisé.': 'Rapò santé-la mété ajou.',
+    'Recette de mise en production démarrée.': 'Tès pou mété vèsyon-la an sèvis koumansé.',
+    'Étape de recette terminée.': 'Étape tès-la bout.',
+    'Rapport de recette exporté.': 'Rapò tès-la ekspòté.'
   }
 });
 

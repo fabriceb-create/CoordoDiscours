@@ -1,0 +1,212 @@
+<script>
+  const releaseReadinessState = {
+    bootstrap: null,
+    report: null,
+    session: null,
+    incidents: [],
+    loading: false
+  };
+
+  function releaseStatusLabel_(status) {
+    const labels = { READY: 'Prêt', ATTENTION: 'À vérifier', BLOCKED: 'Bloqué', PASS: 'Conforme', WARNING: 'Attention', BLOCKING: 'Bloquant', PENDING: 'À faire', IN_PROGRESS: 'En cours', COMPLETED: 'Terminée', COMPLETED_WITH_ISSUES: 'Terminée avec réserves' };
+    return labels[status] || status || 'Inconnu';
+  }
+
+  function releaseStatusClass_(status) {
+    if (status === 'READY' || status === 'PASS' || status === 'COMPLETED') return 'pass';
+    if (status === 'BLOCKED' || status === 'BLOCKING') return 'blocking';
+    if (status === 'ATTENTION' || status === 'WARNING' || status === 'IN_PROGRESS' || status === 'COMPLETED_WITH_ISSUES') return 'warning';
+    return 'pending';
+  }
+
+  function formatReleaseDate_(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? String(value) : date.toLocaleString('fr-FR');
+  }
+
+  async function loadReleaseReadiness_(force) {
+    if (releaseReadinessState.loading) return;
+    const summary = document.getElementById('release-readiness-summary');
+    if (!summary) return;
+    releaseReadinessState.loading = true;
+    if (!releaseReadinessState.bootstrap || force) summary.innerHTML = '<div class="release-empty">Analyse de la préparation au déploiement...</div>';
+    try {
+      if (!releaseReadinessState.bootstrap || force) {
+        releaseReadinessState.bootstrap = await runServer('getReleaseReadinessBootstrap');
+      }
+      releaseReadinessState.report = releaseReadinessState.bootstrap.report;
+      releaseReadinessState.session = releaseReadinessState.bootstrap.session;
+      renderReleaseReadiness_();
+      loadRecentReleaseIncidents_();
+    } catch (error) {
+      showError(error);
+      summary.innerHTML = '<div class="release-empty">Impossible de produire le rapport de santé.</div>';
+    } finally {
+      releaseReadinessState.loading = false;
+    }
+  }
+
+  async function refreshReleaseReadiness_(button) {
+    await withBusyElement_(button, async () => {
+      try {
+        releaseReadinessState.report = await runServer('getReleaseReadinessReport');
+        if (releaseReadinessState.bootstrap) releaseReadinessState.bootstrap.report = releaseReadinessState.report;
+        renderReleaseReadiness_();
+        toast('Rapport de santé actualisé.');
+      } catch (error) { showError(error); }
+    });
+  }
+
+  function renderReleaseReadiness_() {
+    renderReleaseReadinessSummary_();
+    renderReleaseReadinessChecks_();
+    renderReleaseAcceptance_();
+  }
+
+  function renderReleaseReadinessSummary_() {
+    const container = document.getElementById('release-readiness-summary');
+    const report = releaseReadinessState.report;
+    if (!container || !report) return;
+    const cssStatus = String(report.status || '').toLowerCase();
+    container.innerHTML = `
+      <section class="release-hero ${escapeHtml(cssStatus)}">
+        <div class="release-score" aria-label="Score de préparation ${escapeHtml(report.score)} sur 100"><strong>${escapeHtml(report.score)}</strong></div>
+        <div><p class="eyebrow">Santé avant déploiement</p><h3>${escapeHtml(releaseStatusLabel_(report.status))}</h3><p>${escapeHtml(report.summary)}</p><span class="release-reference">Référence : ${escapeHtml(report.reference)}</span></div>
+        <div class="release-toolbar-actions"><button id="release-refresh" type="button" class="secondary-button">Actualiser</button><button id="release-start" type="button" class="primary-button">${releaseReadinessState.session && releaseReadinessState.session.status === 'IN_PROGRESS' ? 'Recommencer la recette' : 'Démarrer la recette'}</button></div>
+      </section>`;
+  }
+
+  function renderReleaseReadinessChecks_() {
+    const container = document.getElementById('release-readiness-checks');
+    const report = releaseReadinessState.report;
+    if (!container || !report) return;
+    container.innerHTML = `
+      <div class="release-check-grid">${(report.checks || []).map(check => `
+        <article class="release-check">
+          <div class="release-check-head"><div><p class="eyebrow">${escapeHtml(check.score)} / ${escapeHtml(check.weight)} points</p><h3>${escapeHtml(check.label)}</h3></div><span class="release-status ${releaseStatusClass_(check.status)}">${escapeHtml(releaseStatusLabel_(check.status))}</span></div>
+          <p>${escapeHtml(check.message)}</p>
+          ${check.remediation ? `<div class="release-check-remediation"><strong>Action recommandée</strong><br>${escapeHtml(check.remediation)}</div>` : ''}
+          ${check.details && Object.keys(check.details).length ? `<details class="release-detail-toggle"><summary>Détails techniques</summary><pre class="release-detail-json">${escapeHtml(JSON.stringify(check.details, null, 2))}</pre></details>` : ''}
+        </article>`).join('')}</div>
+      ${(report.recommendations || []).length ? `<section class="release-panel"><div class="release-panel-head"><div><p class="eyebrow">Plan d’action</p><h3>Points à traiter</h3></div><span class="release-status ${releaseStatusClass_(report.status)}">${escapeHtml((report.recommendations || []).length)} action(s)</span></div><div class="release-recommendations">${report.recommendations.map(item => `<div class="release-recommendation"><strong>${escapeHtml(item.label)}</strong><br>${escapeHtml(item.action)}</div>`).join('')}</div></section>` : ''}`;
+  }
+
+  function releaseAcceptanceResultMap_() {
+    return (releaseReadinessState.session && releaseReadinessState.session.results || []).reduce((map, result) => { map[result.id] = result; return map; }, {});
+  }
+
+  function renderReleaseAcceptance_() {
+    const container = document.getElementById('release-acceptance-panel');
+    const bootstrap = releaseReadinessState.bootstrap;
+    if (!container || !bootstrap) return;
+    const session = releaseReadinessState.session;
+    const results = releaseAcceptanceResultMap_();
+    const completed = Object.keys(results).length;
+    const total = (bootstrap.steps || []).length;
+    const progress = total ? Math.round(completed / total * 100) : 0;
+    const nextStep = session && session.status === 'IN_PROGRESS' ? (bootstrap.steps || []).find(step => !results[step.id]) : null;
+    container.innerHTML = `
+      <section class="release-panel">
+        <div class="release-panel-head"><div><p class="eyebrow">Recette guidée</p><h3>${session ? escapeHtml(releaseStatusLabel_(session.status)) : 'Aucune recette en cours'}</h3><p class="release-session-meta">${session ? 'Référence ' + escapeHtml(session.id) + ' — démarrée le ' + escapeHtml(formatReleaseDate_(session.startedAt)) : 'Démarre une recette pour vérifier chaque étape dans l’ordre.'}</p></div>${session ? `<span class="release-status ${releaseStatusClass_(session.status)}">${completed} / ${total}</span>` : ''}</div>
+        <div class="release-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><span style="width:${progress}%"></span></div>
+        <div class="release-step-list">${(bootstrap.steps || []).map(step => {
+          const result = results[step.id];
+          const current = nextStep && nextStep.id === step.id;
+          return `<article class="release-step ${result ? 'done' : ''} ${current ? 'current' : ''}"><span class="release-step-number">${result ? '✓' : step.number}</span><div><strong>${escapeHtml(step.label)}</strong><small>${escapeHtml(result ? result.message : step.description)}</small></div><span class="release-status ${releaseStatusClass_(result ? result.status : 'PENDING')}">${escapeHtml(releaseStatusLabel_(result ? result.status : 'PENDING'))}</span></article>`;
+        }).join('')}</div>
+        ${session && session.finalReport ? `<div class="release-final ${escapeHtml(String(session.finalReport.status || '').toLowerCase())}"><strong>Décision finale : ${escapeHtml(releaseStatusLabel_(session.finalReport.status))}</strong><br>${escapeHtml(session.finalReport.summary || '')}</div>` : ''}
+        <div class="release-actions">
+          ${nextStep ? `<button id="release-run-next" type="button" class="primary-button" data-step-id="${escapeHtml(nextStep.id)}">Exécuter l’étape ${escapeHtml(nextStep.number)}</button>` : ''}
+          ${session ? '<button id="release-export" type="button" class="secondary-button">Exporter le rapport</button><button id="release-reset" type="button" class="secondary-button">Effacer la recette</button>' : ''}
+        </div>
+      </section>`;
+  }
+
+  async function startReleaseAcceptance_(button) {
+    if (releaseReadinessState.session && releaseReadinessState.session.status === 'IN_PROGRESS' && !window.confirm('Une recette est déjà en cours. La remplacer ?')) return;
+    await withBusyElement_(button, async () => {
+      try {
+        releaseReadinessState.session = await runServer('startReleaseAcceptance');
+        renderReleaseReadiness_();
+        toast('Recette de mise en production démarrée.');
+      } catch (error) { showError(error); }
+    });
+  }
+
+  async function runNextReleaseAcceptanceStep_(button) {
+    const session = releaseReadinessState.session;
+    const stepId = button && button.dataset.stepId;
+    if (!session || !stepId) return;
+    await withBusyElement_(button, async () => {
+      try {
+        releaseReadinessState.session = await runServer('runReleaseAcceptanceStep', session.id, stepId);
+        if (releaseReadinessState.session.finalReport) {
+          releaseReadinessState.report = releaseReadinessState.session.finalReport;
+          if (releaseReadinessState.bootstrap) releaseReadinessState.bootstrap.report = releaseReadinessState.report;
+        }
+        renderReleaseReadiness_();
+        toast('Étape de recette terminée.');
+      } catch (error) { showError(error); }
+    });
+  }
+
+  async function exportReleaseAcceptance_(button) {
+    const session = releaseReadinessState.session;
+    if (!session) return;
+    await withBusyElement_(button, async () => {
+      try {
+        const file = await runServer('exportReleaseAcceptanceReport', session.id);
+        const blob = new Blob([file.content], { type: file.mimeType || 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.fileName || 'CoordoDiscours-recette.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        toast('Rapport de recette exporté.');
+      } catch (error) { showError(error); }
+    });
+  }
+
+  async function resetReleaseAcceptance_(button) {
+    if (!window.confirm('Effacer la recette enregistrée ?')) return;
+    await withBusyElement_(button, async () => {
+      try {
+        await runServer('resetReleaseAcceptanceSession');
+        releaseReadinessState.session = null;
+        renderReleaseReadiness_();
+        toast('Recette effacée.');
+      } catch (error) { showError(error); }
+    });
+  }
+
+  async function loadRecentReleaseIncidents_() {
+    const container = document.getElementById('release-incidents');
+    if (!container) return;
+    try {
+      releaseReadinessState.incidents = await runServer('getRecentSupportIncidents', 8);
+      if (!releaseReadinessState.incidents.length) {
+        container.innerHTML = '<div class="release-empty">Aucun incident client récent n’est enregistré.</div>';
+        return;
+      }
+      container.innerHTML = `<div class="release-incidents">${releaseReadinessState.incidents.map(item => `<article class="release-incident"><strong>${escapeHtml(item.reference)} — ${escapeHtml(item.operation || item.view || 'Application')}</strong><small>${escapeHtml(item.displayDate || formatReleaseDate_(item.timestamp))}${item.user ? ' — ' + escapeHtml(item.user) : ''}</small><p>${escapeHtml(item.message || 'Message non disponible')}</p></article>`).join('')}</div>`;
+    } catch (error) {
+      container.innerHTML = '<div class="release-empty">Les incidents récents ne peuvent pas être chargés.</div>';
+    }
+  }
+
+  document.addEventListener('coordodiscours:viewchange', event => {
+    if (event.detail && event.detail.name === 'release') loadReleaseReadiness_(false);
+  });
+
+  document.addEventListener('click', event => {
+    if (event.target.id === 'release-refresh') refreshReleaseReadiness_(event.target);
+    if (event.target.id === 'release-start') startReleaseAcceptance_(event.target);
+    if (event.target.id === 'release-run-next') runNextReleaseAcceptanceStep_(event.target);
+    if (event.target.id === 'release-export') exportReleaseAcceptance_(event.target);
+    if (event.target.id === 'release-reset') resetReleaseAcceptance_(event.target);
+  });
+</script>

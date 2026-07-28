@@ -113,7 +113,7 @@ assertNotContains(communication, /originalShowView/, 'Navigation : Communication
 assertContains(automatic, /invalidatePlanningDependentCaches_\(\)/, 'Performance : la planification automatique n’invalide pas les listes dépendantes.');
 assertContains(backup, /state\.speakers = \[\][\s\S]*invalidatePlanningDependentCaches_\(\)/, 'Performance : une restauration complète ne vide pas les caches client.');
 assertContains(settings, /state\.automaticPlanningDraft/, 'Fiabilité : un changement de paramètres ne rend pas le brouillon automatique obsolète côté interface.');
-assertContains(access, /\['view-backup', 'view-settings'\]/, 'Sécurité UI : une vue administrateur ouverte par lien n’est pas refermée pour un rôle insuffisant.');
+assertContains(access, /\['view-backup', 'view-settings', 'view-release'\]/, 'Sécurité UI : une vue administrateur ouverte par lien n’est pas refermée pour un rôle insuffisant.');
 assertContains(i18n, /\[aria-label\]/, 'Traduction : les libellés accessibles ne sont pas traduits.');
 
 assertContains(help, /runServer\(['"]getHelpBootstrap['"]\)/, 'Guide : le contenu serveur n’est pas chargé.');

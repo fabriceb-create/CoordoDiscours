@@ -1,4 +1,4 @@
-# Guide utilisateur CoordoDiscours 1.12
+# Guide utilisateur CoordoDiscours 1.13
 
 ## 1. Ouvrir l’application
 
@@ -119,3 +119,8 @@ En cas de doute, note :
 - le message affiché.
 
 Transmets ces éléments à l’administrateur.
+
+
+## Référence de support
+
+Lorsqu’une erreur s’affiche, note la référence `CD-ERR-...` et communique-la à l’administrateur.

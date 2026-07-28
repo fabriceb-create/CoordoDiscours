@@ -220,6 +220,16 @@ function runAcceptanceTests() {
     return 'Mesures et caches disponibles';
   }, false);
 
+  test('Préparation à la mise en production disponible', function () {
+    if (typeof getReleaseReadinessBootstrap !== 'function' || typeof startReleaseAcceptance !== 'function' || typeof exportReleaseAcceptanceReport !== 'function') {
+      throw new Error('Module de préparation à la mise en production incomplet.');
+    }
+    if (typeof registerClientIncident !== 'function' || typeof buildSupportReference_ !== 'function') {
+      throw new Error('Diagnostic de support incomplet.');
+    }
+    return 'Rapport de santé, recette guidée et références de support disponibles';
+  }, false);
+
   test('Disponibilité de l’impression', function () {
     if (typeof getPrintablePlanning !== 'function' && typeof buildPrintablePlanning !== 'function') {
       throw new Error('Fonction d’impression du planning introuvable.');

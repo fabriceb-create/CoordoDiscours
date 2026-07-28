@@ -5,7 +5,8 @@ function getDataIntegrityReport() {
   });
 }
 
-function getDataIntegrityReport_() {
+function getDataIntegrityReport_(options) {
+  options = options || {};
   const ss = getDatabase_();
   const issues = [];
   const pushIssue = function (severity, code, message, details) {
@@ -93,7 +94,7 @@ function getDataIntegrityReport_() {
     issues: issues
   };
 
-  logAction_('CONTROLE_INTEGRITE', 'APPLICATION', APP_CONFIG.version, { ok: result.ok, issues: issues.length });
+  if (!options.silent) logAction_('CONTROLE_INTEGRITE', 'APPLICATION', APP_CONFIG.version, { ok: result.ok, issues: issues.length });
   return result;
 }
 

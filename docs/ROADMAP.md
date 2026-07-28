@@ -4,7 +4,7 @@
 
 Construire un assistant fiable permettant au coordinateur des discours publics de gérer l’ensemble du processus dans un seul outil, avec des propositions automatiques contrôlées par des règles métier explicites.
 
-## Version 1.12 Stable — en préparation de recette
+## Version 1.13 Stable — en préparation de recette
 
 ### Fondations et sécurité
 
@@ -15,59 +15,44 @@ Construire un assistant fiable permettant au coordinateur des discours publics d
 - Contrôle d’intégrité et historique détaillé avant/après.
 - Verrouillage optimiste et fusion intelligente des modifications concurrentes.
 
-### Guide et assistance
-
-- Module Aide intégré à la navigation.
-- Recherche dans les sujets du guide.
-- Contenu filtré selon le rôle réel de l’utilisateur.
-- Aide contextuelle disponible depuis chaque module.
-- Bouton global et raccourci clavier `?`.
-- Guide utilisateur et guide administrateur dans la documentation.
-- Procédure de déploiement et de retour arrière consolidée.
-
-### Fiabilité réseau
-
-- Classement explicite des appels client en lectures et écritures.
-- Une seule reprise automatique pour une lecture transitoirement interrompue.
-- Aucune répétition automatique d’une écriture.
-- Bandeau indiquant quand recharger et quand vérifier l’état avant de recommencer.
-- Conservation des protections contre les doubles clics, conflits de version et doublons métier.
-
-### Performance serveur
-
-- Cache serveur de 60 secondes pour les données partagées compatibles avec une cohérence courte.
-- Invalidation ciblée après les écritures concernées.
-- Réutilisation des référentiels préchargés dans les calculs composites.
-- Mesure temporaire des durées, erreurs et appels lents.
-- Diagnostic administrateur dans Paramètres.
-- Aucune donnée métier sensible enregistrée dans le contexte des mesures.
-
-### Ergonomie et accessibilité
-
-- Navigation mobile en tiroir sous 820 pixels.
-- Lien d’évitement et focus clavier visible.
-- Focus contenu dans le tiroir et restitué après fermeture.
-- Annonces accessibles pour les messages et erreurs.
-- Réduction des animations respectée.
-- Guide et reprise réseau adaptés aux écrans étroits.
-
-### Programmation intelligente et collaboration
+### Assistant de programmation
 
 - Moteur central de règles PLAN_001 à PLAN_010.
 - Recommandation pondérée des orateurs.
-- Assistant de résolution des conflits métier.
+- Assistant de résolution des conflits.
 - Planification automatique de 1 à 6 mois.
 - Disponibilités, périodes préférées et dates à éviter.
-- Fusion intelligente à trois voies.
-- Historique navigable, paginé et restaurable.
+- Historique navigable, comparaison et restauration des versions.
 
-## Prochain lot — 1.13
+### Guide, accessibilité et fiabilité
 
-- Rapport de santé global avant déploiement, réunissant installation, intégrité, sauvegarde récente et performances.
-- Mode recette guidée avec progression et résultats exportables.
-- Diagnostics d’erreur enrichis avec identifiant de corrélation non sensible.
-- Amélioration des résumés de versions et des journaux d’administration.
-- Consolidation des procédures de mise en production et de support.
+- Guide intégré filtré selon les droits.
+- Aide contextuelle et raccourci `?`.
+- Navigation mobile en tiroir et focus clavier contrôlé.
+- Une seule reprise automatique pour les lectures transitoires.
+- Aucune répétition automatique d’une écriture incertaine.
+- Cache serveur court et invalidation ciblée.
+- Mesures temporaires des durées, erreurs et appels lents.
+
+### Préparation à la mise en production
+
+- Rapport global de santé avant déploiement.
+- Score pondéré sur 100.
+- États `READY`, `ATTENTION` et `BLOCKED`.
+- Contrôle de l’installation, du schéma, de l’intégrité, des sauvegardes, des performances et de la dernière recette.
+- Recette guidée en six étapes avec progression persistée.
+- Protection de la recette par verrou serveur.
+- Export JSON du rapport de recette.
+- Références non sensibles pour les erreurs et incidents client.
+- Liste administrateur des incidents récents.
+
+## Prochain lot — 1.14
+
+- Recette réelle consolidée sur ordinateur, tablette et téléphone.
+- Déploiement Apps Script documenté avec captures et critères de retour arrière.
+- Tableau de suivi des actions correctives issues du rapport de santé.
+- Rapport de capacité annuel et indicateurs d’équilibre avancés.
+- Nettoyage des anciens journaux et stratégie d’archivage contrôlée.
 
 ## Version 2
 

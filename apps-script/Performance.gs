@@ -55,6 +55,10 @@ function recordServerPerformance_(operation, durationMs, failed, context) {
 
 function getServerPerformanceReport() {
   assertAdminAccess_();
+  return getServerPerformanceReport_();
+}
+
+function getServerPerformanceReport_() {
   const state = readServerPerformanceState_(CacheService.getScriptCache());
   const operations = Object.keys(state.operations).map(function (key) {
     const item = state.operations[key];

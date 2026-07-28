@@ -1,9 +1,9 @@
-# Plan de recette fonctionnelle CoordoDiscours 1.12
+# Plan de recette fonctionnelle CoordoDiscours 1.13
 
 ## Préparation
 
 - Utiliser une base de test.
-- Exécuter `npm run check` et vérifier la réussite des neuf suites.
+- Exécuter `npm run check` et vérifier la réussite des dix suites.
 - Exécuter `npm run predeploy:check` et traiter toute erreur bloquante.
 - Envoyer le code dans un projet Apps Script de recette.
 - Exécuter `installCoordoDiscours`.
@@ -202,11 +202,38 @@ Ces essais peuvent être réalisés avec les outils réseau du navigateur ou une
 - Tester les dialogues de grande hauteur.
 - Tester le guide, les versions et les paramètres sur écran étroit.
 
-## 17. Critères de validation
+## 17. Préparation à la mise en production
 
-La version 1.12 peut être déclarée testable lorsque :
+### Rapport de santé
 
-- les neuf suites automatiques réussissent ;
+- Ouvrir `#release` avec un Administrateur.
+- Vérifier le score, l’état global et les cinq contrôles.
+- Vérifier qu’un compte Coordinateur ou Consultation ne voit pas le module.
+- Supprimer ou vieillir la dernière sauvegarde dans une base de recette et vérifier le blocage.
+- Introduire une anomalie contrôlée puis vérifier le blocage d’intégrité.
+- Produire des mesures lentes et vérifier l’avertissement de performance.
+
+### Recette guidée
+
+- Démarrer une recette et vérifier la référence.
+- Exécuter les six étapes dans l’ordre.
+- Tenter une étape hors ordre et vérifier le refus.
+- Ouvrir une seconde fenêtre, remplacer la session et vérifier le refus de la session périmée.
+- Exporter le rapport JSON et contrôler la version, les étapes et la décision finale.
+- Vérifier les actions de recette dans l’historique.
+
+### Références de support
+
+- Provoquer une erreur de lecture et relever la référence affichée.
+- Provoquer une erreur d’écriture dans une base de test et vérifier le bandeau de prudence.
+- Retrouver les références dans Mise en production.
+- Vérifier qu’aucune pile technique, jeton ou donnée métier complète n’est enregistrée.
+
+## 18. Critères de validation
+
+La version 1.13 peut être déclarée testable lorsque :
+
+- les dix suites automatiques réussissent ;
 - `runAcceptanceTests` réussit ;
 - aucun blocage JavaScript n’apparaît ;
 - les droits sont respectés ;
@@ -215,4 +242,6 @@ La version 1.12 peut être déclarée testable lorsque :
 - une lecture peut être reprise sans doubler une écriture ;
 - les mesures serveur restent accessibles uniquement aux administrateurs ;
 - la programmation, la fusion, les versions, les sauvegardes et l’intégrité restent fonctionnelles ;
+- le rapport de santé ne contient aucun blocage non traité ;
+- la recette guidée est terminée et exportée ;
 - la recette ordinateur, tablette et téléphone est réussie.

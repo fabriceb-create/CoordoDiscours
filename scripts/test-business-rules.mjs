@@ -283,6 +283,29 @@ assertContains(indexUi, /id="global-help-button"[\s\S]*id="help-dialog"/, 'Guide
 assertContains(installation, /getHelpBootstrap/, 'Recette : le guide intégré n’est pas vérifié.');
 assertContains(installation, /measureServerOperation_[\s\S]*getCachedServerValue_/, 'Recette : l’observabilité et le cache serveur ne sont pas vérifiés.');
 
+
+const releaseReadiness = read('ReleaseReadiness.gs');
+const releaseUi = read('ReleaseReadinessScripts.html');
+const supportDiagnostics = read('SupportDiagnostics.gs');
+assertContains(releaseReadiness, /RELEASE_READINESS_BACKUP_WARNING_DAYS[\s\S]*RELEASE_READINESS_BACKUP_BLOCKING_DAYS/, 'Mise en production : les seuils de fraîcheur des sauvegardes sont absents.');
+assertContains(releaseReadiness, /function\s+buildReleaseReadinessReport_\s*\(/, 'Mise en production : le rapport consolidé est absent.');
+assertContains(releaseReadiness, /assessInstallationReadiness_[\s\S]*assessIntegrityReadiness_[\s\S]*assessBackupReadiness_[\s\S]*assessPerformanceReadiness_[\s\S]*assessAcceptanceReadiness_/, 'Mise en production : les cinq contrôles de santé ne sont pas tous intégrés.');
+assertContains(releaseReadiness, /RELEASE_ACCEPTANCE_STEPS[\s\S]*final/, 'Mise en production : la recette guidée est incomplète.');
+assertContains(releaseReadiness, /LockService\.getScriptLock\(\)/, 'Mise en production : la progression de recette n’est pas protégée par un verrou.');
+assertContains(releaseReadiness, /PropertiesService\.getScriptProperties\(\)/, 'Mise en production : la session de recette n’est pas persistée.');
+assertContains(releaseReadiness, /compactReleaseAcceptanceSession_/, 'Mise en production : la session n’est pas compactée avant stockage.');
+assertContains(releaseReadiness, /exportReleaseAcceptanceReport/, 'Mise en production : le rapport de recette n’est pas exportable.');
+assertContains(releaseUi, /role="progressbar"/, 'Mise en production UI : la progression n’est pas accessible.');
+assertContains(releaseUi, /getReleaseReadinessBootstrap/, 'Mise en production UI : le rapport de santé n’est pas chargé.');
+assertContains(releaseUi, /runReleaseAcceptanceStep/, 'Mise en production UI : les étapes de recette ne peuvent pas être exécutées.');
+assertContains(releaseUi, /Blob\(/, 'Mise en production UI : l’export local du rapport est absent.');
+assertContains(indexUi, /data-view="release"[\s\S]*id="view-release"/, 'Mise en production UI : le module n’est pas accessible depuis la navigation.');
+assertContains(supportDiagnostics, /function\s+registerClientIncident\s*\(/, 'Support : l’enregistrement d’un incident est absent.');
+assertContains(supportDiagnostics, /INCIDENT_CLIENT/, 'Support : les incidents ne sont pas journalisés.');
+assertContains(supportDiagnostics, /SUPPORT_INCIDENT_MESSAGE_MAX_LENGTH/, 'Support : les messages d’incident ne sont pas bornés.');
+assertContains(scriptsUi, /createClientSupportReference_/, 'Support UI : aucune référence locale n’est créée en cas d’erreur.');
+assertContains(scriptsUi, /registerClientIncidentBestEffort_/, 'Support UI : les incidents ne sont pas transmis au serveur en mode best effort.');
+
 if (failures.length) {
   console.error('\nTests des règles métier : ÉCHEC\n');
   failures.forEach(failure => console.error(`- ${failure}`));

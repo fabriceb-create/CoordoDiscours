@@ -1,6 +1,6 @@
 {
   "name": "coordodiscours",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,13 +12,14 @@
     "test:merge": "node scripts/test-merge-engine.mjs",
     "test:versions": "node scripts/test-version-history.mjs",
     "test:ui": "node scripts/test-responsive-accessibility.mjs",
-    "check": "npm run validate && npm run test:business && npm run test:conflicts && npm run test:auto && npm run test:availability && npm run test:merge && npm run test:versions && npm run test:ui && npm run test:ops",
+    "check": "npm run validate && npm run test:business && npm run test:conflicts && npm run test:auto && npm run test:availability && npm run test:merge && npm run test:versions && npm run test:ui && npm run test:ops && npm run test:release",
     "predeploy:check": "npm run check && node scripts/predeploy-check.mjs",
     "clasp:login": "npx @google/clasp login",
     "clasp:status": "npx @google/clasp status",
     "clasp:push": "npm run predeploy:check && npx @google/clasp push",
     "clasp:deploy": "npm run predeploy:check && npx @google/clasp deploy",
-    "test:ops": "node scripts/test-help-observability.mjs"
+    "test:ops": "node scripts/test-help-observability.mjs",
+    "test:release": "node scripts/test-release-readiness.mjs"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0-alpha"
