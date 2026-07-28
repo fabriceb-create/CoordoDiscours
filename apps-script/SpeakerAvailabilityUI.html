@@ -1,0 +1,237 @@
+<dialog id="speaker-availability-dialog">
+  <form id="speaker-availability-form" method="dialog" class="form-panel speaker-availability-panel">
+    <div class="dialog-header">
+      <div><p class="eyebrow">Calendrier personnel</p><h2 id="speaker-availability-title">Disponibilités de l’orateur</h2></div>
+      <button type="button" class="icon-button" data-close="speaker-availability-dialog">×</button>
+    </div>
+    <input type="hidden" name="speakerId">
+    <input type="hidden" name="version">
+    <p class="speaker-availability-intro">Déclare les périodes réellement indisponibles, les fenêtres pendant lesquelles l’orateur est disponible, ainsi que les dates préférées ou à éviter. Les programmations bloquantes seront refusées automatiquement.</p>
+    <section class="speaker-availability-editor">
+      <label>Type<select name="availabilityType">
+        <option value="INDISPONIBLE">Indisponible</option>
+        <option value="DISPONIBLE_SEULEMENT">Disponible seulement</option>
+        <option value="PREFEREE">Période préférée</option>
+        <option value="A_EVITER">Période à éviter</option>
+      </select></label>
+      <label>Date de début<input name="availabilityStartDate" type="date"></label>
+      <label>Date de fin<input name="availabilityEndDate" type="date"></label>
+      <label>Motif ou précision<input name="availabilityReason" maxlength="500" placeholder="Vacances, déplacement, préférence…"></label>
+      <label class="speaker-availability-active"><input name="availabilityActive" type="checkbox" checked> Active</label>
+      <div class="speaker-availability-editor-actions">
+        <button id="speaker-availability-entry-reset" type="button" class="secondary-button">Vider</button>
+        <button id="speaker-availability-entry-save" type="button" class="secondary-button">Ajouter la période</button>
+      </div>
+    </section>
+    <div id="speaker-availability-summary" class="speaker-availability-summary"></div>
+    <div id="speaker-availability-list" class="speaker-availability-list"><div class="empty-state">Aucune période enregistrée.</div></div>
+    <div class="form-actions">
+      <button type="button" class="secondary-button" data-close="speaker-availability-dialog">Annuler</button>
+      <button type="submit" class="primary-button">Enregistrer les disponibilités</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  state.speakerAvailabilitySchedule = null;
+  state.speakerAvailabilityEditingKey = '';
+  let speakerAvailabilityClientCounter = 0;
+
+  function installSpeakerAvailabilityButton_() {
+    const actions = document.querySelector('#speaker-form .form-actions');
+    if (!actions || document.getElementById('manage-speaker-availability')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'manage-speaker-availability';
+    button.className = 'secondary-button';
+    button.dataset.writeAction = '';
+    button.textContent = 'Gérer ses disponibilités';
+    actions.prepend(button);
+  }
+
+  async function openSpeakerAvailability_(speakerId) {
+    if (!speakerId) {
+      toast('Enregistre d’abord la fiche de l’orateur.');
+      return;
+    }
+    try {
+      const schedule = await runServer('getSpeakerAvailabilitySchedule', speakerId);
+      schedule.entries = (schedule.entries || []).map(entry => Object.assign({}, entry, { _key: entry.id || speakerAvailabilityClientKey_() }));
+      state.speakerAvailabilitySchedule = schedule;
+      state.speakerAvailabilityEditingKey = '';
+      const form = document.getElementById('speaker-availability-form');
+      form.elements.speakerId.value = speakerId;
+      form.elements.version.value = schedule.version || '';
+      document.getElementById('speaker-availability-title').textContent = 'Disponibilités de ' + (schedule.speaker.fullName || schedule.speaker.lastName);
+      resetSpeakerAvailabilityEditor_();
+      renderSpeakerAvailabilityEntries_();
+      const dialog = document.getElementById('speaker-availability-dialog');
+      if (!dialog.open) dialog.showModal();
+    } catch (error) { showError(error); }
+  }
+
+  function speakerAvailabilityClientKey_() {
+    speakerAvailabilityClientCounter += 1;
+    return 'TEMP_' + Date.now() + '_' + speakerAvailabilityClientCounter;
+  }
+
+  function resetSpeakerAvailabilityEditor_() {
+    const form = document.getElementById('speaker-availability-form');
+    state.speakerAvailabilityEditingKey = '';
+    form.elements.availabilityType.value = 'INDISPONIBLE';
+    form.elements.availabilityStartDate.value = '';
+    form.elements.availabilityEndDate.value = '';
+    form.elements.availabilityReason.value = '';
+    form.elements.availabilityActive.checked = true;
+    document.getElementById('speaker-availability-entry-save').textContent = 'Ajouter la période';
+  }
+
+  function upsertSpeakerAvailabilityEntry_() {
+    if (!state.speakerAvailabilitySchedule) return;
+    const form = document.getElementById('speaker-availability-form');
+    const startDate = String(form.elements.availabilityStartDate.value || '');
+    const endDate = String(form.elements.availabilityEndDate.value || startDate);
+    if (!startDate) { toast('La date de début est obligatoire.'); return; }
+    if (!endDate) { toast('La date de fin est obligatoire.'); return; }
+    if (endDate < startDate) { toast('La date de fin doit être postérieure à la date de début.'); return; }
+    const entry = {
+      id: '',
+      _key: state.speakerAvailabilityEditingKey || speakerAvailabilityClientKey_(),
+      type: form.elements.availabilityType.value,
+      typeLabel: form.elements.availabilityType.options[form.elements.availabilityType.selectedIndex].textContent,
+      startDate: startDate,
+      endDate: endDate,
+      reason: String(form.elements.availabilityReason.value || '').trim(),
+      active: form.elements.availabilityActive.checked
+    };
+    const entries = state.speakerAvailabilitySchedule.entries || [];
+    const index = entries.findIndex(item => item._key === state.speakerAvailabilityEditingKey);
+    if (index >= 0) {
+      entry.id = entries[index].id || '';
+      entries[index] = entry;
+    } else {
+      entries.push(entry);
+    }
+    entries.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || String(a.type).localeCompare(String(b.type)));
+    resetSpeakerAvailabilityEditor_();
+    renderSpeakerAvailabilityEntries_();
+  }
+
+  function editSpeakerAvailabilityEntry_(key) {
+    const entry = (state.speakerAvailabilitySchedule && state.speakerAvailabilitySchedule.entries || []).find(item => item._key === key);
+    if (!entry) return;
+    const form = document.getElementById('speaker-availability-form');
+    state.speakerAvailabilityEditingKey = key;
+    form.elements.availabilityType.value = entry.type;
+    form.elements.availabilityStartDate.value = entry.startDate;
+    form.elements.availabilityEndDate.value = entry.endDate;
+    form.elements.availabilityReason.value = entry.reason || '';
+    form.elements.availabilityActive.checked = entry.active !== false;
+    document.getElementById('speaker-availability-entry-save').textContent = 'Mettre à jour la période';
+    form.elements.availabilityType.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function removeSpeakerAvailabilityEntry_(key) {
+    if (!state.speakerAvailabilitySchedule) return;
+    state.speakerAvailabilitySchedule.entries = (state.speakerAvailabilitySchedule.entries || []).filter(item => item._key !== key);
+    if (state.speakerAvailabilityEditingKey === key) resetSpeakerAvailabilityEditor_();
+    renderSpeakerAvailabilityEntries_();
+  }
+
+  function renderSpeakerAvailabilityEntries_() {
+    const schedule = state.speakerAvailabilitySchedule || { entries: [] };
+    const entries = schedule.entries || [];
+    const container = document.getElementById('speaker-availability-list');
+    const summary = document.getElementById('speaker-availability-summary');
+    const counts = entries.reduce((map, entry) => { map[entry.type] = (map[entry.type] || 0) + 1; return map; }, {});
+    summary.innerHTML = entries.length ? `
+      <span>${entries.length} période${entries.length > 1 ? 's' : ''}</span>
+      ${Object.keys(counts).map(type => `<span>${escapeHtml(speakerAvailabilityTypeLabelUi_(type))} : ${counts[type]}</span>`).join('')}` : '';
+    if (!entries.length) {
+      container.innerHTML = '<div class="empty-state">Aucune période enregistrée. Sans restriction, l’orateur reste considéré comme disponible.</div>';
+      return;
+    }
+    container.innerHTML = entries.map(entry => `
+      <article class="speaker-availability-entry ${entry.active === false ? 'inactive' : ''}">
+        <div>
+          <h4><span class="speaker-availability-badge ${speakerAvailabilityCssClass_(entry.type)}">${escapeHtml(entry.typeLabel || speakerAvailabilityTypeLabelUi_(entry.type))}</span>${escapeHtml(speakerAvailabilityRangeUi_(entry.startDate, entry.endDate))}</h4>
+          <small>${entry.reason ? escapeHtml(entry.reason) + '<br>' : ''}${entry.active === false ? 'Période désactivée' : speakerAvailabilityEffectUi_(entry.type)}</small>
+        </div>
+        <div class="record-actions">
+          <button type="button" class="secondary-button" data-edit-speaker-availability="${escapeHtml(entry._key)}">Modifier</button>
+          <button type="button" class="danger-button" data-remove-speaker-availability="${escapeHtml(entry._key)}">Retirer</button>
+        </div>
+      </article>`).join('');
+  }
+
+  function speakerAvailabilityTypeLabelUi_(type) {
+    return ({
+      INDISPONIBLE: 'Indisponible',
+      DISPONIBLE_SEULEMENT: 'Disponible seulement',
+      PREFEREE: 'Période préférée',
+      A_EVITER: 'Période à éviter'
+    })[type] || type;
+  }
+
+  function speakerAvailabilityEffectUi_(type) {
+    return ({
+      INDISPONIBLE: 'Bloque toute programmation comprise dans cette période.',
+      DISPONIBLE_SEULEMENT: 'Lorsque ce type existe, les dates situées hors de toutes les fenêtres autorisées sont bloquées.',
+      PREFEREE: 'Augmente le classement de l’orateur pour les dates concernées.',
+      A_EVITER: 'Déclenche un avertissement et diminue le classement de l’orateur.'
+    })[type] || '';
+  }
+
+  function speakerAvailabilityCssClass_(type) {
+    return String(type || '').toLowerCase().replace(/_/g, '-');
+  }
+
+  function speakerAvailabilityRangeUi_(startDate, endDate) {
+    const format = value => {
+      const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return match ? match[3] + '/' + match[2] + '/' + match[1] : String(value || '');
+    };
+    return startDate === endDate ? format(startDate) : 'Du ' + format(startDate) + ' au ' + format(endDate);
+  }
+
+  document.addEventListener('click', event => {
+    if (event.target.id === 'manage-speaker-availability') {
+      openSpeakerAvailability_(document.getElementById('speaker-form').elements.id.value);
+    }
+    const edit = event.target.closest('[data-edit-speaker-availability]');
+    if (edit) editSpeakerAvailabilityEntry_(edit.dataset.editSpeakerAvailability);
+    const remove = event.target.closest('[data-remove-speaker-availability]');
+    if (remove) removeSpeakerAvailabilityEntry_(remove.dataset.removeSpeakerAvailability);
+  });
+
+  document.getElementById('speaker-availability-entry-save').addEventListener('click', upsertSpeakerAvailabilityEntry_);
+  document.getElementById('speaker-availability-entry-reset').addEventListener('click', resetSpeakerAvailabilityEditor_);
+  document.getElementById('speaker-availability-form').elements.availabilityStartDate.addEventListener('change', event => {
+    const end = document.getElementById('speaker-availability-form').elements.availabilityEndDate;
+    if (!end.value || end.value < event.target.value) end.value = event.target.value;
+  });
+
+  document.getElementById('speaker-availability-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const speakerId = event.target.elements.speakerId.value;
+    const entries = (state.speakerAvailabilitySchedule && state.speakerAvailabilitySchedule.entries || []).map(entry => ({
+      id: entry.id || '',
+      type: entry.type,
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+      reason: entry.reason || '',
+      active: entry.active !== false
+    }));
+    try {
+      await runServer('saveSpeakerAvailabilitySchedule', speakerId, entries, event.target.elements.version.value);
+      document.getElementById('speaker-availability-dialog').close();
+      toast('Disponibilités de l’orateur enregistrées.');
+      if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
+    } catch (error) {
+      showError(error);
+      if (String(error.message || error).includes('CONFLIT_VERSION|')) await openSpeakerAvailability_(speakerId);
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', installSpeakerAvailabilityButton_);
+</script>
