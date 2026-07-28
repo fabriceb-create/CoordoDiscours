@@ -12,6 +12,8 @@ const SETTINGS_DEFINITIONS = Object.freeze([
   { key: 'RECO_POIDS_MOIS', label: 'Recommandation — disponibilité dans le mois', type: 'number', min: 0, max: 100, defaultValue: '15', suffix: 'points', description: 'Importance accordée à l’absence d’une autre programmation durant le même mois.' },
   { key: 'RECO_POIDS_LOCAL', label: 'Recommandation — proximité', type: 'number', min: 0, max: 100, defaultValue: '10', suffix: 'points', description: 'Importance accordée aux orateurs locaux afin de limiter déplacements et accueil.' },
   { key: 'RECO_POIDS_EQUILIBRE', label: 'Recommandation — équilibre des affectations', type: 'number', min: 0, max: 100, defaultValue: '5', suffix: 'points', description: 'Importance accordée aux orateurs les moins sollicités dans le planning.' },
+  { key: 'RECO_BONUS_DATE_PREFEREE', label: 'Recommandation — bonus date préférée', type: 'number', min: 0, max: 30, defaultValue: '10', suffix: 'points', description: 'Bonus ajouté au score lorsqu’une date appartient à une période préférée de l’orateur.' },
+  { key: 'RECO_MALUS_DATE_A_EVITER', label: 'Recommandation — malus date à éviter', type: 'number', min: 0, max: 50, defaultValue: '18', suffix: 'points', description: 'Malus retiré du score lorsqu’une date appartient à une période signalée comme à éviter.' },
   { key: 'ASSISTANT_LECTURE_SEULE', label: 'Assistant en lecture seule', type: 'boolean', defaultValue: 'OUI', description: 'Conserve les fonctions d’assistance sans autoriser de modification automatique.' }
 ]);
 
