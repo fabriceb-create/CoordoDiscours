@@ -9,6 +9,7 @@
   <?!= include('VersionHistoryStyles'); ?>
   <?!= include('HelpStyles'); ?>
   <?!= include('ReleaseReadinessStyles'); ?>
+  <?!= include('ReleaseGovernanceStyles'); ?>
   <?!= include('DashboardStyles'); ?>
   <?!= include('ConflictResolutionStyles'); ?>
   <?!= include('AutomaticPlanningStyles'); ?>
@@ -163,7 +164,14 @@
           <div id="release-readiness-summary"><div class="release-empty">Ouvre ce module pour analyser la préparation au déploiement.</div></div>
           <div id="release-readiness-checks"></div>
           <div id="release-acceptance-panel"></div>
-          <section class="release-panel"><div class="release-panel-head"><div><p class="eyebrow">Support</p><h3>Incidents récents</h3></div><span class="release-status pending">Références non sensibles</span></div><div id="release-incidents"><div class="release-empty">Les incidents récents seront chargés avec le rapport.</div></div></section>
+          <div class="release-governance-grid">
+            <div id="release-governance-actions"><div class="release-empty">Chargement des actions correctives...</div></div>
+            <div id="release-decisions"><div class="release-empty">Chargement du registre de déploiement...</div></div>
+            <div id="release-device-acceptance" class="release-governance-wide"><div class="release-empty">Chargement de la recette multi-écrans...</div></div>
+            <div id="release-capacity" class="release-governance-wide"><div class="release-empty">Calcul de la capacité annuelle...</div></div>
+            <div id="release-history-maintenance"><div class="release-empty">Chargement des outils de maintenance...</div></div>
+            <section class="release-panel"><div class="release-panel-head"><div><p class="eyebrow">Support</p><h3>Incidents récents</h3></div><span class="release-status pending">Références non sensibles</span></div><div id="release-incidents"><div class="release-empty">Les incidents récents seront chargés avec le rapport.</div></div></section>
+          </div>
         </div>
       </section>
 
@@ -218,6 +226,25 @@
   <dialog id="congregation-dialog"><form id="congregation-form" method="dialog" class="form-panel" data-merge-entity="ASSEMBLEE"><div class="dialog-header"><h2>Fiche assemblée</h2><button type="button" class="icon-button" data-close="congregation-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="name" required></label><label>Coordinateur<input name="coordinator"></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Adresse<textarea name="address" rows="2"></textarea></label><label>Jour de réunion<input name="meetingDay"></label><label>Heure<input name="meetingTime" type="time"></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Active</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="congregation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
   <dialog id="talk-dialog"><form id="talk-form" method="dialog" class="form-panel" data-merge-entity="DISCOURS"><div class="dialog-header"><h2>Fiche discours</h2><button type="button" class="icon-button" data-close="talk-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div><div class="form-grid"><label>Numéro*<input name="number" type="number" min="1" required></label><label class="full-width">Titre*<textarea name="title" rows="3" required></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="talk-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
 
+  <dialog id="release-action-dialog" aria-labelledby="release-action-dialog-title">
+    <form id="release-action-form" method="dialog" class="form-panel release-dialog-panel">
+      <div class="dialog-header"><div><p class="eyebrow">Plan d’action</p><h2 id="release-action-dialog-title">Action corrective</h2></div><button type="button" class="icon-button" data-close="release-action-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div>
+      <input type="hidden" name="id"><input type="hidden" name="version">
+      <div class="release-dialog-grid"><label class="full-width">Titre<input name="title" required maxlength="180"></label><label class="full-width">Description<textarea name="description" rows="3" required maxlength="1000"></textarea></label><label>Priorité<select name="priority"><option value="BLOQUANTE">Bloquante</option><option value="HAUTE">Haute</option><option value="NORMALE" selected>Normale</option></select></label><label>Statut<select name="status"><option value="A_FAIRE">À faire</option><option value="EN_COURS">En cours</option><option value="TERMINEE">Terminée</option><option value="RISQUE_ACCEPTE">Risque accepté</option><option value="ANNULEE">Annulée</option></select></label><label>Responsable<input name="responsible" maxlength="120"></label><label>Échéance<input name="dueDate" type="date"></label><label class="full-width">Notes<textarea name="notes" rows="3" maxlength="1000"></textarea></label></div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="release-action-dialog">Annuler</button><button type="submit" class="primary-button">Enregistrer</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="release-decision-dialog" aria-labelledby="release-decision-dialog-title">
+    <form id="release-decision-form" method="dialog" class="form-panel release-dialog-panel">
+      <div class="dialog-header"><div><p class="eyebrow">Registre de production</p><h2 id="release-decision-dialog-title">Décision</h2></div><button type="button" class="icon-button" data-close="release-decision-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div>
+      <div id="release-decision-guidance" class="release-decision-guidance"></div>
+      <input type="hidden" name="decision"><input type="hidden" name="reportFingerprint">
+      <div class="release-dialog-grid"><label>Environnement<select name="environment"><option value="PRODUCTION">Production</option><option value="RECETTE">Recette</option></select></label><label>Identifiant du déploiement<input name="deploymentId" maxlength="160" autocomplete="off"></label><label class="full-width">Motif ou commentaire<textarea name="reason" rows="4" maxlength="1000"></textarea></label><label class="full-width">Confirmation<input name="confirmation" autocomplete="off" maxlength="20"></label></div>
+      <div class="form-actions"><button type="button" class="secondary-button" data-close="release-decision-dialog">Annuler</button><button type="submit" class="primary-button">Enregistrer la décision</button></div>
+    </form>
+  </dialog>
+
   <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-dialog-heading">
     <div class="form-panel">
       <div class="dialog-header"><div><p class="eyebrow">Aide contextuelle</p><h2 id="help-dialog-heading">Guide CoordoDiscours</h2></div><button type="button" class="icon-button" data-close="help-dialog" aria-label="Fermer la fenêtre"><span aria-hidden="true">×</span></button></div>
@@ -229,6 +256,7 @@
   <?!= include('Scripts'); ?>
   <?!= include('HelpScripts'); ?>
   <?!= include('ReleaseReadinessScripts'); ?>
+  <?!= include('ReleaseGovernanceScripts'); ?>
   <?!= include('MergeScripts'); ?>
   <?!= include('VersionHistoryScripts'); ?>
   <?!= include('PlanningScripts'); ?>

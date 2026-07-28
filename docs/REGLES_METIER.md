@@ -153,3 +153,61 @@
 4. Le rapport et sa réinitialisation sont réservés aux administrateurs.
 5. La réinitialisation des mesures est historisée.
 6. Une durée élevée isolée ne suffit pas à conclure à un défaut permanent.
+
+## Rapport de santé et recette réelle
+
+1. Le rapport de santé comporte six contrôles pondérés totalisant 100 points.
+2. Un contrôle `BLOCKING` impose l’état global `BLOCKED`, quel que soit le score numérique obtenu ailleurs.
+3. Un contrôle `WARNING` impose l’état global `ATTENTION` en l’absence de blocage.
+4. L’état `READY` exige six contrôles `PASS` et un score de 100/100.
+5. La recette guidée exécute sept étapes dans l’ordre et refuse une session remplacée ou terminée.
+6. La recette multi-écrans comprend exactement 15 résultats : cinq scénarios sur trois appareils.
+7. Un scénario `ECHEC` rend le contrôle multi-écrans bloquant.
+8. Un scénario `A_TESTER` maintient le contrôle hors de l’état conforme.
+9. La modification de la matrice multi-écrans exige la version technique attendue.
+
+## Actions correctives
+
+1. Une recommandation du rapport peut créer ou mettre à jour une action de source `RAPPORT`.
+2. Une recommandation disparue peut terminer automatiquement l’action active correspondante de la même version applicative.
+3. Une action manuelle doit comporter un titre et une description.
+4. Les priorités autorisées sont `BLOQUANTE`, `HAUTE` et `NORMALE`.
+5. Les statuts terminaux sont `TERMINEE`, `RISQUE_ACCEPTE` et `ANNULEE`.
+6. Une action bloquante non terminale interdit l’approbation de la mise en production.
+7. Une écriture sur une action périmée est refusée par le verrouillage optimiste.
+8. Une action en retard reste visible tant qu’elle n’est pas dans un statut terminal.
+
+## Décisions de mise en production
+
+1. CoordoDiscours n’effectue aucune publication Apps Script automatique.
+2. Une approbation exige le mot `AUTORISER`, un rapport `READY` à 100/100 et aucune action bloquante ouverte.
+3. L’empreinte transmise par l’interface doit correspondre au rapport recalculé au moment de la décision.
+4. Un même rapport ne peut pas être approuvé plusieurs fois pour la même version.
+5. Un report exige un motif.
+6. La confirmation d’un déploiement exige le mot `DEPLOYE`, un identifiant de déploiement Apps Script et une approbation correspondant au rapport courant.
+7. Un retour arrière exige le mot `RETOUR`, un motif et l’existence d’un déploiement antérieur.
+8. Chaque décision est ajoutée au registre et à l’audit ; une décision antérieure n’est pas réécrite.
+9. Le manifeste reprend le noyau de la décision et son checksum SHA-256.
+
+## Rapport annuel de capacité
+
+1. Seules les programmations non annulées de l’année sélectionnée sont comptées.
+2. Le jour hebdomadaire théorique est déduit du jour le plus fréquent dans l’historique disponible.
+3. Les orateurs actifs sans affectation participent au calcul de l’équilibre.
+4. L’indice d’équilibre est `100 / (1 + coefficient de variation)`.
+5. La concentration des 20 % les plus sollicités est calculée sur les affectations totales.
+6. La couverture des discours compare les discours actifs distincts utilisés aux discours actifs disponibles.
+7. Les résultats nominaux sont réservés à l’administrateur et retirés du dossier de support expurgé.
+8. Les indicateurs sont descriptifs ; ils ne remplacent pas l’appréciation pastorale et organisationnelle du coordinateur.
+
+## Archivage de l’historique
+
+1. Une ligne de moins de 180 jours ne peut pas être archivée.
+2. Au moins les 500 lignes les plus récentes doivent rester dans la feuille `HISTORIQUE`.
+3. Une opération ne peut pas dépasser 25 000 lignes.
+4. L’aperçu et l’exécution doivent retrouver le même nombre de lignes éligibles.
+5. Le mot `ARCHIVER` est obligatoire.
+6. Un fichier JSON Google Drive est créé avant la suppression.
+7. En cas d’échec de la création de l’archive, aucune ligne ne doit être supprimée.
+8. La suppression s’effectue du bas vers le haut afin de préserver les numéros de ligne restants.
+9. L’opération est auditée avec les critères et le nombre de lignes archivées.

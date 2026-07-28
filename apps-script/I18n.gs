@@ -249,7 +249,25 @@ const INTERFACE_TRANSLATIONS = Object.freeze({
     'Rapport de santé actualisé.': 'Rapò santé-la mété ajou.',
     'Recette de mise en production démarrée.': 'Tès pou mété vèsyon-la an sèvis koumansé.',
     'Étape de recette terminée.': 'Étape tès-la bout.',
-    'Rapport de recette exporté.': 'Rapò tès-la ekspòté.'
+    'Rapport de recette exporté.': 'Rapò tès-la ekspòté.',
+    'Actions correctives': 'Aksyon pou korijé',
+    'Suivi du plan d’action': 'Swivi plan aksyon-la',
+    'Synchroniser le rapport': 'Mété rapò-la ansanm',
+    'Nouvelle action': 'Nouvo aksyon',
+    'Recette multi-écrans': 'Tès anlè plizyè ekran',
+    'Ordinateur, tablette et téléphone': 'Òdinatè, tablèt é téléfòn',
+    'Enregistrer la recette multi-écrans': 'Anrèjistré tès plizyè ekran-la',
+    'Registre de mise en production': 'Lis désizyon pou mété an sèvis',
+    'Approuver': 'Aprové',
+    'Reporter': 'Ranvoyé',
+    'Confirmer déployé': 'Konfimé i déplwayé',
+    'Retour arrière': 'Viré dèyè',
+    'Exporter le dossier de support': 'Ekspòté dosyé sipò-la',
+    'Exporter le manifeste': 'Ekspòté manifès-la',
+    'Capacité annuelle': 'Kapasité asi lanné-la',
+    'Archivage de l’historique': 'Achivaj listorik-la',
+    'Recalculer': 'Rikalkilé',
+    'Archiver': 'Achivé'
   }
 });
 

@@ -4,125 +4,158 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.13 Stable**
+Version en préparation de recette réelle : **1.14 Stable**
 
-Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques, un guide intégré et la documentation d’installation, d’administration et de recette.
+Le dépôt contient le code Apps Script, une base Google Sheets auto-installable, les modules métier, les migrations, les contrôles automatiques, l’aide intégrée et la documentation d’installation, d’administration, de recette et de mise en production.
+
+La branche principale est destinée à rester déployable. Une publication réelle dans Google Apps Script exige toutefois une sauvegarde récente, un rapport de santé `READY` à `100/100`, une recette multi-écrans complète et une décision administrative enregistrée.
 
 ## Modules disponibles
 
 - Tableau de bord et alertes prioritaires.
-- Programmation des discours.
+- Programmation manuelle des discours.
 - Recommandation automatique des orateurs.
 - Assistant de résolution des conflits métier.
-- Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
-- Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter.
+- Planification automatique de 1 à 6 mois avec trois scénarios.
+- Disponibilités, indisponibilités, périodes préférées et dates à éviter.
 - Fusion intelligente des modifications concurrentes.
 - Historique navigable, comparaison et restauration contrôlée des versions.
 - Répertoire des orateurs et des assemblées.
 - Référentiel des discours et discours déclarés par orateur extérieur.
 - Invitations et hospitalité.
 - Planning imprimable sur 3 ou 6 mois.
-- Historique détaillé avant/après.
+- Audit détaillé avant/après.
 - Contrôle d’intégrité, sauvegarde et restauration sécurisées.
 - Gestion des rôles et des accès.
 - Guide utilisateur intégré et aide contextuelle.
-- Diagnostic temporaire des durées serveur.
+- Cache serveur court, diagnostic de performance et références de support.
 - Rapport de santé avant déploiement et recette guidée exportable.
-- Références de support non sensibles pour les erreurs.
+- Plan d’actions correctives issu du rapport de santé.
+- Recette réelle sur ordinateur, tablette et téléphone.
+- Registre des décisions de mise en production et manifestes SHA-256.
+- Rapport annuel de capacité, d’équilibre et de couverture.
+- Archivage contrôlé de l’historique avec copie préalable dans Google Drive.
 - Interface Français / Kréyòl Gwadloup.
 
+## Gouvernance de mise en production
 
-## Préparation à la mise en production
+La version 1.14 complète le module administrateur **Mise en production**.
 
-La version 1.13 ajoute un module administrateur **Mise en production**. Il consolide cinq contrôles pondérés :
+### Rapport de santé
 
-- installation, schéma, version et fuseau horaire ;
-- intégrité des relations et des référentiels ;
-- présence d’une sauvegarde récente ;
-- erreurs et lenteurs observées côté serveur ;
-- résultat et ancienneté de la dernière recette d’acceptation.
+Le rapport consolide six contrôles pondérés :
 
-Le rapport fournit un score sur 100 et un état `Prêt`, `À vérifier` ou `Bloqué`. Une recette guidée de six étapes peut être exécutée dans l’application puis exportée au format JSON. La session est protégée par un verrou, compactée avant stockage et associée à une référence de recette.
+1. installation, schéma, version et fuseau horaire ;
+2. intégrité des relations et référentiels ;
+3. présence d’une sauvegarde récente ;
+4. erreurs et lenteurs observées côté serveur ;
+5. résultat et ancienneté de la recette interne ;
+6. recette réelle sur ordinateur, tablette et téléphone.
 
-Les erreurs visibles reçoivent également une référence de support non sensible. Le message, le module et le type d’opération sont journalisés sous une forme bornée, sans pile technique ni objet arbitraire.
+Le résultat est un score sur 100 et un état :
 
-## Guide intégré et aide contextuelle
+- `READY` : tous les contrôles sont conformes ;
+- `ATTENTION` : une vérification ou une décision reste nécessaire ;
+- `BLOCKED` : au moins un contrôle interdit la proposition de déploiement.
 
-La version 1.12 ajoute un véritable module **Aide**. Son contenu est filtré selon le rôle de l’utilisateur :
+La recette guidée comporte désormais sept étapes, la dernière consolidant la décision finale.
 
-- Consultation : démarrage, tableau de bord, impression, historique, versions et dépannage ;
-- Coordinateur : programmation, recommandations, planification automatique, orateurs, disponibilités et communication ;
-- Administrateur : paramètres, utilisateurs, intégrité, déploiement et diagnostic de performance.
+### Actions correctives
 
-Le guide peut être ouvert de trois façons :
+Les recommandations du rapport peuvent être synchronisées vers un plan d’action persistant. Chaque action possède notamment :
 
-1. depuis le menu **Aide** ;
-2. avec le bouton `?` de l’en-tête ou du module affiché ;
-3. avec la touche `?`, lorsque le curseur n’est pas dans un champ de saisie.
+- une priorité `BLOQUANTE`, `HAUTE` ou `NORMALE` ;
+- un statut ;
+- un responsable ;
+- une échéance ;
+- des notes ;
+- une version technique empêchant l’écrasement silencieux.
 
-L’aide contextuelle restitue le focus à l’élément d’origine après fermeture. Lorsque l’interface est en Kréyòl Gwadloup, les commandes restent traduites et un message précise que le guide détaillé est actuellement rédigé en français.
+Une action bloquante ouverte empêche l’approbation du déploiement.
 
-## Fiabilité réseau
+### Recette multi-écrans
 
-Les appels serveur sont maintenant classés entre lectures et écritures.
+Cinq scénarios doivent être exécutés sur chacun des trois formats :
 
-- Une lecture interrompue par une erreur transitoire est relancée automatiquement une seule fois après 500 ms.
-- Une écriture n’est jamais répétée automatiquement, car son résultat peut déjà avoir été enregistré côté serveur.
-- Un bandeau de reprise explique l’action adaptée : recharger une lecture ou vérifier l’état d’une écriture avant de la recommencer.
+- navigation ;
+- programmation ;
+- formulaires ;
+- recherche et filtres ;
+- impression ou export.
 
-Cette stratégie réduit les erreurs visibles sans risquer de créer silencieusement une programmation, une invitation ou une autre fiche en double.
+La matrice comprend donc 15 résultats. Un seul échec bloque le rapport de santé. Un scénario non testé maintient le rapport hors de l’état `READY`.
 
-## Cache et observabilité serveur
+### Décisions humaines
 
-Un cache serveur court de 60 secondes limite certaines lectures Google Sheets répétitives :
+Le registre conserve quatre décisions :
 
-- paramètres généraux ;
-- options de programmation ;
-- options d’invitation et d’hospitalité ;
-- libellés utilisés dans la comparaison des versions.
+- `APPROVED` : déploiement approuvé ;
+- `POSTPONED` : déploiement reporté ;
+- `DEPLOYED` : version réellement déployée ;
+- `ROLLED_BACK` : retour arrière enregistré.
 
-Les caches sont invalidés après les écritures qui peuvent rendre les données obsolètes. Une indisponibilité du cache n’empêche jamais l’application de fonctionner : la lecture directe reste la solution de repli.
+CoordoDiscours ne publie jamais automatiquement le projet Apps Script. L’approbation exige un rapport `READY` à `100/100`, aucune action bloquante et une confirmation explicite. La confirmation du déploiement exige l’identifiant réel du déploiement Apps Script.
 
-Les opérations les plus coûteuses sont chronométrées de manière agrégée. Un administrateur peut consulter dans **Paramètres > Performance serveur** :
+Chaque décision peut produire un manifeste JSON accompagné d’un checksum SHA-256.
 
-- le nombre d’appels ;
-- la durée moyenne, minimale, maximale et la dernière durée ;
-- le nombre d’appels dépassant le seuil de 1 500 ms ;
-- le nombre d’erreurs observées.
+## Capacité annuelle et équilibre
 
-Ces mesures sont temporaires, conservées dans le cache du script pendant six heures et ne constituent pas un engagement de temps de réponse.
+Le rapport annuel calcule notamment :
+
+- le nombre de programmations actives ;
+- le taux d’occupation des créneaux hebdomadaires théoriques ;
+- le nombre d’orateurs utilisés et sans affectation ;
+- un indice d’équilibre fondé sur le coefficient de variation ;
+- la concentration des affectations sur les 20 % d’orateurs les plus sollicités ;
+- la couverture des discours actifs ;
+- la part d’orateurs extérieurs ;
+- la répartition mensuelle.
+
+Les noms des orateurs restent visibles uniquement dans le rapport administrateur. Ils sont retirés du dossier de support exportable.
+
+## Archivage contrôlé de l’historique
+
+L’archivage :
+
+- refuse les lignes de moins de 180 jours ;
+- conserve au minimum les 500 lignes les plus récentes ;
+- limite une opération à 25 000 lignes ;
+- recalcule le nombre de lignes juste avant l’écriture ;
+- crée un fichier JSON dans Google Drive avant toute suppression ;
+- exige la confirmation `ARCHIVER` ;
+- journalise l’opération.
+
+L’archive n’est pas une restauration automatique. Elle doit être conservée selon la politique documentaire de l’assemblée.
+
+## Aide, fiabilité réseau et observabilité
+
+Le module **Aide** est filtré selon le rôle et peut être ouvert depuis le menu, le bouton `?` ou le raccourci clavier `?` hors champ de saisie.
+
+Les appels serveur sont distingués entre lectures et écritures :
+
+- une lecture interrompue de manière transitoire peut être relancée une seule fois ;
+- une écriture n’est jamais répétée automatiquement ;
+- l’utilisateur est invité à vérifier l’état enregistré avant de recommencer.
+
+Un cache serveur de 60 secondes limite certaines lectures Google Sheets répétitives. Les principales opérations sont mesurées de manière agrégée et temporaire. Les erreurs visibles reçoivent une référence de support non sensible.
 
 ## Ergonomie mobile et accessibilité
 
-La navigation mobile utilise un tiroir adapté aux téléphones et tablettes. Le menu :
+La navigation mobile utilise un tiroir adapté aux téléphones et tablettes. L’interface comprend notamment :
 
-- s’ouvre depuis l’en-tête ;
-- se ferme avec son bouton, le voile de fond ou la touche Échap ;
-- maintient le focus clavier à l’intérieur lorsqu’il est ouvert ;
-- restitue le focus au bouton d’ouverture après fermeture ;
-- retire du parcours clavier la navigation placée hors écran.
-
-L’interface comporte également un lien d’évitement, un focus visible, `aria-current` sur la section active, des annonces adaptées pour les messages et le respect de la réduction des animations demandée par le système.
-
-## Historique des versions
-
-Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` enregistrés dans la feuille `HISTORIQUE`.
-
-Les fiches sont chargées par pages de 40. Pour chaque fiche, le module permet de :
-
-- parcourir les versions numérotées ;
-- identifier l’état actuel ;
-- sélectionner exactement deux versions ;
-- comparer leurs champs avec des libellés lisibles ;
-- restaurer une ancienne version lorsque le rôle de l’utilisateur l’autorise.
-
-La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations et l’audit. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
+- un lien d’évitement ;
+- un focus clavier visible ;
+- une gestion du focus dans le tiroir ;
+- `aria-current` sur la section active ;
+- des annonces accessibles pour les messages ;
+- le respect de la réduction des animations ;
+- des liens directs vers les différentes vues.
 
 ## Principes métier validés
 
 - Un orateur local peut présenter tout discours public actif.
 - Un orateur extérieur est limité aux discours déclarés dans sa fiche.
-- Les discours 59, 82, 122 et 123 sont inactifs.
+- Les discours 59, 82, 122 et 123 sont officiellement inactifs.
 - Une répétition dans la période configurée déclenche une alerte non bloquante.
 - Une indisponibilité ou une date hors des fenêtres « Disponible seulement » bloque la programmation.
 - Une date préférée augmente le classement ; une date à éviter produit un avertissement et diminue le score.
@@ -132,7 +165,9 @@ La restauration repasse par les fonctions d’écriture métier existantes. Elle
 - Une fiche périmée ne peut pas écraser silencieusement une version plus récente.
 - Une ancienne version n’est restaurée qu’après contrôle des droits, de la version actuelle et des règles métier.
 - Une écriture incertaine après coupure réseau n’est jamais répétée automatiquement.
-- Les modifications importantes sont historisées.
+- Une mise en production ne peut être approuvée avec une action corrective bloquante ouverte.
+- Une archive d’historique est créée avant la suppression des lignes correspondantes.
+- Les modifications importantes sont auditées.
 
 ## Structure principale
 
@@ -147,6 +182,7 @@ apps-script/
   SupportDiagnostics.gs
   Help.gs
   ReleaseReadiness.gs
+  ReleaseGovernance.gs
   Dashboard.gs
   Planning.gs
   RulesEngine.gs
@@ -184,22 +220,28 @@ scripts/
   test-responsive-accessibility.mjs
   test-help-observability.mjs
   test-release-readiness.mjs
+  test-release-governance.mjs
+  predeploy-check.mjs
 ```
 
 ## Installation rapide
 
-1. Créer un projet Google Apps Script.
-2. Copier tous les fichiers du dossier `apps-script/`.
+1. Créer ou sélectionner le projet Google Apps Script.
+2. Copier tous les fichiers du dossier `apps-script/` ou utiliser `clasp` après contrôle du projet ciblé.
 3. Exécuter `installCoordoDiscours`.
-4. Vérifier que le résultat contient `success: true`.
+4. Vérifier que le résultat contient `success: true` et le schéma `1.9.0`.
 5. Exécuter `runAcceptanceTests`.
-6. Déployer le projet comme application web en accès restreint pour la recette.
+6. Créer une sauvegarde.
+7. Ouvrir **Mise en production**, traiter les actions et compléter la recette multi-écrans.
+8. Approuver le rapport uniquement lorsqu’il est `READY` à `100/100`.
+9. Créer ou mettre à jour le déploiement Web Apps Script.
+10. Enregistrer ensuite l’identifiant réel du déploiement dans le registre.
 
-La procédure détaillée se trouve dans `docs/INSTALLATION.md`. Les guides complets se trouvent dans `docs/GUIDE_UTILISATEUR.md` et `docs/GUIDE_ADMINISTRATEUR.md`.
+La procédure détaillée se trouve dans `docs/INSTALLATION.md` et `docs/DEPLOIEMENT.md`. Les guides complets se trouvent dans `docs/GUIDE_UTILISATEUR.md` et `docs/GUIDE_ADMINISTRATEUR.md`.
 
 ## Validation
 
-La commande `npm run check` exécute dix niveaux de contrôle :
+La commande `npm run check` exécute onze niveaux de contrôle :
 
 1. structure Apps Script, syntaxe et droits d’accès ;
 2. contrats statiques des règles métier ;
@@ -210,6 +252,7 @@ La commande `npm run check` exécute dix niveaux de contrôle :
 7. reconstruction, comparaison et restauration des versions ;
 8. responsive, accessibilité, syntaxe JavaScript et caches client ;
 9. guide intégré, cache serveur et observabilité ;
-10. préparation à la mise en production, recette guidée et références de support.
+10. préparation à la mise en production, recette guidée et références de support ;
+11. actions correctives, recette multi-écrans, décisions, capacité annuelle et archivage.
 
-La version ne doit pas être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.
+Le contrôle `npm run predeploy:check` vérifie en plus les conditions locales de pré-déploiement. La validation automatique ne remplace pas la recette réelle dans Google Apps Script ni le contrôle des droits du futur déploiement Web.

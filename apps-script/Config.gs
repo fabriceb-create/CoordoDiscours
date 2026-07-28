@@ -1,6 +1,6 @@
 const APP_CONFIG = Object.freeze({
   name: 'CoordoDiscours',
-  version: '1.13 Stable',
+  version: '1.14 Stable',
   spreadsheetProperty: 'COORDODISCOURS_SPREADSHEET_ID',
   sheets: {
     settings: 'PARAMETRES',
@@ -13,7 +13,10 @@ const APP_CONFIG = Object.freeze({
     hospitality: 'HOSPITALITE',
     invitations: 'INVITATIONS',
     users: 'UTILISATEURS',
-    history: 'HISTORIQUE'
+    history: 'HISTORIQUE',
+    releaseActions: 'ACTIONS_CORRECTIVES',
+    releaseDevices: 'RECETTE_MULTI_ECRANS',
+    releaseDecisions: 'MISES_EN_PRODUCTION'
   },
   inactiveTalks: [59, 82, 122, 123]
 });

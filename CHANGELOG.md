@@ -4,6 +4,39 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 
 ## [En développement]
 
+## [1.14.0] — en préparation de recette réelle
+
+### Ajouté
+
+- Plan d’actions correctives synchronisable avec les recommandations du rapport de santé.
+- Recette réelle de 15 scénarios répartis entre ordinateur, tablette et téléphone.
+- Registre des décisions `APPROVED`, `POSTPONED`, `DEPLOYED` et `ROLLED_BACK`.
+- Manifeste de déploiement JSON avec checksum SHA-256.
+- Dossier de support expurgé des identifiants de base et des noms d’orateurs.
+- Rapport annuel de capacité, d’équilibre et de couverture.
+- Archivage contrôlé de l’historique avec copie Google Drive préalable.
+- Nouvelle suite `test-release-governance.mjs`.
+
+### Amélioré
+
+- Rapport de santé étendu à la recette multi-écrans.
+- Recette guidée portée à sept étapes.
+- Score de préparation réparti sur six contrôles.
+- Schéma d’installation porté à `1.9.0`.
+- Contrôle d’intégrité étendu aux actions, tests multi-écrans et décisions de déploiement.
+- Aide intégrée et traductions complétées pour la gouvernance de production.
+- Validation automatique portée à onze suites.
+
+### Sécurité et fiabilité
+
+- Verrouillage optimiste des actions correctives.
+- Approbation impossible sans rapport `READY` à `100/100`.
+- Approbation impossible lorsqu’une action bloquante reste ouverte.
+- Confirmation textuelle obligatoire pour l’approbation, le déploiement, le retour arrière et l’archivage.
+- Vérification de l’empreinte du rapport avant enregistrement d’une décision.
+- Limites d’âge, de conservation et de volume appliquées à l’archivage.
+
+
 ## [1.13.0] — en préparation de recette
 
 ### Ajouté

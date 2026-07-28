@@ -1,4 +1,4 @@
-# Guide utilisateur CoordoDiscours 1.13
+# Guide utilisateur CoordoDiscours 1.14
 
 ## 1. Ouvrir l’application
 
@@ -124,3 +124,18 @@ Transmets ces éléments à l’administrateur.
 ## Référence de support
 
 Lorsqu’une erreur s’affiche, note la référence `CD-ERR-...` et communique-la à l’administrateur.
+
+
+## 12. Comprendre la gouvernance de production
+
+Le module **Mise en production** est réservé aux administrateurs. Il ne modifie pas tes droits et ne publie pas automatiquement l’application.
+
+Pendant une recette, un administrateur peut te demander de vérifier un scénario sur ordinateur, tablette ou téléphone. Signale précisément :
+
+- l’appareil utilisé ;
+- le navigateur ;
+- le scénario testé ;
+- le résultat observé ;
+- la référence d’erreur éventuelle.
+
+Ne transmets pas de capture contenant des données personnelles ou confidentielles sans les masquer.

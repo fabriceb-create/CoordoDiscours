@@ -289,7 +289,7 @@ const releaseUi = read('ReleaseReadinessScripts.html');
 const supportDiagnostics = read('SupportDiagnostics.gs');
 assertContains(releaseReadiness, /RELEASE_READINESS_BACKUP_WARNING_DAYS[\s\S]*RELEASE_READINESS_BACKUP_BLOCKING_DAYS/, 'Mise en production : les seuils de fraîcheur des sauvegardes sont absents.');
 assertContains(releaseReadiness, /function\s+buildReleaseReadinessReport_\s*\(/, 'Mise en production : le rapport consolidé est absent.');
-assertContains(releaseReadiness, /assessInstallationReadiness_[\s\S]*assessIntegrityReadiness_[\s\S]*assessBackupReadiness_[\s\S]*assessPerformanceReadiness_[\s\S]*assessAcceptanceReadiness_/, 'Mise en production : les cinq contrôles de santé ne sont pas tous intégrés.');
+assertContains(releaseReadiness, /assessInstallationReadiness_[\s\S]*assessIntegrityReadiness_[\s\S]*assessBackupReadiness_[\s\S]*assessPerformanceReadiness_[\s\S]*assessAcceptanceReadiness_[\s\S]*assessDeviceAcceptanceReadiness_/, 'Mise en production : les six contrôles de santé ne sont pas tous intégrés.');
 assertContains(releaseReadiness, /RELEASE_ACCEPTANCE_STEPS[\s\S]*final/, 'Mise en production : la recette guidée est incomplète.');
 assertContains(releaseReadiness, /LockService\.getScriptLock\(\)/, 'Mise en production : la progression de recette n’est pas protégée par un verrou.');
 assertContains(releaseReadiness, /PropertiesService\.getScriptProperties\(\)/, 'Mise en production : la session de recette n’est pas persistée.');
@@ -305,6 +305,21 @@ assertContains(supportDiagnostics, /INCIDENT_CLIENT/, 'Support : les incidents n
 assertContains(supportDiagnostics, /SUPPORT_INCIDENT_MESSAGE_MAX_LENGTH/, 'Support : les messages d’incident ne sont pas bornés.');
 assertContains(scriptsUi, /createClientSupportReference_/, 'Support UI : aucune référence locale n’est créée en cas d’erreur.');
 assertContains(scriptsUi, /registerClientIncidentBestEffort_/, 'Support UI : les incidents ne sont pas transmis au serveur en mode best effort.');
+
+const releaseGovernance = read('ReleaseGovernance.gs');
+const releaseGovernanceUi = read('ReleaseGovernanceScripts.html');
+assertContains(releaseGovernance, /RELEASE_ACTION_SOURCES[\s\S]*RAPPORT[\s\S]*MANUEL/, 'Gouvernance : les sources d’action corrective sont incomplètes.');
+assertContains(releaseGovernance, /assertEntityVersion_\(['"]ACTION_CORRECTIVE['"]/, 'Gouvernance : les actions correctives ne contrôlent pas leur version.');
+assertContains(releaseGovernance, /assertEntityVersion_\(['"]RECETTE_MULTI_ECRANS['"]/, 'Gouvernance : la matrice multi-écrans ne contrôle pas sa version.');
+assertContains(releaseGovernance, /report\.status !== ['"]READY['"][\s\S]*Number\(report\.score\) !== 100/, 'Gouvernance : l’approbation n’exige pas un rapport READY à 100 sur 100.');
+assertContains(releaseGovernance, /blockingOpen/, 'Gouvernance : une action bloquante n’empêche pas l’approbation.');
+assertContains(releaseGovernance, /releaseGovernanceSanitizeCapacityReport_/, 'Gouvernance : le rapport de capacité du dossier support n’est pas expurgé.');
+assertContains(releaseGovernance, /archiveSha256/, 'Gouvernance : l’archive de l’historique ne possède pas d’empreinte.');
+assertContains(releaseGovernance, /RELEASE_HISTORY_ARCHIVE_MIN_DAYS\s*=\s*180/, 'Gouvernance : l’âge minimal d’archivage est absent.');
+assertContains(releaseGovernance, /RELEASE_HISTORY_ARCHIVE_MIN_KEEP\s*=\s*500/, 'Gouvernance : la conservation minimale de l’historique est absente.');
+assertContains(releaseGovernanceUi, /data-release-device-row/, 'Gouvernance UI : la matrice multi-écrans est absente.');
+assertContains(releaseGovernanceUi, /data-release-decision-open/, 'Gouvernance UI : les décisions de mise en production sont absentes.');
+assertContains(releaseGovernanceUi, /handleReleaseGovernanceVersionConflict_/, 'Gouvernance UI : les conflits de version ne déclenchent pas une actualisation.');
 
 if (failures.length) {
   console.error('\nTests des règles métier : ÉCHEC\n');

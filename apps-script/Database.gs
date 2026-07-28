@@ -81,6 +81,20 @@ function setupDatabase_() {
   ensureSheet_(ss, APP_CONFIG.sheets.history, [
     'DATE_HEURE', 'UTILISATEUR', 'ACTION', 'ENTITE', 'ENTITE_ID', 'DETAILS'
   ]);
+  ensureSheet_(ss, APP_CONFIG.sheets.releaseActions, [
+    'ID', 'SOURCE', 'SOURCE_ID', 'VERSION', 'RAPPORT_REF', 'TITRE', 'DESCRIPTION',
+    'PRIORITE', 'STATUT', 'RESPONSABLE', 'DATE_ECHEANCE', 'NOTES',
+    'CREE_LE', 'CREE_PAR', 'MODIFIE_LE', 'MODIFIE_PAR'
+  ]);
+  ensureSheet_(ss, APP_CONFIG.sheets.releaseDevices, [
+    'ID', 'VERSION', 'APPAREIL', 'TEST_ID', 'LIBELLE', 'STATUT',
+    'COMMENTAIRE', 'TESTE_LE', 'TESTE_PAR'
+  ]);
+  ensureSheet_(ss, APP_CONFIG.sheets.releaseDecisions, [
+    'ID', 'VERSION', 'DECISION', 'RAPPORT_REF', 'RAPPORT_EMPREINTE',
+    'RAPPORT_STATUT', 'SCORE', 'ENVIRONNEMENT', 'DEPLOIEMENT_ID',
+    'SAUVEGARDE_REF', 'MOTIF', 'DATE_DECISION', 'DECIDE_PAR', 'MANIFESTE_SHA256'
+  ]);
 
   seedSettings_(ss);
   seedInactiveTalks_(ss);

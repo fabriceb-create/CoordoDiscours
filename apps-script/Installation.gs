@@ -1,4 +1,4 @@
-const INSTALLATION_SCHEMA_VERSION = '1.8.0';
+const INSTALLATION_SCHEMA_VERSION = '1.9.0';
 
 function installCoordoDiscours() {
   const startedAt = new Date();
@@ -228,6 +228,16 @@ function runAcceptanceTests() {
       throw new Error('Diagnostic de support incomplet.');
     }
     return 'Rapport de santé, recette guidée et références de support disponibles';
+  }, false);
+
+  test('Gouvernance de mise en production disponible', function () {
+    if (typeof getReleaseGovernanceBootstrap !== 'function' || typeof syncReleaseCorrectiveActions !== 'function' || typeof registerReleaseDecision !== 'function') {
+      throw new Error('Module de gouvernance de mise en production incomplet.');
+    }
+    if (typeof getReleaseDeviceAcceptance !== 'function' || typeof getAnnualCapacityReport !== 'function' || typeof previewHistoryArchive !== 'function') {
+      throw new Error('Recette multi-écrans, capacité annuelle ou archivage incomplet.');
+    }
+    return 'Actions correctives, recette multi-écrans, décisions, capacité et archivage disponibles';
   }, false);
 
   test('Disponibilité de l’impression', function () {

@@ -21,6 +21,7 @@ apps-script/
   SupportDiagnostics.gs
   Help.gs
   ReleaseReadiness.gs
+  ReleaseGovernance.gs
 
   Planning.gs
   RulesEngine.gs
@@ -55,6 +56,8 @@ apps-script/
   HelpStyles.html
   ReleaseReadinessScripts.html
   ReleaseReadinessStyles.html
+  ReleaseGovernanceScripts.html
+  ReleaseGovernanceStyles.html
   ...
 ```
 
@@ -76,6 +79,9 @@ apps-script/
 14. Une écriture au résultat réseau incertain ne doit pas être répétée automatiquement.
 15. Une décision de mise en production doit agréger des contrôles explicites et exportables.
 16. Les références de support ne doivent contenir aucune donnée métier sensible.
+17. Une approbation de production ne peut pas contourner un contrôle bloquant ou une action corrective ouverte.
+18. Une suppression massive d’historique doit être précédée d’une archive Drive vérifiable.
+19. Les exports de support doivent retirer les identifiants directs et les noms d’orateurs.
 
 ## Pipeline de programmation
 
@@ -219,11 +225,35 @@ La liste des fiches est paginée par défaut à 40 éléments. Le contexte lisib
 
 Les périodes sont consommées par `RulesEngine`, `RecommendationEngine`, `ConflictResolution`, `AutomaticPlanning`, `Integrity`, `MergeEngine` et `VersionHistory`.
 
-## Préparation à la mise en production
+## Préparation et gouvernance de la mise en production
 
-`ReleaseReadiness.gs` agrège cinq contrôles pondérés : installation, intégrité, sauvegarde, performance et recette interne. Chaque contrôle renvoie un statut `PASS`, `WARNING` ou `BLOCKING`, un score et une action recommandée.
+`ReleaseReadiness.gs` agrège six contrôles pondérés : installation, intégrité, sauvegarde, performance, recette interne et recette multi-écrans. Chaque contrôle renvoie un statut `PASS`, `WARNING` ou `BLOCKING`, un score et une action recommandée. L’empreinte SHA-256 du rapport ne dépend que des états stables nécessaires à une décision.
 
-La recette guidée conserve une seule session courante dans `PropertiesService`. La progression est protégée par `ScriptLock`. Les résultats détaillés sont compactés avant stockage afin de rester sous la limite des propriétés Apps Script. Le rapport exporté contient la version, les étapes, la décision et les recommandations.
+La recette guidée conserve une seule session courante dans `PropertiesService`. La progression en sept étapes est protégée par `ScriptLock`. Les résultats détaillés sont compactés avant stockage afin de rester sous la limite des propriétés Apps Script. Le rapport exporté contient la version, les étapes, la décision et les recommandations.
+
+`ReleaseGovernance.gs` ajoute cinq sous-domaines :
+
+```text
+rapport READY
+   ↓
+synchronisation des recommandations
+   ↓
+actions correctives versionnées
+   ↓
+recette réelle 3 appareils × 5 scénarios
+   ↓
+approbation humaine
+   ↓
+déploiement Apps Script effectué hors de CoordoDiscours
+   ↓
+enregistrement de l’identifiant réel et export du manifeste
+```
+
+Les actions correctives utilisent une feuille dédiée et une version optimiste par action. La matrice multi-écrans utilise une version technique commune à l’application. Les décisions sont append-only : elles ne modifient ni le code Apps Script ni le déploiement Web.
+
+Le rapport annuel de capacité relit les programmations, orateurs et discours actifs. Les indicateurs sont calculés à la demande et ne deviennent pas une nouvelle source de vérité. Le dossier de support n’inclut pas le classement nominatif des orateurs.
+
+L’archivage de l’historique calcule d’abord un plan, crée ensuite un fichier JSON dans Google Drive puis supprime les groupes de lignes du bas vers le haut. Un nombre attendu de lignes protège l’opération contre un aperçu devenu périmé.
 
 `SupportDiagnostics.gs` génère ou valide une référence non sensible. Seuls le module, l’opération, le type de lecture ou d’écriture et un message borné sont journalisés. Les piles, objets imbriqués et données arbitraires sont ignorés.
 
@@ -239,8 +269,8 @@ La recette guidée conserve une seule session courante dans `PropertiesService`.
 6. exécute la recette interne ;
 7. journalise le résultat.
 
-Le schéma reste en version `1.8.0`, car la version 1.13 n’ajoute aucune feuille obligatoire.
+Le schéma est en version `1.9.0`. Il ajoute `ACTIONS_CORRECTIVES`, `RECETTE_MULTI_ECRANS` et `MISES_EN_PRODUCTION`. Les migrations créent uniquement les feuilles manquantes et ne réécrivent pas les données métier existantes.
 
 ## Validation automatique
 
-`npm run check` exécute dix suites. Le validateur contrôle notamment les fichiers essentiels, les fonctions sensibles, la syntaxe Apps Script, les protections d’accès, le guide, les caches, l’observabilité, la stratégie réseau et la préparation à la mise en production.
+`npm run check` exécute onze suites. Le validateur contrôle notamment les fichiers essentiels, les fonctions sensibles, la syntaxe Apps Script, les protections d’accès, le guide, les caches, l’observabilité, la stratégie réseau et la préparation à la mise en production.

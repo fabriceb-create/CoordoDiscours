@@ -119,6 +119,64 @@ L’ensemble des périodes d’un même orateur est protégé par une version op
 | DATE_MISE_A_JOUR | Date de la dernière modification. |
 | MODIFIE_PAR | Utilisateur ayant effectué la modification. |
 
+## ACTIONS_CORRECTIVES
+
+| Colonne | Description |
+|---|---|
+| ID | Identifiant UUID de l’action. |
+| SOURCE | `RAPPORT` ou `MANUEL`. |
+| SOURCE_ID | Identifiant du contrôle du rapport lorsque la source est automatique. |
+| VERSION | Version applicative concernée. |
+| RAPPORT_REF | Référence du rapport ayant produit l’action. |
+| TITRE | Libellé court. |
+| DESCRIPTION | Action attendue. |
+| PRIORITE | `BLOQUANTE`, `HAUTE` ou `NORMALE`. |
+| STATUT | `A_FAIRE`, `EN_COURS`, `TERMINEE`, `RISQUE_ACCEPTE` ou `ANNULEE`. |
+| RESPONSABLE | Responsable désigné. |
+| DATE_ECHEANCE | Échéance facultative. |
+| NOTES | Suivi administratif. |
+| CREE_LE / CREE_PAR | Création. |
+| MODIFIE_LE / MODIFIE_PAR | Dernière modification. |
+
+Chaque action possède en parallèle une version optimiste `ACTION_CORRECTIVE_<ID>` dans les propriétés du script.
+
+## RECETTE_MULTI_ECRANS
+
+| Colonne | Description |
+|---|---|
+| ID | Identifiant stable du couple appareil/scénario. |
+| VERSION | Version applicative testée. |
+| APPAREIL | `ORDINATEUR`, `TABLETTE` ou `TELEPHONE`. |
+| TEST_ID | `NAVIGATION`, `PLANNING`, `FORMULAIRES`, `RECHERCHE` ou `IMPRESSION`. |
+| LIBELLE | Libellé lisible du scénario. |
+| STATUT | `A_TESTER`, `REUSSI` ou `ECHEC`. |
+| COMMENTAIRE | Observation facultative. |
+| TESTE_LE | Date du dernier résultat effectif. |
+| TESTE_PAR | Administrateur ayant enregistré le résultat. |
+
+La matrice complète de la version courante partage une version optimiste `RECETTE_MULTI_ECRANS_<VERSION>`.
+
+## MISES_EN_PRODUCTION
+
+| Colonne | Description |
+|---|---|
+| ID | Référence technique non sensible de la décision. |
+| VERSION | Version applicative concernée. |
+| DECISION | `APPROVED`, `POSTPONED`, `DEPLOYED` ou `ROLLED_BACK`. |
+| RAPPORT_REF | Référence du rapport de santé. |
+| RAPPORT_EMPREINTE | Empreinte SHA-256 du contenu stable du rapport. |
+| RAPPORT_STATUT | État global du rapport. |
+| SCORE | Score sur 100. |
+| ENVIRONNEMENT | Environnement visé, par défaut `PRODUCTION`. |
+| DEPLOIEMENT_ID | Identifiant réel du déploiement Apps Script lorsqu’il existe. |
+| SAUVEGARDE_REF | Nom de la sauvegarde de référence. |
+| MOTIF | Motif du report ou du retour arrière. |
+| DATE_DECISION | Horodatage. |
+| DECIDE_PAR | Administrateur ayant enregistré la décision. |
+| MANIFESTE_SHA256 | Checksum du noyau du manifeste. |
+
+Les décisions sont ajoutées à la suite. Elles ne déclenchent aucune publication automatique.
+
 ## HISTORIQUE
 
 | Colonne | Description |
@@ -152,3 +210,6 @@ Chaque valeur contient :
 - Les doublons stricts de disponibilité sont interdits.
 - Les périodes contradictoires sont signalées par le rapport d’intégrité.
 - Les sauvegardes incluent automatiquement toutes les feuilles déclarées dans `APP_CONFIG.sheets`.
+- Une décision de mise en production doit référencer une version, un rapport, un état et une empreinte non vides.
+- Une matrice multi-écrans ne peut contenir qu’un résultat par couple version/appareil/scénario.
+- Une action corrective doit avoir une priorité, un statut, un titre et une description reconnus.

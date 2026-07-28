@@ -1,4 +1,4 @@
-const HELP_CONTENT_VERSION = '1.1.0';
+const HELP_CONTENT_VERSION = '1.2.0';
 const HELP_VIEW_TOPICS = Object.freeze({
   dashboard: 'dashboard',
   planning: 'planning',
@@ -198,12 +198,14 @@ const HELP_TOPICS = Object.freeze([
     steps: [
       'Ouvre Mise en production puis actualise le rapport de santé.',
       'Traite en priorité chaque contrôle Bloquant : installation, intégrité, sauvegarde ou recette.',
-      'Démarre la recette guidée et exécute les six étapes dans l’ordre.',
-      'Consulte les incidents récents à l’aide de leurs références non sensibles.',
-      'Exporte le rapport JSON et conserve-le avec la sauvegarde et la version déployée.'
+      'Démarre la recette guidée et exécute les sept étapes dans l’ordre, y compris la recette multi-écrans.',
+      'Synchronise les recommandations dans le tableau des actions correctives et attribue un responsable ainsi qu’une échéance.',
+      'Valide les scénarios sur ordinateur, tablette et téléphone.',
+      'Enregistre l’approbation, l’identifiant Apps Script et le manifeste après le déploiement.',
+      'Consulte les incidents récents à l’aide de leurs références non sensibles puis exporte le dossier de support.'
     ],
-    tips: ['Un score élevé ne remplace pas la décision de l’administrateur.', 'La mise en production reste bloquée tant qu’un contrôle est classé Bloquant.'],
-    keywords: ['mise en production', 'santé', 'score', 'recette', 'rapport', 'incident', 'référence']
+    tips: ['Un score élevé ne remplace pas la décision de l’administrateur.', 'L’approbation exige un rapport READY à 100/100 et aucune action bloquante ouverte.', 'Le registre ne lance jamais le déploiement automatiquement.'],
+    keywords: ['mise en production', 'santé', 'score', 'recette', 'multi-écrans', 'action corrective', 'manifeste', 'capacité', 'archivage', 'incident', 'référence']
   },
   {
     id: 'deploiement', category: 'Administration', title: 'Déployer une nouvelle version', minimumRole: 'ADMIN', view: 'settings',
