@@ -1,0 +1,202 @@
+<script>
+  state.automaticPlanningDraft = null;
+  state.automaticPlanningScenario = '';
+
+  async function openAutomaticPlanningDialog_() {
+    const dialog = document.getElementById('automatic-planning-dialog');
+    const form = document.getElementById('automatic-planning-form');
+    const results = document.getElementById('automatic-planning-results');
+    const commitButton = document.getElementById('automatic-planning-commit');
+    state.automaticPlanningDraft = null;
+    state.automaticPlanningScenario = '';
+    results.innerHTML = '<div class="empty-state">Chargement des valeurs proposées...</div>';
+    commitButton.hidden = true;
+    dialog.showModal();
+    try {
+      const defaults = await runServer('getAutomaticPlanningDefaults');
+      form.elements.startDate.value = defaults.startDate || '';
+      form.elements.time.value = defaults.time || '09:30';
+      form.elements.months.value = String(defaults.months || 4);
+      form.elements.createFollowUps.checked = defaults.createFollowUps !== false;
+      results.innerHTML = '<div class="empty-state">Choisis la période puis lance la génération. Aucun élément ne sera enregistré sans ta validation.</div>';
+    } catch (error) {
+      showError(error);
+      results.innerHTML = '<div class="warning-box">Impossible de préparer la planification automatique.</div>';
+    }
+  }
+
+  function automaticPlanningRequestFromForm_() {
+    const form = document.getElementById('automatic-planning-form');
+    return {
+      startDate: form.elements.startDate.value,
+      time: form.elements.time.value,
+      months: Number(form.elements.months.value),
+      createFollowUps: form.elements.createFollowUps.checked
+    };
+  }
+
+  async function generateAutomaticPlanningDraft_() {
+    const results = document.getElementById('automatic-planning-results');
+    const generateButton = document.getElementById('automatic-planning-generate');
+    const commitButton = document.getElementById('automatic-planning-commit');
+    generateButton.disabled = true;
+    commitButton.hidden = true;
+    results.innerHTML = '<div class="empty-state">Analyse du planning, des orateurs, des discours et de l’équilibre des affectations...</div>';
+    try {
+      const draft = await runServer('generateAutomaticPlanningDraft', automaticPlanningRequestFromForm_());
+      state.automaticPlanningDraft = draft;
+      state.automaticPlanningScenario = draft.recommendedScenario || ((draft.scenarios || [])[0] || {}).key || '';
+      renderAutomaticPlanningDraft_();
+    } catch (error) {
+      showError(error);
+      results.innerHTML = '<div class="warning-box">La génération du brouillon a échoué.</div>';
+    } finally {
+      generateButton.disabled = false;
+    }
+  }
+
+  function renderAutomaticPlanningDraft_() {
+    const results = document.getElementById('automatic-planning-results');
+    const draft = state.automaticPlanningDraft || {};
+    const scenarios = draft.scenarios || [];
+    if (!scenarios.length) {
+      results.innerHTML = `<div class="empty-state">${escapeHtml(draft.message || 'Aucun scénario disponible.')}</div>`;
+      document.getElementById('automatic-planning-commit').hidden = true;
+      return;
+    }
+    results.innerHTML = `
+      <div class="panel-heading"><div><p class="eyebrow">Comparaison</p><h3>Scénarios proposés</h3></div><span class="version-badge">Moteur ${escapeHtml(draft.version || '')}</span></div>
+      <div class="automatic-scenario-grid">${scenarios.map(scenario => renderAutomaticPlanningScenarioCard_(scenario, draft.recommendedScenario)).join('')}</div>
+      <section id="automatic-planning-selection" class="automatic-planning-selection"></section>`;
+    renderAutomaticPlanningSelection_();
+  }
+
+  function renderAutomaticPlanningScenarioCard_(scenario, recommendedKey) {
+    const selected = scenario.key === state.automaticPlanningScenario;
+    const summary = scenario.summary || {};
+    return `
+      <article class="automatic-scenario-card ${selected ? 'selected' : ''}">
+        <div><p class="eyebrow">Score ${escapeHtml(scenario.score || 0)}/100</p><h3>${escapeHtml(scenario.label || scenario.key)}</h3><p class="record-meta">${escapeHtml(scenario.description || '')}</p></div>
+        <div class="automatic-scenario-badges">
+          ${scenario.key === recommendedKey ? '<span class="automatic-scenario-badge recommended">Recommandé</span>' : ''}
+          <span class="automatic-scenario-badge">${escapeHtml(summary.proposedCount || 0)} dates</span>
+          <span class="automatic-scenario-badge">Moyenne ${escapeHtml(summary.averageScore || 0)}/100</span>
+          <span class="automatic-scenario-badge">${escapeHtml(summary.uniqueSpeakers || 0)} orateurs</span>
+          <span class="automatic-scenario-badge">${escapeHtml(summary.warningCount || 0)} alerte${Number(summary.warningCount || 0) > 1 ? 's' : ''}</span>
+        </div>
+        <button type="button" class="${selected ? 'primary-button' : 'secondary-button'}" data-auto-scenario="${escapeHtml(scenario.key)}">${selected ? 'Scénario sélectionné' : 'Comparer ce scénario'}</button>
+      </article>`;
+  }
+
+  function renderAutomaticPlanningSelection_() {
+    const container = document.getElementById('automatic-planning-selection');
+    const scenario = automaticPlanningSelectedScenario_();
+    const commitButton = document.getElementById('automatic-planning-commit');
+    if (!container || !scenario) {
+      if (commitButton) commitButton.hidden = true;
+      return;
+    }
+    const items = scenario.items || [];
+    container.innerHTML = `
+      <div class="automatic-planning-selection-head">
+        <div><p class="eyebrow">Brouillon modifiable</p><h3>${escapeHtml(scenario.label)}</h3><p class="record-meta">Décoche les dates que tu ne souhaites pas enregistrer.</p></div>
+        <div class="automatic-planning-selection-actions"><button type="button" class="secondary-button" data-auto-select-all="true">Tout cocher</button><button type="button" class="secondary-button" data-auto-select-all="false">Tout décocher</button></div>
+      </div>
+      <div class="automatic-planning-items">${items.map((item, index) => `
+        <label class="automatic-planning-item">
+          <input type="checkbox" data-auto-item-index="${index}" checked>
+          <span><h4>${escapeHtml(item.displayDate)} à ${escapeHtml(item.time)} — ${escapeHtml(item.speakerName)}</h4><small>Discours n° ${escapeHtml(item.talkNumber)} - ${escapeHtml(item.talkTitle || 'Titre à compléter')}${item.congregationName ? '<br>Assemblée : ' + escapeHtml(item.congregationName) : ''}</small>${(item.reasons || []).length ? '<small>' + item.reasons.map(reason => '✓ ' + escapeHtml(reason)).join('<br>') + '</small>' : ''}${(item.warnings || []).length ? '<small class="automatic-planning-warning">' + item.warnings.map(warning => '⚠ ' + escapeHtml(warning)).join('<br>') + '</small>' : ''}</span>
+          <span class="automatic-planning-score">${escapeHtml(item.score || 0)}/100</span>
+        </label>`).join('')}</div>
+      ${(scenario.skipped || []).length ? `<details class="automatic-planning-skipped"><summary>${scenario.skipped.length} créneau${scenario.skipped.length > 1 ? 'x' : ''} conservé${scenario.skipped.length > 1 ? 's' : ''} ou non pourvu${scenario.skipped.length > 1 ? 's' : ''}</summary><ul>${scenario.skipped.map(item => `<li>${escapeHtml(item.displayDate)} : ${escapeHtml(item.reason)}</li>`).join('')}</ul></details>` : ''}`;
+    commitButton.hidden = items.length === 0;
+    updateAutomaticPlanningSelectionCount_();
+  }
+
+  function automaticPlanningSelectedScenario_() {
+    return ((state.automaticPlanningDraft || {}).scenarios || []).find(item => item.key === state.automaticPlanningScenario) || null;
+  }
+
+  function updateAutomaticPlanningSelectionCount_() {
+    const button = document.getElementById('automatic-planning-commit');
+    if (!button || button.hidden) return;
+    const selected = document.querySelectorAll('#automatic-planning-selection [data-auto-item-index]:checked').length;
+    button.textContent = selected ? `Enregistrer ${selected} programmation${selected > 1 ? 's' : ''}` : 'Sélectionne au moins une date';
+    button.disabled = selected === 0;
+  }
+
+  function automaticPlanningSelectedItems_() {
+    const scenario = automaticPlanningSelectedScenario_();
+    if (!scenario) return [];
+    return Array.from(document.querySelectorAll('#automatic-planning-selection [data-auto-item-index]:checked')).map(input => scenario.items[Number(input.dataset.autoItemIndex)]).filter(Boolean);
+  }
+
+  async function commitAutomaticPlanningDraft_(confirmWarnings) {
+    const draft = state.automaticPlanningDraft;
+    const scenario = automaticPlanningSelectedScenario_();
+    const button = document.getElementById('automatic-planning-commit');
+    if (!draft || !scenario) return;
+    const items = automaticPlanningSelectedItems_();
+    if (!items.length) { toast('Sélectionne au moins une date.'); return; }
+    button.disabled = true;
+    try {
+      const result = await runServer('commitAutomaticPlanningDraft', {
+        sourceSignature: draft.sourceSignature,
+        scenario: scenario.key,
+        createFollowUps: document.getElementById('automatic-planning-form').elements.createFollowUps.checked,
+        items: items
+      }, Boolean(confirmWarnings));
+      if (result.requiresConfirmation) {
+        const accepted = window.confirm((result.warnings || []).join('\n') + '\n\nCes alertes ne sont pas bloquantes. Souhaites-tu enregistrer malgré tout ?');
+        if (accepted) return commitAutomaticPlanningDraft_(true);
+        return;
+      }
+      document.getElementById('automatic-planning-dialog').close();
+      state.automaticPlanningDraft = null;
+      toast(`${result.createdCount} programmation${result.createdCount > 1 ? 's' : ''} enregistrée${result.createdCount > 1 ? 's' : ''}.`);
+      await loadPlannings();
+      if (typeof loadDashboard === 'function') loadDashboard();
+    } catch (error) {
+      const message = String(error && (error.message || error));
+      if (message.includes('AUTO_PLAN_OBSOLETE|')) {
+        const results = document.getElementById('automatic-planning-results');
+        results.innerHTML = '<div class="warning-box"><strong>Brouillon obsolète</strong><p>' + escapeHtml(message.replace(/^.*AUTO_PLAN_OBSOLETE\|/, '')) + '</p></div>';
+        state.automaticPlanningDraft = null;
+        state.automaticPlanningScenario = '';
+        document.getElementById('automatic-planning-commit').hidden = true;
+      }
+      showError(error);
+    } finally {
+      button.disabled = false;
+      updateAutomaticPlanningSelectionCount_();
+    }
+  }
+
+  document.addEventListener('click', async event => {
+    if (event.target.id === 'automatic-planning') await openAutomaticPlanningDialog_();
+
+    const scenarioButton = event.target.closest('[data-auto-scenario]');
+    if (scenarioButton) {
+      state.automaticPlanningScenario = scenarioButton.dataset.autoScenario;
+      renderAutomaticPlanningDraft_();
+    }
+
+    const selectAll = event.target.closest('[data-auto-select-all]');
+    if (selectAll) {
+      const checked = selectAll.dataset.autoSelectAll === 'true';
+      document.querySelectorAll('#automatic-planning-selection [data-auto-item-index]').forEach(input => { input.checked = checked; });
+      updateAutomaticPlanningSelectionCount_();
+    }
+
+    if (event.target.id === 'automatic-planning-commit') await commitAutomaticPlanningDraft_(false);
+  });
+
+  document.getElementById('automatic-planning-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    await generateAutomaticPlanningDraft_();
+  });
+
+  document.addEventListener('change', event => {
+    if (event.target.matches('#automatic-planning-selection [data-auto-item-index]')) updateAutomaticPlanningSelectionCount_();
+  });
+</script>

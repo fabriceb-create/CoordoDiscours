@@ -10,7 +10,8 @@ const required = [
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
   'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs',
   'RecommendationEngine.gs','ConflictResolution.gs','ConflictResolutionStyles.html',
-  'ConflictResolutionScripts.html','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
+  'ConflictResolutionScripts.html','AutomaticPlanning.gs','AutomaticPlanningStyles.html',
+  'AutomaticPlanningScripts.html','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
 ];
 
 const errors = [];
@@ -38,6 +39,8 @@ if (fs.existsSync(indexPath)) {
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
   if (!index.includes('ConflictResolutionStyles') || !index.includes('ConflictResolutionScripts')) errors.push('Le module de résolution des conflits n’est pas entièrement inclus.');
+  if (!index.includes('AutomaticPlanningStyles') || !index.includes('AutomaticPlanningScripts')) errors.push('Le module de planification automatique n’est pas entièrement inclus.');
+  if (!index.includes('id="automatic-planning"') || !index.includes('id="automatic-planning-dialog"')) errors.push('L’accès à la planification automatique est absent de l’interface.');
 }
 
 const codePath = path.join(root, 'Code.gs');
@@ -71,6 +74,9 @@ const protectedFunctions = [
   ['Planning.gs', 'cancelPlanning', 'COORDINATEUR'],
   ['Planning.gs', 'restorePlanning', 'COORDINATEUR'],
   ['ConflictResolution.gs', 'getPlanningConflictResolutions', 'COORDINATEUR'],
+  ['AutomaticPlanning.gs', 'getAutomaticPlanningDefaults', 'COORDINATEUR'],
+  ['AutomaticPlanning.gs', 'generateAutomaticPlanningDraft', 'COORDINATEUR'],
+  ['AutomaticPlanning.gs', 'commitAutomaticPlanningDraft', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'saveHospitality', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'setHospitalityStatus', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'saveInvitation', 'COORDINATEUR'],
@@ -132,6 +138,7 @@ const installationPath = path.join(root, 'Installation.gs');
 if (fs.existsSync(installationPath)) {
   const installation = fs.readFileSync(installationPath, 'utf8');
   if (!installation.includes('LANGUE_INTERFACE')) errors.push('La recette doit contrôler le paramètre LANGUE_INTERFACE.');
+  if (!installation.includes('AUTO_PLAN_MOIS') || !installation.includes('AUTO_PLAN_SUIVIS')) errors.push('La migration doit installer les paramètres de planification automatique.');
   if (!installation.includes('getDataIntegrityReport_()')) errors.push('La recette doit exécuter le contrôle d’intégrité.');
   if (!installation.includes('parseAndValidateBackup_')) errors.push('La recette doit valider le format de sauvegarde.');
 }
@@ -154,6 +161,16 @@ if (fs.existsSync(recommendationPath)) {
   if (!recommendation.includes('getSpeakerRecommendations')) errors.push('Le point d’entrée des recommandations est absent.');
   if (!recommendation.includes('scoreSpeakerRecommendation_')) errors.push('Le calcul du score de recommandation est absent.');
   if (!recommendation.includes('resources.speakerTalks') && !recommendation.includes('getSpeakerTalkNumbersMap_')) errors.push('Les recommandations doivent contrôler les discours déclarés des orateurs extérieurs.');
+}
+
+const automaticPath = path.join(root, 'AutomaticPlanning.gs');
+if (fs.existsSync(automaticPath)) {
+  const automatic = fs.readFileSync(automaticPath, 'utf8');
+  if (!automatic.includes('AUTOMATIC_PLANNING_SCENARIOS')) errors.push('Planification automatique : les scénarios sont absents.');
+  if (!automatic.includes('automaticPlanningDatasetSignature_')) errors.push('Planification automatique : la protection des brouillons obsolètes est absente.');
+  if (!automatic.includes('LockService.getScriptLock()')) errors.push('Planification automatique : la validation groupée n’est pas verrouillée.');
+  if (!automatic.includes('evaluatePlanningRules_')) errors.push('Planification automatique : les propositions ne sont pas validées par RulesEngine.');
+  if (!automatic.includes('rollbackAutomaticPlanningWrites_')) errors.push('Planification automatique : le retour arrière est absent.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];

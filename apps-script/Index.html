@@ -7,6 +7,7 @@
   <?!= include('Styles'); ?>
   <?!= include('DashboardStyles'); ?>
   <?!= include('ConflictResolutionStyles'); ?>
+  <?!= include('AutomaticPlanningStyles'); ?>
   <?!= include('SpeakerTalkStyles'); ?>
   <?!= include('CommunicationStyles'); ?>
   <?!= include('PrintPlanningStyles'); ?>
@@ -43,7 +44,10 @@
       </section>
 
       <section id="view-planning" class="view">
-        <div class="section-header"><div><p class="eyebrow">Calendrier</p><h2>Programmation</h2></div><button class="primary-button" id="new-planning">Programmer un discours</button></div>
+        <div class="section-header">
+          <div><p class="eyebrow">Calendrier</p><h2>Programmation</h2></div>
+          <div class="record-actions"><button class="secondary-button" id="automatic-planning" type="button" data-write-action>Planifier automatiquement</button><button class="primary-button" id="new-planning">Programmer un discours</button></div>
+        </div>
         <div class="toolbar"><input id="planning-search" type="search" placeholder="Rechercher une date, un orateur ou un discours..."><label><input id="planning-cancelled" type="checkbox"> Voir les annulées</label></div>
         <div id="planning-list" class="cards-list"></div>
       </section>
@@ -132,6 +136,21 @@
   </div>
 
   <dialog id="planning-dialog"><form id="planning-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Programmation</h2><button type="button" class="icon-button" data-close="planning-dialog">×</button></div><input type="hidden" name="id"><input type="hidden" name="status" value="PROGRAMME"><div class="form-grid"><label>Date*<input name="date" type="date" required></label><label>Heure*<input name="time" type="time" required></label><label class="full-width">Orateur*<select name="speakerId" required><option value="">Sélectionner</option></select></label><label class="full-width">Discours*<select name="talkNumber" required><option value="">Sélectionner</option></select></label><label class="full-width">Assemblée d’origine<select name="originCongregationId"><option value="">Aucune</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div id="planning-warning" class="warning-box" hidden></div><div class="form-actions"><button type="button" class="secondary-button" data-close="planning-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
+
+  <dialog id="automatic-planning-dialog">
+    <form id="automatic-planning-form" method="dialog" class="form-panel automatic-planning-panel">
+      <div class="dialog-header"><div><p class="eyebrow">Assistant intelligent</p><h2>Planification automatique</h2></div><button type="button" class="icon-button" data-close="automatic-planning-dialog">×</button></div>
+      <div class="automatic-planning-config">
+        <label>Première date<input name="startDate" type="date" required></label>
+        <label>Heure<input name="time" type="time" required></label>
+        <label>Période à préparer<select name="months"><option value="1">1 mois</option><option value="2">2 mois</option><option value="3">3 mois</option><option value="4">4 mois</option><option value="5">5 mois</option><option value="6">6 mois</option></select></label>
+        <label class="automatic-planning-followups"><input name="createFollowUps" type="checkbox" checked> Créer les invitations et hospitalités à compléter</label>
+      </div>
+      <div id="automatic-planning-results" class="automatic-planning-results"><div class="empty-state">Choisis la période puis lance la génération.</div></div>
+      <div class="form-actions"><span class="automatic-planning-footer-note">Aucune proposition n’est enregistrée automatiquement.</span><button type="button" class="secondary-button" data-close="automatic-planning-dialog">Fermer</button><button id="automatic-planning-generate" class="secondary-button" type="submit">Générer trois scénarios</button><button id="automatic-planning-commit" class="primary-button" type="button" data-requires-edit hidden>Enregistrer les programmations</button></div>
+    </form>
+  </dialog>
+
   <dialog id="hospitality-dialog"><form id="hospitality-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Hospitalité</h2><button type="button" class="icon-button" data-close="hospitality-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label class="full-width">Programmation*<select name="planningId" required><option value="">Sélectionner</option></select></label><label>Groupe d’accueil<input name="group"></label><label>Contact<input name="contact"></label><label>Statut<select name="status"><option value="A_ATTRIBUER">À attribuer</option><option value="PROPOSE">Proposé</option><option value="CONFIRME">Confirmé</option><option value="REFUSE">Refusé</option><option value="ANNULE">Annulé</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="hospitality-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
   <dialog id="invitation-dialog"><form id="invitation-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Invitation</h2><button type="button" class="icon-button" data-close="invitation-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label class="full-width">Programmation*<select name="planningId" required><option value="">Sélectionner</option></select></label><label>Destinataire<input name="recipient"></label><label>Date d’envoi<input name="sentDate" type="date"></label><label>Statut<select name="status"><option value="A_ENVOYER">À envoyer</option><option value="ENVOYEE">Envoyée</option><option value="ACCEPTEE">Acceptée</option><option value="REFUSEE">Refusée</option><option value="RELANCEE">Relancée</option><option value="ANNULEE">Annulée</option></select></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="invitation-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
   <dialog id="speaker-dialog"><form id="speaker-form" method="dialog" class="form-panel"><div class="dialog-header"><h2>Fiche orateur</h2><button type="button" class="icon-button" data-close="speaker-dialog">×</button></div><input type="hidden" name="id"><div class="form-grid"><label>Nom*<input name="lastName" required></label><label>Prénom<input name="firstName"></label><label>Type<select name="type"><option value="LOCAL">Local</option><option value="EXTERIEUR">Extérieur</option></select></label><label>Assemblée<select name="congregationId"><option value="">Aucune</option></select></label><label>Téléphone<input name="phone"></label><label>E-mail<input name="email" type="email"></label><label class="full-width">Notes<textarea name="notes" rows="3"></textarea></label><label class="checkbox-field"><input name="active" type="checkbox" checked> Actif</label></div><div class="form-actions"><button type="button" class="secondary-button" data-close="speaker-dialog">Annuler</button><button class="primary-button" type="submit">Enregistrer</button></div></form></dialog>
@@ -141,6 +160,7 @@
   <div id="toast" class="toast" hidden></div>
   <?!= include('Scripts'); ?>
   <?!= include('PlanningScripts'); ?>
+  <?!= include('AutomaticPlanningScripts'); ?>
   <?!= include('ConflictResolutionScripts'); ?>
   <?!= include('SpeakerTalkUI'); ?>
   <?!= include('DashboardScripts'); ?>
