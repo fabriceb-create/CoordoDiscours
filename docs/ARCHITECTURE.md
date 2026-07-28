@@ -166,3 +166,50 @@ L’architecture prépare :
 - l’envoi de courriels ;
 - la génération de PDF ;
 - une migration future vers une base de données externe.
+
+## Navigation et performance client — version 1.11
+
+### Changement central de vue
+
+`Scripts.html` reste le seul module autorisé à activer une vue. Après chaque navigation, il émet :
+
+```text
+coordodiscours:viewchange
+```
+
+Les modules Tableau de bord, Programmation, Invitations, Hospitalité, Impression, Historique, Versions, Sauvegarde et Paramètres chargent leurs données en réaction à cet événement. Cette organisation prend également en charge les ancres d’URL et évite que plusieurs gestionnaires remplacent directement `showView`.
+
+### Navigation mobile
+
+Sous 820 pixels, la barre latérale devient un tiroir :
+
+- l’état est porté par la classe `navigation-open` du document ;
+- `aria-expanded` expose l’état du bouton d’ouverture ;
+- le menu fermé devient `inert` afin de quitter le parcours clavier ;
+- le focus est contenu dans le tiroir ouvert ;
+- Échap, le voile de fond ou le bouton de fermeture referment le tiroir.
+
+### Caches client courts
+
+Deux caches de 60 secondes limitent les appels Google Apps Script répétés :
+
+```text
+getPlanningOptions
+getCommunicationOptions
+```
+
+Chaque cache conserve :
+
+- les dernières données ;
+- l’heure de chargement ;
+- la promesse de la demande actuellement en cours.
+
+Une seconde demande identique réutilise donc la même promesse. `invalidatePlanningDependentCaches_()` invalide les données après toute écriture susceptible de modifier les listes proposées.
+
+### Réponses devenues obsolètes
+
+Les recherches de programmations, invitations et hospitalités utilisent un identifiant croissant. Une réponse n’est rendue que si son identifiant correspond encore à la demande la plus récente. Une requête lente ne peut donc plus remplacer les résultats d’une saisie plus récente.
+
+### Protection contre les doubles actions
+
+`withBusyElement_()` place l’élément déclencheur en état `aria-busy`, le désactive pendant la promesse, puis rétablit son état initial. Les principales écritures et actions rapides utilisent ce garde-fou sans remplacer les verrous serveur, qui restent la protection définitive.

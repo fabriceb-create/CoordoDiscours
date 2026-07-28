@@ -86,9 +86,11 @@
 
   window.addEventListener('afterprint', () => document.body.classList.remove('history-printing'));
 
+  document.addEventListener('coordodiscours:viewchange', event => {
+    if (event.detail && event.detail.name === 'history') loadHistory();
+  });
+
   document.addEventListener('click', event => {
-    const target = event.target.closest('[data-view], [data-open]');
-    if (target && (target.dataset.view === 'history' || target.dataset.open === 'history')) loadHistory();
     if (event.target.id === 'history-refresh') loadHistory();
     if (event.target.id === 'history-reset') resetHistoryFilters();
     if (event.target.id === 'history-print') printHistory();

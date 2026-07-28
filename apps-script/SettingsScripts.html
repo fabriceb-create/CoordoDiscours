@@ -162,6 +162,8 @@
     renderSettings(data);
     const map = settingsMapFromData_(data);
     document.getElementById('congregation').textContent = map.ASSEMBLEE || 'Basse-Terre';
+    invalidatePlanningDependentCaches_();
+    if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
     toast(t(message || 'Paramètres enregistrés.'));
     if (typeof loadDashboard === 'function') loadDashboard();
   }
@@ -202,9 +204,8 @@
     }
   }
 
-  document.addEventListener('click', event => {
-    const target = event.target.closest('[data-view], [data-open]');
-    if (target && (target.dataset.view === 'settings' || target.dataset.open === 'settings')) loadSettings();
+  document.addEventListener('coordodiscours:viewchange', event => {
+    if (event.detail && event.detail.name === 'settings') loadSettings();
   });
 
   document.addEventListener('DOMContentLoaded', async () => { await setInterfaceLanguage(''); });

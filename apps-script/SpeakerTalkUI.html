@@ -66,7 +66,7 @@
   }
 
   function invalidatePlanningOptionsAfterSpeakerTalks_() {
-    if (state.planningOptions) state.planningOptions = { speakers: [], talks: [], congregations: [] };
+    invalidatePlanningDependentCaches_();
     if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
   }
 

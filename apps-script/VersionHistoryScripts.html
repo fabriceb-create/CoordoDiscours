@@ -324,10 +324,11 @@
     message.innerHTML = '<div class="version-history-restore-warning">' + escapeHtml(result.message || 'La restauration n’a pas pu être effectuée.') + '</div>';
   }
 
-  document.addEventListener('click', async event => {
-    const navigation = event.target.closest('[data-view="versions"], [data-open="versions"]');
-    if (navigation) await loadVersionHistoryView_();
+  document.addEventListener('coordodiscours:viewchange', async event => {
+    if (event.detail && event.detail.name === 'versions') await loadVersionHistoryView_();
+  });
 
+  document.addEventListener('click', async event => {
     const record = event.target.closest('[data-version-history-record-index]');
     if (record) await openVersionHistoryRecord_(Number(record.dataset.versionHistoryRecordIndex));
 

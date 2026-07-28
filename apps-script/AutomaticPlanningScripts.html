@@ -153,6 +153,7 @@
       }
       document.getElementById('automatic-planning-dialog').close();
       state.automaticPlanningDraft = null;
+      invalidatePlanningDependentCaches_();
       toast(`${result.createdCount} programmation${result.createdCount > 1 ? 's' : ''} enregistrée${result.createdCount > 1 ? 's' : ''}.`);
       await loadPlannings();
       if (typeof loadDashboard === 'function') loadDashboard();

@@ -157,3 +157,50 @@ La version peut être déclarée testable lorsque :
 - les deux langues sont sélectionnables ;
 - le planning imprimé est lisible ;
 - l’historique enregistre les opérations principales.
+
+## 17. Responsive, accessibilité et caches — version 1.11
+
+### Navigation mobile
+
+- Ouvrir l’application avec une largeur inférieure à 820 pixels.
+- Vérifier que la navigation est masquée au démarrage.
+- Ouvrir le tiroir depuis l’en-tête.
+- Vérifier que le focus est placé dans le menu et ne peut pas sortir avec Tab.
+- Fermer avec le bouton, le voile de fond puis la touche Échap.
+- Vérifier que le focus revient au bouton d’ouverture après une fermeture sans changement de vue.
+- Choisir une section et vérifier que le focus arrive sur son titre.
+- Passer en largeur supérieure à 820 pixels et vérifier que la navigation redevient fixe.
+
+### Clavier et technologies d’assistance
+
+- Utiliser le lien « Aller au contenu principal ».
+- Parcourir toutes les actions principales uniquement au clavier.
+- Vérifier la visibilité du focus.
+- Vérifier que la section active possède `aria-current="page"`.
+- Vérifier l’annonce d’une confirmation puis d’une erreur.
+- Vérifier les libellés des boutons d’ouverture, de fermeture et des fenêtres avec un lecteur d’écran.
+- Activer la réduction des animations dans le système et vérifier l’absence de transitions longues.
+
+### Navigation directe
+
+- Ouvrir l’application avec `#planning`, `#versions`, `#history` puis `#settings`.
+- Vérifier que la section correspondante est active et chargée.
+- Avec un compte non administrateur, ouvrir directement `#settings` et vérifier le retour vers le tableau de bord.
+
+### Caches et chargements
+
+- Ouvrir deux fois le formulaire de programmation en moins d’une minute et vérifier qu’une seule lecture récente des options suffit.
+- Ouvrir successivement Invitations et Hospitalité et vérifier la réutilisation des mêmes programmations.
+- Modifier une programmation puis rouvrir une invitation et vérifier l’actualisation des options.
+- Modifier un orateur, une assemblée ou un discours puis rouvrir la programmation et vérifier l’actualisation.
+- Lancer rapidement plusieurs recherches et vérifier qu’une réponse ancienne ne remplace pas la dernière saisie.
+- Double-cliquer sur une action d’écriture et vérifier qu’une seule demande est envoyée.
+
+### Critères de validation 1.11
+
+- Les huit suites de `npm run check` réussissent.
+- Aucun blocage JavaScript ne survient sur ordinateur ou mobile.
+- Le tiroir est utilisable au clavier et avec un lecteur d’écran.
+- Les vues lourdes ne sont plus chargées au démarrage lorsqu’elles ne sont pas ouvertes.
+- Les caches sont réutilisés puis invalidés au bon moment.
+- Les deux langues restent sélectionnables.
