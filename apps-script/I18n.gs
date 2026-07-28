@@ -145,7 +145,24 @@ const INTERFACE_TRANSLATIONS = Object.freeze({
     'Solution combinée': 'Solisyon konbiné',
     'Solution': 'Solisyon',
     'Programmation impossible': 'Pwogramasyon-la pé pa fèt',
-    'Solution appliquée. Vérifie la proposition puis enregistre.': 'Solisyon-la apliké. Gadé pwopozisyon-la é anrèjistré.'
+    'Solution appliquée. Vérifie la proposition puis enregistre.': 'Solisyon-la apliké. Gadé pwopozisyon-la é anrèjistré.',
+    'Gérer ses disponibilités': 'Jéré disponibilté a-y',
+    'Calendrier personnel': 'Kalandriyé pèwsonèl',
+    'Disponibilités de l’orateur': 'Disponibilté a oratè-la',
+    'Indisponible': 'Pa disponib',
+    'Disponible seulement': 'Disponib yenki',
+    'Période préférée': 'Péryòd i pisimé',
+    'Période à éviter': 'Péryòd pou évité',
+    'Date de début': 'Dat koumansman',
+    'Date de fin': 'Dat bout',
+    'Motif ou précision': 'Rézon oben présizyon',
+    'Vider': 'Vidanjé',
+    'Ajouter la période': 'Ajouté péryòd-la',
+    'Mettre à jour la période': 'Mété péryòd-la ajou',
+    'Enregistrer les disponibilités': 'Anrèjistré sé disponibilté-la',
+    'Disponibilités de l’orateur enregistrées.': 'Disponibilté a oratè-la anrèjistré.',
+    'Aucune période enregistrée.': 'Pon péryòd anrèjistré.',
+    'Période désactivée': 'Péryòd-la pa aktif'
   }
 });
 
