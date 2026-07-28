@@ -50,6 +50,26 @@ assertContains(planningUi, /result\.blocked[\s\S]*renderPlanningConflictResoluti
 assertContains(indexUi, /name="originCongregationId"/, 'Interface : l’assemblée d’origine n’est pas modifiable dans la programmation.');
 assertContains(indexUi, /ConflictResolutionStyles[\s\S]*ConflictResolutionScripts/, 'Interface : le module de résolution n’est pas chargé.');
 
+const automatic = read('AutomaticPlanning.gs');
+const automaticUi = read('AutomaticPlanningScripts.html');
+assertContains(automatic, /function\s+generateAutomaticPlanningDraft\s*\(/, 'Planification automatique : la génération du brouillon est absente.');
+assertContains(automatic, /function\s+commitAutomaticPlanningDraft\s*\(/, 'Planification automatique : la validation du brouillon est absente.');
+['BALANCED','TALK_RENEWAL','SPEAKER_ROTATION'].forEach(type => assertContains(automatic, type, `Planification automatique : le scénario ${type} est absent.`));
+assertContains(automatic, /getSpeakerRecommendationsWithData_\(/, 'Planification automatique : RecommendationEngine n’est pas utilisé.');
+assertContains(automatic, /evaluatePlanningRules_\(/, 'Planification automatique : RulesEngine n’est pas utilisé.');
+assertContains(automatic, /automaticPlanningDatasetSignature_/, 'Planification automatique : la signature du brouillon est absente.');
+assertContains(automatic, /AUTO_PLAN_OBSOLETE\|/, 'Planification automatique : le code de brouillon obsolète est absent.');
+assertContains(automatic, /LockService\.getScriptLock\(\)/, 'Planification automatique : la validation groupée n’est pas verrouillée.');
+assertContains(automatic, /setValues\(/, 'Planification automatique : l’écriture groupée est absente.');
+assertContains(automatic, /rollbackAutomaticPlanningWrites_/, 'Planification automatique : le retour arrière est absent.');
+assertContains(automatic, /buildAutomaticPlanningFollowUps_/, 'Planification automatique : la préparation des invitations et hospitalités est absente.');
+assertContains(automatic, /listHospitalities\(''\)[\s\S]*listInvitations\(''\)/, 'Planification automatique : la charge de communication existante n’est pas analysée.');
+assertContains(automaticUi, /renderAutomaticPlanningDraft_/, 'Interface : la comparaison des scénarios est absente.');
+assertContains(automaticUi, /data-auto-item-index/, 'Interface : les dates du brouillon ne peuvent pas être désélectionnées.');
+assertContains(automaticUi, /commitAutomaticPlanningDraft/, 'Interface : la validation explicite du brouillon est absente.');
+assertContains(indexUi, /id="automatic-planning"[\s\S]*id="automatic-planning-dialog"/, 'Interface : l’assistant de planification automatique n’est pas accessible.');
+assertContains(indexUi, /AutomaticPlanningStyles[\s\S]*AutomaticPlanningScripts/, 'Interface : le module de planification automatique n’est pas chargé.');
+
 [
   ['Speakers.gs', 'ORATEUR'],
   ['Congregations.gs', 'ASSEMBLEE'],
@@ -89,9 +109,10 @@ assertContains(recommendations, /function\s+getRecommendationWeights_\s*\(/, 'Re
 assertContains(recommendations, /rawScore\s*\/\s*weights\.total/, 'Recommandations : le score n’est pas normalisé.');
 assertContains(recommendations, /function\s+getSpeakerRecommendationsWithData_\s*\(/, 'Recommandations : le calcul avec données préchargées est absent.');
 assertContains(recommendations, /resources\.speakerTalks/, 'Recommandations : les discours déclarés préchargés ne sont pas réutilisés.');
+assertContains(recommendations, /resources\.recommendationWeights/, 'Recommandations : les pondérations préchargées ne sont pas réutilisées.');
 
 const settings = read('Settings.gs');
-['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE'].forEach(key => assertContains(settings, key, `Paramètres : ${key} est absent.`));
+['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE','AUTO_PLAN_MOIS','AUTO_PLAN_SUIVIS'].forEach(key => assertContains(settings, key, `Paramètres : ${key} est absent.`));
 assertContains(settings, /validateRecommendationWeights_/, 'Paramètres : la validation des pondérations est absente.');
 
 const dashboard = read('Dashboard.gs');
@@ -118,6 +139,7 @@ assertContains(historyUi, /history-change-head/, 'Audit : le tableau avant/aprè
   assertContains(source, /buildAuditDetails_\(/, `Audit : ${file} n’utilise pas le format avant-après.`);
   assertContains(source, entity, `Audit : ${entity} n’est pas journalisée.`);
 });
+assertContains(automatic, /safeAutomaticPlanningAudit_/, 'Audit : la planification automatique n’est pas journalisée.');
 
 const communication = read('HospitalityInvitations.gs');
 assertContains(communication, /Une hospitalité existe déjà pour cette programmation/, 'Hospitalité : le contrôle des doublons est absent.');
