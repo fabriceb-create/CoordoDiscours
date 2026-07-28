@@ -11,7 +11,8 @@ const required = [
   'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs',
   'RecommendationEngine.gs','ConflictResolution.gs','ConflictResolutionStyles.html',
   'ConflictResolutionScripts.html','AutomaticPlanning.gs','AutomaticPlanningStyles.html',
-  'AutomaticPlanningScripts.html','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
+  'AutomaticPlanningScripts.html','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html',
+  'SpeakerAvailability.gs','SpeakerAvailabilityStyles.html','SpeakerAvailabilityUI.html'
 ];
 
 const errors = [];
@@ -41,6 +42,7 @@ if (fs.existsSync(indexPath)) {
   if (!index.includes('ConflictResolutionStyles') || !index.includes('ConflictResolutionScripts')) errors.push('Le module de résolution des conflits n’est pas entièrement inclus.');
   if (!index.includes('AutomaticPlanningStyles') || !index.includes('AutomaticPlanningScripts')) errors.push('Le module de planification automatique n’est pas entièrement inclus.');
   if (!index.includes('id="automatic-planning"') || !index.includes('id="automatic-planning-dialog"')) errors.push('L’accès à la planification automatique est absent de l’interface.');
+  if (!index.includes('SpeakerAvailabilityStyles') || !index.includes('SpeakerAvailabilityUI')) errors.push('Le module de disponibilité des orateurs n’est pas entièrement inclus.');
 }
 
 const codePath = path.join(root, 'Code.gs');
@@ -57,6 +59,7 @@ const configPath = path.join(root, 'Config.gs');
 if (fs.existsSync(configPath)) {
   const config = fs.readFileSync(configPath, 'utf8');
   if (!config.includes("users: 'UTILISATEURS'")) errors.push('La feuille UTILISATEURS n’est pas déclarée dans Config.gs.');
+  if (!config.includes("speakerAvailability: 'ORATEUR_DISPONIBILITES'")) errors.push('La feuille ORATEUR_DISPONIBILITES n’est pas déclarée dans Config.gs.');
 }
 
 const protectedFunctions = [
@@ -70,6 +73,7 @@ const protectedFunctions = [
   ['Talks.gs', 'setTalkActive', 'COORDINATEUR'],
   ['Talks.gs', 'importTalkReference', 'ADMIN'],
   ['SpeakerTalks.gs', 'saveSpeakerTalkSelection', 'COORDINATEUR'],
+  ['SpeakerAvailability.gs', 'saveSpeakerAvailabilitySchedule', 'COORDINATEUR'],
   ['Planning.gs', 'savePlanning', 'COORDINATEUR'],
   ['Planning.gs', 'cancelPlanning', 'COORDINATEUR'],
   ['Planning.gs', 'restorePlanning', 'COORDINATEUR'],
@@ -139,6 +143,8 @@ if (fs.existsSync(installationPath)) {
   const installation = fs.readFileSync(installationPath, 'utf8');
   if (!installation.includes('LANGUE_INTERFACE')) errors.push('La recette doit contrôler le paramètre LANGUE_INTERFACE.');
   if (!installation.includes('AUTO_PLAN_MOIS') || !installation.includes('AUTO_PLAN_SUIVIS')) errors.push('La migration doit installer les paramètres de planification automatique.');
+  if (!installation.includes('RECO_BONUS_DATE_PREFEREE') || !installation.includes('RECO_MALUS_DATE_A_EVITER')) errors.push('La migration doit installer les réglages de disponibilité des recommandations.');
+  if (!installation.includes('getSpeakerAvailabilityMap_')) errors.push('La recette doit vérifier le module de disponibilité des orateurs.');
   if (!installation.includes('getDataIntegrityReport_()')) errors.push('La recette doit exécuter le contrôle d’intégrité.');
   if (!installation.includes('parseAndValidateBackup_')) errors.push('La recette doit valider le format de sauvegarde.');
 }
@@ -150,9 +156,10 @@ if (fs.existsSync(planningPath) && !fs.readFileSync(planningPath, 'utf8').includ
 }
 if (fs.existsSync(rulesPath)) {
   const rules = fs.readFileSync(rulesPath, 'utf8');
-  ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => {
+  ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007','PLAN_008','PLAN_009','PLAN_010'].forEach(code => {
     if (!rules.includes(code)) errors.push(`Règle métier obligatoire absente : ${code}.`);
   });
+  if (!rules.includes('getSpeakerAvailabilityMap_') || !rules.includes('evaluateSpeakerAvailability_')) errors.push('RulesEngine doit exploiter les disponibilités préchargées.');
 }
 
 const recommendationPath = path.join(root, 'RecommendationEngine.gs');
@@ -161,6 +168,20 @@ if (fs.existsSync(recommendationPath)) {
   if (!recommendation.includes('getSpeakerRecommendations')) errors.push('Le point d’entrée des recommandations est absent.');
   if (!recommendation.includes('scoreSpeakerRecommendation_')) errors.push('Le calcul du score de recommandation est absent.');
   if (!recommendation.includes('resources.speakerTalks') && !recommendation.includes('getSpeakerTalkNumbersMap_')) errors.push('Les recommandations doivent contrôler les discours déclarés des orateurs extérieurs.');
+  if (!recommendation.includes('evaluateSpeakerAvailability_')) errors.push('Les recommandations doivent exclure les orateurs indisponibles.');
+  if (!recommendation.includes('RECO_BONUS_DATE_PREFEREE') || !recommendation.includes('RECO_MALUS_DATE_A_EVITER')) errors.push('Les recommandations doivent ajuster les dates préférées et à éviter.');
+}
+
+const availabilityPath = path.join(root, 'SpeakerAvailability.gs');
+if (fs.existsSync(availabilityPath)) {
+  const availability = fs.readFileSync(availabilityPath, 'utf8');
+  ['INDISPONIBLE','DISPONIBLE_SEULEMENT','PREFEREE','A_EVITER'].forEach(type => {
+    if (!availability.includes(type)) errors.push(`Disponibilités : le type ${type} est absent.`);
+  });
+  if (!availability.includes("assertEntityVersion_('ORATEUR_DISPONIBILITES'")) errors.push('Disponibilités : le verrouillage optimiste est absent.');
+  if (!availability.includes('LockService.getScriptLock()')) errors.push('Disponibilités : l’écriture n’est pas protégée par un verrou.');
+  if (!availability.includes('buildAuditDetails_')) errors.push('Disponibilités : les changements ne sont pas audités.');
+  if (!availability.includes('restoreSpeakerAvailabilitySnapshot_')) errors.push('Disponibilités : le retour arrière en cas d’échec est absent.');
 }
 
 const automaticPath = path.join(root, 'AutomaticPlanning.gs');
