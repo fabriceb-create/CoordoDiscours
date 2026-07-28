@@ -38,6 +38,9 @@ jobs:
       - name: Tester l’historique des versions
         run: npm run test:versions
 
+      - name: Tester le responsive, l’accessibilité et les caches
+        run: npm run test:ui
+
       - name: Publier le code testé
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
