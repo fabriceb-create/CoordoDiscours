@@ -1,10 +1,32 @@
 <script>
   state.plannings = [];
+  const PLANNING_OPTIONS_CACHE_TTL_MS = 60000;
   state.planningOptions = { speakers: [], talks: [], congregations: [] };
+  state.planningOptionsLoadedAt = 0;
+  state.planningOptionsRequest = null;
+  state.planningOptionsGeneration = 0;
   let recommendationRequestId = 0;
+  let planningListRequestId = 0;
 
-  async function loadPlanningOptions() {
-    state.planningOptions = await runServer('getPlanningOptions');
+  async function loadPlanningOptions(force) {
+    const fresh = Number(state.planningOptionsLoadedAt || 0) > 0 && (Date.now() - Number(state.planningOptionsLoadedAt || 0)) < PLANNING_OPTIONS_CACHE_TTL_MS;
+    if (!force && fresh) { renderPlanningOptions_(); return state.planningOptions; }
+    if (!force && state.planningOptionsRequest) return state.planningOptionsRequest;
+    const generation = Number(state.planningOptionsGeneration || 0);
+    const request = runServer('getPlanningOptions').then(data => {
+      if (generation !== Number(state.planningOptionsGeneration || 0)) return loadPlanningOptions(true);
+      state.planningOptions = data || { speakers: [], talks: [], congregations: [] };
+      state.planningOptionsLoadedAt = Date.now();
+      renderPlanningOptions_();
+      return state.planningOptions;
+    });
+    state.planningOptionsRequest = request;
+    return request.finally(() => {
+      if (state.planningOptionsRequest === request) state.planningOptionsRequest = null;
+    });
+  }
+
+  function renderPlanningOptions_() {
     const form = document.getElementById('planning-form');
     const speakerSelect = form.elements.speakerId;
     const talkSelect = form.elements.talkNumber;
@@ -26,12 +48,15 @@
   }
 
   async function loadPlannings() {
+    const requestId = ++planningListRequestId;
     try {
-      state.plannings = await runServer(
+      const items = await runServer(
         'listPlannings',
         document.getElementById('planning-search').value,
         document.getElementById('planning-cancelled').checked
       );
+      if (requestId !== planningListRequestId) return;
+      state.plannings = items || [];
       renderPlannings();
     } catch (error) { showError(error); }
   }
@@ -50,8 +75,8 @@
           <div class="record-meta">Discours n° ${item.talkNumber} - ${escapeHtml(item.talkTitle || 'Titre à compléter')}<br>Statut : ${escapeHtml(item.status)}${item.notes ? '<br>' + escapeHtml(item.notes) : ''}</div>
         </div>
         <div class="record-actions">
-          <button class="secondary-button" data-edit-planning="${item.id}">Modifier</button>
-          <button class="${item.status === 'ANNULE' ? 'secondary-button' : 'danger-button'}" data-toggle-planning="${item.id}" data-version="${escapeHtml(item.version || '')}" data-status="${item.status}">${item.status === 'ANNULE' ? 'Restaurer' : 'Annuler'}</button>
+          <button type="button" class="secondary-button" data-edit-planning="${item.id}">Modifier</button>
+          <button type="button" class="${item.status === 'ANNULE' ? 'secondary-button' : 'danger-button'}" data-toggle-planning="${item.id}" data-version="${escapeHtml(item.version || '')}" data-status="${item.status}">${item.status === 'ANNULE' ? 'Restaurer' : 'Annuler'}</button>
         </div>
       </article>`).join('');
   }
@@ -166,6 +191,7 @@
     }
     if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
     document.getElementById('planning-dialog').close();
+    invalidatePlanningDependentCaches_();
     toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
     await loadPlannings();
     return result;
@@ -180,6 +206,7 @@
       if (!isPlanningVersionConflict_(error)) throw error;
       return handleConcurrentFormConflict_(form, payload, {
         onSaved: async () => {
+          invalidatePlanningDependentCaches_();
           document.getElementById('planning-dialog').close();
           await loadPlannings();
         },
@@ -193,11 +220,6 @@
   }
 
   document.addEventListener('click', async event => {
-    const navigation = event.target.closest('[data-view="planning"], [data-open="planning"]');
-    if (navigation) {
-      if (!state.planningOptions.speakers.length) await loadPlanningOptions();
-      await loadPlannings();
-    }
     if (event.target.id === 'new-planning') await openPlanning();
 
     const recommended = event.target.closest('[data-select-recommended-speaker]');
@@ -212,11 +234,12 @@
     if (edit) await openPlanning(state.plannings.find(item => item.id === edit.dataset.editPlanning));
 
     const toggle = event.target.closest('[data-toggle-planning]');
-    if (toggle) {
+    if (toggle) await withBusyElement_(toggle, async () => {
       const item = state.plannings.find(entry => entry.id === toggle.dataset.togglePlanning);
       const nextStatus = toggle.dataset.status === 'ANNULE' ? 'PROGRAMME' : 'ANNULE';
       try {
         await runServer(nextStatus === 'PROGRAMME' ? 'restorePlanning' : 'cancelPlanning', item.id, toggle.dataset.version);
+        invalidatePlanningDependentCaches_();
         toast(nextStatus === 'PROGRAMME' ? 'Programmation restaurée.' : 'Programmation annulée.');
         await loadPlannings();
       } catch (error) {
@@ -224,16 +247,20 @@
           await handleConcurrentMerge_({
             entity: 'PROGRAMMATION', entityId: item.id, base: item,
             local: Object.assign({}, item, { status: nextStatus }), operation: 'STATUS',
-            onSaved: loadPlannings
+            onSaved: async () => { invalidatePlanningDependentCaches_(); await loadPlannings(); }
           });
         } else showError(error);
       }
-    }
+    });
   });
 
   document.getElementById('planning-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try { await submitPlanning(event.target, false); } catch (error) { showError(error); }
+    const form = event.target;
+    const button = form.querySelector('[type="submit"]');
+    await withBusyElement_(button, async () => {
+      try { await submitPlanning(form, false); } catch (error) { showError(error); }
+    });
   });
 
   document.getElementById('planning-form').addEventListener('change', event => {
@@ -243,8 +270,11 @@
   debounce('planning-search', loadPlannings);
   document.getElementById('planning-cancelled').addEventListener('change', loadPlannings);
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    ensurePlanningVersionField_();
-    try { await loadPlanningOptions(); } catch (error) { showError(error); }
+  document.addEventListener('coordodiscours:viewchange', async event => {
+    if (!event.detail || event.detail.name !== 'planning') return;
+    try { await Promise.all([loadPlanningOptions(false), loadPlannings()]); }
+    catch (error) { showError(error); }
   });
+
+  document.addEventListener('DOMContentLoaded', ensurePlanningVersionField_);
 </script>

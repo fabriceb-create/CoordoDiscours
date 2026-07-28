@@ -4,6 +4,31 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 
 ## [En développement]
 
+## [1.11.0] — en préparation de recette
+
+### Ajouté
+
+- Navigation mobile en tiroir avec bouton d’ouverture, fermeture par voile de fond et touche Échap.
+- Lien d’évitement vers le contenu principal.
+- Libellés accessibles sur les boutons icônes et annonces `aria-live` pour les messages.
+- Nouvelle suite `test-responsive-accessibility.mjs`.
+
+### Amélioré
+
+- Focus clavier visible et contenu dans le tiroir mobile ouvert.
+- Respect de la préférence de réduction des animations.
+- Navigation centralisée par événement `coordodiscours:viewchange`, y compris pour les liens directs par ancre.
+- Cache client de 60 secondes pour les options de programmation et de communication.
+- Mutualisation des demandes simultanées et rejet des réponses de recherche devenues obsolètes.
+- Chargement à la demande des modules impression, paramètres, sauvegarde, historique et versions.
+- Protection des principaux boutons et formulaires contre les doubles actions.
+
+### Corrigé
+
+- Invalidation des listes partagées après modification d’une programmation ou d’un référentiel.
+- Nettoyage des caches après restauration complète de la base.
+- Redirection vers le tableau de bord lorsqu’un lien direct ouvre une vue administrateur sans droit suffisant.
+
 ## [1.10.0] — en préparation de recette
 
 ### Amélioré

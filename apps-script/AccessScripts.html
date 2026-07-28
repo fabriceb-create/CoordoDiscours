@@ -22,8 +22,12 @@
       if (button) button.hidden = !access.canEdit;
     });
     document.querySelectorAll('[data-view="backup"],[data-view="settings"]').forEach(button => {
-      if (button && !access.canAdminister) button.hidden = true;
+      if (button) button.hidden = !access.canAdminister;
     });
+    const activeView = document.querySelector('.view.active-view');
+    if (!access.canAdminister && activeView && ['view-backup', 'view-settings'].includes(activeView.id)) {
+      showView('dashboard');
+    }
     const status = document.getElementById('status');
     if (status) status.title = access.email + ' — ' + access.roleLabel;
   }

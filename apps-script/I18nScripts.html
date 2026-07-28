@@ -46,6 +46,12 @@
     root.querySelectorAll?.('[title]').forEach(element => {
       element.title = translateText(element.title);
     });
+    const labelled = [];
+    if (root.nodeType === Node.ELEMENT_NODE && root.hasAttribute?.('aria-label')) labelled.push(root);
+    root.querySelectorAll?.('[aria-label]').forEach(element => labelled.push(element));
+    labelled.forEach(element => {
+      element.setAttribute('aria-label', translateText(element.getAttribute('aria-label')));
+    });
   }
 
   function observeTranslatedContent() {

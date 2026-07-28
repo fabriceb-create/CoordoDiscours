@@ -75,6 +75,10 @@
     button.disabled = true;
     try {
       const result = await runServer('restoreApplicationBackup', selectedBackupContent, confirmation);
+      state.speakers = [];
+      state.congregations = [];
+      state.talks = [];
+      invalidatePlanningDependentCaches_();
       toast(result.message || 'Restauration terminée.');
       document.getElementById('backup-file').value = '';
       document.getElementById('backup-confirmation').value = '';
@@ -89,9 +93,11 @@
     }
   }
 
+  document.addEventListener('coordodiscours:viewchange', event => {
+    if (event.detail && event.detail.name === 'backup') loadBackupModule();
+  });
+
   document.addEventListener('click', event => {
-    const target = event.target.closest('[data-view], [data-open]');
-    if (target && (target.dataset.view === 'backup' || target.dataset.open === 'backup')) loadBackupModule();
     if (event.target.id === 'backup-refresh') loadBackupModule();
     if (event.target.id === 'backup-download') downloadBackup_();
     if (event.target.id === 'backup-confirm') restoreBackup_();

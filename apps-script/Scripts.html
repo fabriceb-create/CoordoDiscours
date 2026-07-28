@@ -1,5 +1,7 @@
 <script>
+  const MOBILE_NAV_BREAKPOINT = 820;
   const state = { speakers: [], congregations: [], talks: [] };
+  let mobileNavigationReturnFocus = null;
 
   function runServer(functionName, ...args) {
     return new Promise((resolve, reject) => {
@@ -7,29 +9,91 @@
     });
   }
 
-  function toast(message) {
+  function toast(message, tone) {
     const el = document.getElementById('toast');
-    el.textContent = message;
+    if (!el) return;
+    el.textContent = String(message || '');
+    el.dataset.tone = tone === 'error' ? 'error' : 'status';
+    el.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    el.setAttribute('aria-live', tone === 'error' ? 'assertive' : 'polite');
     el.hidden = false;
     clearTimeout(el._timer);
-    el._timer = setTimeout(() => { el.hidden = true; }, 2800);
+    el._timer = setTimeout(() => { el.hidden = true; }, tone === 'error' ? 5200 : 3000);
   }
 
   function showError(error) {
     const message = error && error.message ? error.message : String(error);
-    toast('Erreur : ' + message.replace('CONFLIT_VERSION|', ''));
-    document.getElementById('status').textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
+    toast('Erreur : ' + message.replace('CONFLIT_VERSION|', ''), 'error');
+    const status = document.getElementById('status');
+    if (status) status.textContent = message.includes('CONFLIT_VERSION|') ? 'Modification concurrente' : 'Erreur détectée';
   }
 
-  function showView(name) {
-    document.querySelectorAll('.view').forEach(el => el.classList.remove('active-view'));
-    document.querySelectorAll('.nav-button').forEach(el => el.classList.remove('active'));
-    document.getElementById('view-' + name).classList.add('active-view');
-    const nav = document.querySelector('.nav-button[data-view="' + name + '"]');
-    if (nav) nav.classList.add('active');
-    if (name === 'speakers') loadSpeakers();
-    if (name === 'congregations') loadCongregations();
-    if (name === 'talks') loadTalks();
+  function isMobileNavigation_() {
+    return window.matchMedia('(max-width: ' + MOBILE_NAV_BREAKPOINT + 'px)').matches;
+  }
+
+  function setMobileNavigationOpen_(open, restoreFocus) {
+    const toggle = document.getElementById('mobile-menu-toggle');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const sidebar = document.getElementById('app-sidebar');
+    const closeButton = document.getElementById('mobile-menu-close');
+    const shouldOpen = Boolean(open && isMobileNavigation_());
+    document.body.classList.toggle('navigation-open', shouldOpen);
+    if (toggle) toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (backdrop) backdrop.hidden = !shouldOpen;
+    if (sidebar) {
+      sidebar.setAttribute('aria-hidden', isMobileNavigation_() && !shouldOpen ? 'true' : 'false');
+      if ('inert' in sidebar) sidebar.inert = Boolean(isMobileNavigation_() && !shouldOpen);
+    }
+    if (shouldOpen) {
+      mobileNavigationReturnFocus = document.activeElement;
+      window.setTimeout(() => {
+        const active = document.querySelector('.nav-button[aria-current="page"]') || document.querySelector('.nav-button:not([hidden])') || closeButton;
+        if (active) active.focus();
+      }, 0);
+    } else if (restoreFocus && mobileNavigationReturnFocus && typeof mobileNavigationReturnFocus.focus === 'function') {
+      mobileNavigationReturnFocus.focus();
+      mobileNavigationReturnFocus = null;
+    }
+  }
+
+  function openMobileNavigation_() { setMobileNavigationOpen_(true, false); }
+  function closeMobileNavigation_(restoreFocus) { setMobileNavigationOpen_(false, restoreFocus !== false); }
+
+  function validViewName_(name) {
+    return Boolean(name && document.getElementById('view-' + name));
+  }
+
+  function showView(name, options) {
+    const viewName = validViewName_(name) ? name : 'dashboard';
+    const settings = options || {};
+    const target = document.getElementById('view-' + viewName);
+    document.querySelectorAll('.view').forEach(el => {
+      el.classList.toggle('active-view', el === target);
+      el.setAttribute('aria-hidden', el === target ? 'false' : 'true');
+    });
+    document.querySelectorAll('.nav-button').forEach(el => {
+      const active = el.dataset.view === viewName;
+      el.classList.toggle('active', active);
+      if (active) el.setAttribute('aria-current', 'page');
+      else el.removeAttribute('aria-current');
+    });
+    if (settings.updateHash !== false && window.location.hash !== '#' + viewName) {
+      history.replaceState(null, '', '#' + viewName);
+    }
+    closeMobileNavigation_(false);
+    if (settings.focus !== false) {
+      const heading = target.querySelector('h2, h1');
+      if (heading) {
+        heading.tabIndex = -1;
+        window.setTimeout(() => heading.focus({ preventScroll: true }), 0);
+      }
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+    if (viewName === 'speakers') loadSpeakers();
+    if (viewName === 'congregations') loadCongregations();
+    if (viewName === 'talks') loadTalks();
+    document.dispatchEvent(new CustomEvent('coordodiscours:viewchange', { detail: { name: viewName } }));
   }
 
   function renderApp(data) {
@@ -49,6 +113,28 @@
     const data = Object.fromEntries(new FormData(form).entries());
     if (form.elements.active) data.active = form.elements.active.checked;
     return data;
+  }
+
+  async function withBusyElement_(element, callback) {
+    if (!element || element.getAttribute('aria-busy') === 'true') return undefined;
+    const previousDisabled = Boolean(element.disabled);
+    element.disabled = true;
+    element.setAttribute('aria-busy', 'true');
+    try { return await callback(); }
+    finally {
+      element.disabled = previousDisabled;
+      element.removeAttribute('aria-busy');
+    }
+  }
+
+  function invalidatePlanningDependentCaches_() {
+    if (state.planningOptions) {
+      state.planningOptions = { speakers: [], talks: [], congregations: [] };
+      state.planningOptionsLoadedAt = 0;
+      state.planningOptionsGeneration = Number(state.planningOptionsGeneration || 0) + 1;
+      state.planningOptionsRequest = null;
+    }
+    if (typeof invalidateCommunicationOptions_ === 'function') invalidateCommunicationOptions_();
   }
 
   function ensureVersionField_(form) {
@@ -106,12 +192,13 @@
           ${item.address ? escapeHtml(item.address) + '<br>' : ''}
           ${item.meetingDay || item.meetingTime ? 'Réunion : ' + escapeHtml([item.meetingDay, item.meetingTime].filter(Boolean).join(' à ')) : ''}
         </div></div>
-        <div class="record-actions"><button class="secondary-button" data-edit-congregation="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
+        <div class="record-actions"><button type="button" class="secondary-button" data-edit-congregation="${item.id}">Modifier</button><button type="button" class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-congregation="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
   function fillCongregationOptions() {
     const select = document.querySelector('#speaker-form [name="congregationId"]');
+    if (!select) return;
     const current = select.value;
     select.innerHTML = '<option value="">Aucune</option>' + state.congregations.filter(item => item.active).map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
     select.value = current;
@@ -131,7 +218,7 @@
     container.innerHTML = state.speakers.map(item => `
       <article class="record-card ${item.active ? '' : 'archived'}">
         <div><h3>${escapeHtml(item.fullName || item.lastName)}</h3><div class="record-meta">${item.type === 'EXTERIEUR' ? 'Orateur extérieur' : 'Orateur local'}${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}<br>${item.phone ? escapeHtml(item.phone) + '<br>' : ''}${item.email ? escapeHtml(item.email) : ''}</div></div>
-        <div class="record-actions"><button class="secondary-button" data-edit-speaker="${item.id}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
+        <div class="record-actions"><button type="button" class="secondary-button" data-edit-speaker="${item.id}">Modifier</button><button type="button" class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-speaker="${item.id}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Archiver' : 'Restaurer'}</button></div>
       </article>`).join('');
   }
 
@@ -143,7 +230,7 @@
   function renderTalks() {
     const container = document.getElementById('talk-list');
     if (!state.talks.length) { container.innerHTML = '<div class="empty-state">Aucun discours trouvé.</div>'; return; }
-    container.innerHTML = state.talks.map(item => `<article class="record-card ${item.active ? '' : 'archived'}"><div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div><div class="record-actions"><button class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div></article>`).join('');
+    container.innerHTML = state.talks.map(item => `<article class="record-card ${item.active ? '' : 'archived'}"><div><h3>N° ${item.number} - ${escapeHtml(item.title || 'Titre à compléter')}</h3><div class="record-meta">${item.active ? 'Discours actif' : 'Discours inactif'}</div></div><div class="record-actions"><button type="button" class="secondary-button" data-edit-talk="${item.number}">Modifier</button><button type="button" class="${item.active ? 'danger-button' : 'secondary-button'}" data-toggle-talk="${item.number}" data-version="${escapeHtml(item.version)}" data-active="${item.active}">${item.active ? 'Désactiver' : 'Activer'}</button></div></article>`).join('');
   }
 
   function openSpeaker(item) { const form = document.getElementById('speaker-form'); fillForm(form, item); document.getElementById('speaker-dialog').showModal(); }
@@ -151,128 +238,198 @@
   function openTalk(item) { const form = document.getElementById('talk-form'); fillForm(form, item); form.elements.number.readOnly = Boolean(item); document.getElementById('talk-dialog').showModal(); }
 
   document.addEventListener('click', async event => {
-    const nav = event.target.closest('[data-view], [data-open]'); if (nav) showView(nav.dataset.view || nav.dataset.open);
-    if (event.target.matches('[data-close]')) document.getElementById(event.target.dataset.close).close();
-    if (event.target.id === 'new-speaker') openSpeaker(); if (event.target.id === 'new-congregation') openCongregation(); if (event.target.id === 'new-talk') openTalk();
+    if (event.target.closest('#mobile-menu-toggle')) { openMobileNavigation_(); return; }
+    if (event.target.closest('#mobile-menu-close, #sidebar-backdrop')) { closeMobileNavigation_(true); return; }
+
+    const nav = event.target.closest('[data-view], [data-open]');
+    if (nav) showView(nav.dataset.view || nav.dataset.open);
+    const close = event.target.closest('[data-close]');
+    if (close) {
+      const dialog = document.getElementById(close.dataset.close);
+      if (dialog && typeof dialog.close === 'function') dialog.close();
+    }
+    if (event.target.id === 'new-speaker') openSpeaker();
+    if (event.target.id === 'new-congregation') openCongregation();
+    if (event.target.id === 'new-talk') openTalk();
     const editSpeaker = event.target.closest('[data-edit-speaker]'); if (editSpeaker) openSpeaker(state.speakers.find(item => item.id === editSpeaker.dataset.editSpeaker));
     const editCongregation = event.target.closest('[data-edit-congregation]'); if (editCongregation) openCongregation(state.congregations.find(item => item.id === editCongregation.dataset.editCongregation));
     const editTalk = event.target.closest('[data-edit-talk]'); if (editTalk) openTalk(state.talks.find(item => item.number === Number(editTalk.dataset.editTalk)));
 
     const toggleSpeaker = event.target.closest('[data-toggle-speaker]');
-    if (toggleSpeaker) {
+    if (toggleSpeaker) await withBusyElement_(toggleSpeaker, async () => {
       const item = state.speakers.find(entry => entry.id === toggleSpeaker.dataset.toggleSpeaker);
+      if (!item) return;
       const active = toggleSpeaker.dataset.active !== 'true';
       try {
         await runServer(active ? 'restoreSpeaker' : 'archiveSpeaker', item.id, toggleSpeaker.dataset.version);
+        invalidatePlanningDependentCaches_();
         toast('Fiche orateur mise à jour.');
         await loadSpeakers();
       } catch (error) {
-        if (isConcurrentVersionConflict_(error) && item) {
+        if (isConcurrentVersionConflict_(error)) {
           await handleConcurrentMerge_({
             entity: 'ORATEUR', entityId: item.id, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
-            onSaved: loadSpeakers
+            onSaved: async () => { invalidatePlanningDependentCaches_(); await loadSpeakers(); }
           });
         } else showError(error);
       }
-    }
+    });
+
     const toggleCongregation = event.target.closest('[data-toggle-congregation]');
-    if (toggleCongregation) {
+    if (toggleCongregation) await withBusyElement_(toggleCongregation, async () => {
       const item = state.congregations.find(entry => entry.id === toggleCongregation.dataset.toggleCongregation);
+      if (!item) return;
       const active = toggleCongregation.dataset.active !== 'true';
       try {
         await runServer(active ? 'restoreCongregation' : 'archiveCongregation', item.id, toggleCongregation.dataset.version);
+        invalidatePlanningDependentCaches_();
         toast('Fiche assemblée mise à jour.');
         await loadCongregations();
       } catch (error) {
-        if (isConcurrentVersionConflict_(error) && item) {
+        if (isConcurrentVersionConflict_(error)) {
           await handleConcurrentMerge_({
             entity: 'ASSEMBLEE', entityId: item.id, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
-            onSaved: loadCongregations
+            onSaved: async () => { invalidatePlanningDependentCaches_(); await loadCongregations(); }
           });
         } else showError(error);
       }
-    }
+    });
+
     const toggleTalk = event.target.closest('[data-toggle-talk]');
-    if (toggleTalk) {
+    if (toggleTalk) await withBusyElement_(toggleTalk, async () => {
       const item = state.talks.find(entry => entry.number === Number(toggleTalk.dataset.toggleTalk));
+      if (!item) return;
       const active = toggleTalk.dataset.active !== 'true';
       try {
         await runServer('setTalkActive', item.number, active, toggleTalk.dataset.version);
+        invalidatePlanningDependentCaches_();
         toast('Statut du discours mis à jour.');
         await loadTalks();
       } catch (error) {
-        if (isConcurrentVersionConflict_(error) && item) {
+        if (isConcurrentVersionConflict_(error)) {
           await handleConcurrentMerge_({
             entity: 'DISCOURS', entityId: item.number, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
-            onSaved: loadTalks
+            onSaved: async () => { invalidatePlanningDependentCaches_(); await loadTalks(); }
           });
         } else showError(error);
       }
+    });
+  });
+
+  document.addEventListener('keydown', event => {
+    if (!document.body.classList.contains('navigation-open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMobileNavigation_(true);
+      return;
     }
+    if (event.key !== 'Tab') return;
+    const sidebar = document.getElementById('app-sidebar');
+    const focusable = sidebar ? Array.from(sidebar.querySelectorAll('a[href], button:not([disabled]):not([hidden]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(element => element.offsetParent !== null) : [];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+
+  window.addEventListener('resize', () => {
+    if (!isMobileNavigation_()) closeMobileNavigation_(false);
+  });
+
+  window.addEventListener('hashchange', () => {
+    const name = String(window.location.hash || '').replace(/^#/, '');
+    if (validViewName_(name)) showView(name, { updateHash: false });
   });
 
   document.getElementById('speaker-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target;
     const payload = formToObject(form);
-    try {
-      await runServer('saveSpeaker', payload);
-      document.getElementById('speaker-dialog').close();
-      toast('Orateur enregistré.');
-      await loadSpeakers();
-    } catch (error) {
-      if (isConcurrentVersionConflict_(error)) {
-        await handleConcurrentFormConflict_(form, payload, {
-          onSaved: async () => { document.getElementById('speaker-dialog').close(); await loadSpeakers(); }
-        });
-      } else showError(error);
-    }
+    const button = form.querySelector('[type="submit"]');
+    await withBusyElement_(button, async () => {
+      try {
+        await runServer('saveSpeaker', payload);
+        invalidatePlanningDependentCaches_();
+        document.getElementById('speaker-dialog').close();
+        toast('Orateur enregistré.');
+        await loadSpeakers();
+      } catch (error) {
+        if (isConcurrentVersionConflict_(error)) {
+          await handleConcurrentFormConflict_(form, payload, {
+            onSaved: async () => { invalidatePlanningDependentCaches_(); document.getElementById('speaker-dialog').close(); await loadSpeakers(); }
+          });
+        } else showError(error);
+      }
+    });
   });
 
   document.getElementById('congregation-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target;
     const payload = formToObject(form);
-    try {
-      await runServer('saveCongregation', payload);
-      document.getElementById('congregation-dialog').close();
-      toast('Assemblée enregistrée.');
-      await loadCongregations();
-    } catch (error) {
-      if (isConcurrentVersionConflict_(error)) {
-        await handleConcurrentFormConflict_(form, payload, {
-          onSaved: async () => { document.getElementById('congregation-dialog').close(); await loadCongregations(); }
-        });
-      } else showError(error);
-    }
+    const button = form.querySelector('[type="submit"]');
+    await withBusyElement_(button, async () => {
+      try {
+        await runServer('saveCongregation', payload);
+        invalidatePlanningDependentCaches_();
+        document.getElementById('congregation-dialog').close();
+        toast('Assemblée enregistrée.');
+        await loadCongregations();
+      } catch (error) {
+        if (isConcurrentVersionConflict_(error)) {
+          await handleConcurrentFormConflict_(form, payload, {
+            onSaved: async () => { invalidatePlanningDependentCaches_(); document.getElementById('congregation-dialog').close(); await loadCongregations(); }
+          });
+        } else showError(error);
+      }
+    });
   });
 
   document.getElementById('talk-form').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.target;
     const payload = formToObject(form);
-    try {
-      await runServer('saveTalk', payload);
-      document.getElementById('talk-dialog').close();
-      toast('Discours enregistré.');
-      await loadTalks();
-    } catch (error) {
-      if (isConcurrentVersionConflict_(error)) {
-        await handleConcurrentFormConflict_(form, payload, {
-          onSaved: async () => { document.getElementById('talk-dialog').close(); await loadTalks(); }
-        });
-      } else showError(error);
-    }
+    const button = form.querySelector('[type="submit"]');
+    await withBusyElement_(button, async () => {
+      try {
+        await runServer('saveTalk', payload);
+        invalidatePlanningDependentCaches_();
+        document.getElementById('talk-dialog').close();
+        toast('Discours enregistré.');
+        await loadTalks();
+      } catch (error) {
+        if (isConcurrentVersionConflict_(error)) {
+          await handleConcurrentFormConflict_(form, payload, {
+            onSaved: async () => { invalidatePlanningDependentCaches_(); document.getElementById('talk-dialog').close(); await loadTalks(); }
+          });
+        } else showError(error);
+      }
+    });
   });
 
-  function debounce(elementId, callback) { let timer; document.getElementById(elementId).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); }); }
-  debounce('speaker-search', loadSpeakers); debounce('congregation-search', loadCongregations); debounce('talk-search', loadTalks);
+  function debounce(elementId, callback) {
+    let timer;
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(callback, 250); });
+  }
+  debounce('speaker-search', loadSpeakers);
+  debounce('congregation-search', loadCongregations);
+  debounce('talk-search', loadTalks);
   document.getElementById('speaker-archived').addEventListener('change', loadSpeakers);
   document.getElementById('congregation-archived').addEventListener('change', loadCongregations);
   document.getElementById('talk-inactive').addEventListener('change', loadTalks);
 
   document.addEventListener('DOMContentLoaded', async () => {
-    try { renderApp(await runServer('getAppBootstrap')); state.congregations = await runServer('listCongregations', '', true); fillCongregationOptions(); }
-    catch (error) { showError(error); }
+    document.querySelectorAll('.view').forEach(view => view.setAttribute('aria-hidden', view.classList.contains('active-view') ? 'false' : 'true'));
+    closeMobileNavigation_(false);
+    const initialView = String(window.location.hash || '').replace(/^#/, '');
+    showView(validViewName_(initialView) ? initialView : 'dashboard', { updateHash: Boolean(initialView), focus: false });
+    try {
+      renderApp(await runServer('getAppBootstrap'));
+      state.congregations = await runServer('listCongregations', '', true);
+      fillCongregationOptions();
+    } catch (error) { showError(error); }
   });
 </script>

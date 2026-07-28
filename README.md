@@ -4,7 +4,7 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.10 Stable**
+Version en préparation de recette : **1.11 Stable**
 
 Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques et la documentation d’installation et de recette.
 
@@ -17,9 +17,8 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
 - Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter.
 - Fusion intelligente des modifications concurrentes.
-- Historique navigable des versions par fiche, avec chargement progressif des listes volumineuses.
-- Comparaison de deux versions.
-- Restauration contrôlée d’une ancienne version.
+- Historique navigable des versions par fiche, avec chargement progressif.
+- Comparaison et restauration contrôlée des versions.
 - Répertoire des orateurs et des assemblées.
 - Référentiel des discours et discours déclarés par orateur extérieur.
 - Invitations et hospitalité.
@@ -29,11 +28,42 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Gestion des rôles et des accès.
 - Interface Français / Kréyòl Gwadloup.
 
+## Ergonomie mobile et accessibilité
+
+La version 1.11 remplace la navigation mobile statique par un tiroir adapté aux téléphones et tablettes. Le menu :
+
+- s’ouvre depuis l’en-tête ;
+- se ferme avec son bouton, le voile de fond ou la touche Échap ;
+- maintient le focus clavier à l’intérieur lorsqu’il est ouvert ;
+- restitue le focus au bouton d’ouverture après fermeture ;
+- retire du parcours clavier la navigation placée hors écran.
+
+L’interface ajoute également :
+
+- un lien d’évitement vers le contenu principal ;
+- un focus clavier visible ;
+- `aria-current` sur la section active ;
+- des libellés accessibles sur les boutons icônes ;
+- des annonces adaptées pour les confirmations et les erreurs ;
+- le respect de la préférence système de réduction des animations ;
+- une navigation par ancre permettant d’ouvrir directement une section.
+
+## Réduction des chargements inutiles
+
+Les données partagées entre plusieurs écrans utilisent maintenant un cache client court de 60 secondes :
+
+- options de programmation : orateurs, discours et assemblées ;
+- programmations proposées dans les formulaires d’invitation et d’hospitalité.
+
+Les demandes simultanées sont mutualisées. Les caches sont invalidés après toute modification susceptible de les rendre obsolètes, notamment après une programmation, une modification de référentiel, une planification automatique, un changement de paramètres ou une restauration complète.
+
+Les listes sensibles aux recherches utilisent des identifiants de requête afin qu’une réponse ancienne ne remplace pas une recherche plus récente.
+
 ## Historique des versions
 
 Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` déjà enregistrés dans la feuille `HISTORIQUE`.
 
-Les fiches sont chargées par pages de 40 afin de limiter les calculs et les transferts sur les historiques volumineux. Pour chaque fiche, le module permet de :
+Les fiches sont chargées par pages de 40 afin de limiter les calculs et les transferts. Pour chaque fiche, le module permet de :
 
 - parcourir les versions numérotées ;
 - identifier l’état actuel ;
@@ -41,7 +71,7 @@ Les fiches sont chargées par pages de 40 afin de limiter les calculs et les tra
 - comparer leurs champs avec des libellés lisibles ;
 - restaurer une ancienne version lorsque le rôle de l’utilisateur l’autorise.
 
-La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations, les règles de disponibilité et l’audit. Une ancienne programmation incompatible avec les règles actuelles reste bloquée. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
+La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations, les règles de disponibilité et l’audit. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
 
 ## Fusion intelligente
 
@@ -52,8 +82,6 @@ Lorsqu’une fiche change entre son ouverture et son enregistrement, CoordoDisco
 3. la dernière valeur enregistrée.
 
 Les champs modifiés d’un seul côté sont fusionnés automatiquement. Lorsque le même champ contient deux modifications différentes, l’utilisateur choisit explicitement la valeur à conserver.
-
-Cette protection couvre les orateurs, assemblées, discours, programmations, invitations, hospitalités, paramètres, utilisateurs, listes de discours déclarés et disponibilités.
 
 ## Principes métier validés
 
@@ -112,6 +140,7 @@ scripts/
   test-speaker-availability.mjs
   test-merge-engine.mjs
   test-version-history.mjs
+  test-responsive-accessibility.mjs
 ```
 
 ## Installation rapide
@@ -127,7 +156,7 @@ La procédure détaillée se trouve dans `docs/INSTALLATION.md`.
 
 ## Validation
 
-La commande `npm run check` exécute sept niveaux de contrôle :
+La commande `npm run check` exécute huit niveaux de contrôle :
 
 1. structure Apps Script et droits d’accès ;
 2. contrats statiques des règles métier ;
@@ -135,6 +164,7 @@ La commande `npm run check` exécute sept niveaux de contrôle :
 4. planification automatique ;
 5. disponibilités des orateurs ;
 6. fusion intelligente ;
-7. reconstruction, comparaison et restauration des versions.
+7. reconstruction, comparaison et restauration des versions ;
+8. responsive, accessibilité, syntaxe JavaScript et caches client.
 
 La version ne doit pas être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.
