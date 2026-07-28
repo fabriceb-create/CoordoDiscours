@@ -17,5 +17,23 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Contrôler l’application et les règles métier
-        run: npm run check
+      - name: Valider la structure Apps Script
+        run: npm run validate
+
+      - name: Contrôler les règles métier
+        run: npm run test:business
+
+      - name: Tester la résolution des conflits
+        run: npm run test:conflicts
+
+      - name: Tester la planification automatique
+        run: npm run test:auto
+
+      - name: Tester les disponibilités des orateurs
+        run: npm run test:availability
+
+      - name: Tester la fusion intelligente
+        run: npm run test:merge
+
+      - name: Tester l’historique des versions
+        run: npm run test:versions
