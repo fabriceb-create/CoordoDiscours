@@ -21,10 +21,12 @@ apps-script/
   RulesEngine.gs
   RecommendationEngine.gs
   ConflictResolution.gs
+  AutomaticPlanning.gs
   Concurrency.gs
 
   Speakers.gs
   SpeakerTalks.gs
+  SpeakerAvailability.gs
   Congregations.gs
   Talks.gs
   HospitalityInvitations.gs
@@ -44,6 +46,12 @@ apps-script/
   PlanningScripts.html
   ConflictResolutionScripts.html
   ConflictResolutionStyles.html
+  AutomaticPlanningScripts.html
+  AutomaticPlanningStyles.html
+  SpeakerTalkUI.html
+  SpeakerTalkStyles.html
+  SpeakerAvailabilityUI.html
+  SpeakerAvailabilityStyles.html
   appsscript.json
 ```
 
@@ -59,6 +67,8 @@ apps-script/
 8. Les droits sont contrôlés côté serveur, sans dépendre uniquement de l’affichage des boutons.
 9. Les écritures collaboratives utilisent un verrou serveur et un numéro de version optimiste.
 10. Les assistants ne contournent jamais les règles métier : chaque proposition est revalidée par `RulesEngine`.
+11. Les moteurs travaillant sur plusieurs hypothèses réutilisent un jeu de données préchargé afin de limiter les lectures Google Sheets.
+12. Une écriture groupée doit pouvoir revenir à l’état précédent lorsqu’une étape échoue.
 
 ## Pipeline de programmation
 
@@ -68,19 +78,43 @@ Formulaire
 normalisation de la demande
    ↓
 chargement d’un jeu de données partagé
+   ├─ orateurs et assemblées
+   ├─ discours et discours déclarés
+   ├─ programmations existantes
+   ├─ disponibilités des orateurs
+   └─ paramètres et pondérations
    ↓
 RulesEngine
    ├─ valide → confirmation éventuelle des avertissements → écriture
    └─ bloqué → ConflictResolution
-                    ↓
-             génération d’hypothèses
-                    ↓
-             revalidation par RulesEngine
-                    ↓
-             classement et affichage
+                     ↓
+              génération d’hypothèses
+                     ↓
+              revalidation par RulesEngine
+                     ↓
+              classement et affichage
 ```
 
-`buildPlanningRuleDataset_()` charge une seule fois les orateurs, discours, assemblées, programmations et discours déclarés. Le même jeu de données est ensuite réutilisé pour évaluer plusieurs hypothèses sans relire Google Sheets à chaque proposition.
+`buildPlanningRuleDataset_()` charge une seule fois les orateurs, discours, assemblées, programmations, discours déclarés et disponibilités. Le même jeu de données est ensuite réutilisé pour évaluer plusieurs hypothèses sans relire Google Sheets à chaque proposition.
+
+## Disponibilités des orateurs
+
+`SpeakerAvailability.gs` gère quatre types de période :
+
+- `INDISPONIBLE` : bloque les dates comprises dans la période ;
+- `DISPONIBLE_SEULEMENT` : lorsqu’au moins une fenêtre existe, les dates extérieures à toutes les fenêtres sont bloquées ;
+- `PREFEREE` : ajoute une information positive et un bonus configurable au classement ;
+- `A_EVITER` : produit un avertissement et un malus configurable.
+
+Les périodes d’un orateur sont enregistrées comme une fiche collaborative unique, identifiée par l’orateur. L’interface transmet la version de l’ensemble de ses périodes. Le serveur prend un verrou, compare la version, remplace les lignes de cet orateur et restaure un instantané de la feuille si l’écriture échoue.
+
+Les disponibilités sont consommées par :
+
+- `RulesEngine` pour les règles `PLAN_008`, `PLAN_009` et `PLAN_010` ;
+- `RecommendationEngine` pour exclure, favoriser ou pénaliser un orateur ;
+- `ConflictResolution` par la revalidation systématique des hypothèses ;
+- `AutomaticPlanning` par le jeu de données et les pondérations préchargés ;
+- `Integrity` pour les relations cassées, doublons, dates invalides et contradictions.
 
 ## Résolution des conflits
 
@@ -95,6 +129,18 @@ Lorsque plusieurs blocages sont indépendants, le moteur évalue des combinaison
 
 L’interface applique uniquement les valeurs dans le formulaire. L’enregistrement final reste une action explicite du coordinateur.
 
+## Planification automatique
+
+`AutomaticPlanning.gs` prépare trois scénarios sur une période de 1 à 6 mois :
+
+- Équilibré ;
+- Renouvellement des discours ;
+- Rotation des orateurs.
+
+Le moteur crée un planning virtuel au fur et à mesure de la génération, de sorte que chaque nouvelle proposition tient compte des précédentes. Les créneaux existants sont conservés. Les orateurs indisponibles sont exclus par `RecommendationEngine` et `RulesEngine`.
+
+Le brouillon porte une signature SHA-256 calculée à partir du planning, des référentiels, des versions, des discours déclarés, des disponibilités, des réglages de classement et des suivis de communication. Toute modification de ces éléments impose de générer un nouveau brouillon avant validation.
+
 ## Concurrence
 
 `Concurrency.gs` conserve les versions dans les propriétés du script. Pour une modification :
@@ -107,18 +153,16 @@ L’interface applique uniquement les valeurs dans le formulaire. L’enregistre
 
 ## Installation
 
-La fonction d’installation crée ou vérifie automatiquement les feuilles nécessaires sans demander à l’utilisateur de modifier un identifiant dans le code.
+La fonction d’installation crée ou vérifie automatiquement les feuilles nécessaires sans demander à l’utilisateur de modifier un identifiant dans le code. La migration `1.8.0` crée notamment `ORATEUR_DISPONIBILITES` et ajoute les réglages de bonus et de malus.
 
 ## Évolutivité
 
 L’architecture prépare :
 
-- la planification automatique de plusieurs mois ;
-- la comparaison de scénarios ;
-- les indisponibilités ;
 - la fusion intelligente des champs ;
 - l’historique navigable des versions ;
 - un portail orateur ;
+- la déclaration d’indisponibilités avec validation du coordinateur ;
 - l’envoi de courriels ;
 - la génération de PDF ;
 - une migration future vers une base de données externe.
