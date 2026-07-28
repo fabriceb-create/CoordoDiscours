@@ -42,6 +42,8 @@ jobs:
           set -euo pipefail
           if git apply --check /tmp/coordo-1.12.patch; then
             git apply --index /tmp/coordo-1.12.patch
+            git restore --staged .github/workflows/validate.yml
+            git restore .github/workflows/validate.yml
             echo "APPLIED=true" >> "$GITHUB_ENV"
           elif git apply --reverse --check /tmp/coordo-1.12.patch; then
             echo "Le lot est déjà présent."
@@ -63,6 +65,4 @@ jobs:
           git config user.name "CoordoDiscours CI"
           git config user.email "actions@users.noreply.github.com"
           git commit -m "feat: add contextual help, observability and reliability"
-          git fetch origin agent/help-observability-reliability
-          git rebase origin/agent/help-observability-reliability
           git push origin HEAD:agent/help-observability-reliability
