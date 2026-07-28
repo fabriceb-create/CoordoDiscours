@@ -42,34 +42,37 @@ jobs:
           base64 --decode /tmp/ui.patch.gz.b64 > /tmp/ui.patch.gz
           gzip --decompress --stdout /tmp/ui.patch.gz > /tmp/ui.patch
           echo "05d4708a4c9729d13d38e46c7e1379fb9f27b97dddfb2e7dc96634451946f082  /tmp/ui.patch" | sha256sum --check
-          wc -c /tmp/ui.patch
 
-      - name: Vérifier l’applicabilité du patch
+      - name: Déterminer le mode d’application
         run: |
           set -euo pipefail
-          if git apply --check --verbose /tmp/ui.patch; then
-            echo "PATCH_MODE=APPLY" >> "$GITHUB_ENV"
-          elif git apply --reverse --check --verbose /tmp/ui.patch; then
+          if grep -q "version: '1.11 Stable'" apps-script/Config.gs; then
             echo "PATCH_MODE=ALREADY_APPLIED" >> "$GITHUB_ENV"
+          elif git apply --check --verbose /tmp/ui.patch; then
+            echo "PATCH_MODE=APPLY" >> "$GITHUB_ENV"
           else
-            echo "Le patch n’est ni applicable ni déjà présent."
+            git apply --check --verbose /tmp/ui.patch
             exit 1
           fi
 
-      - name: Appliquer le patch
+      - name: Appliquer le code 1.11
         if: env.PATCH_MODE == 'APPLY'
-        run: git apply --index --verbose /tmp/ui.patch
+        run: |
+          set -euo pipefail
+          git apply --index --verbose /tmp/ui.patch
+          git restore --source=HEAD --staged --worktree .github/workflows/validate.yml
 
       - name: Exécuter les huit suites de contrôle
         run: npm run check
 
-      - name: Retirer les fichiers temporaires
-        run: git rm .github/patches/ui-1.11.part.* .github/workflows/apply-ui-1.11-patch.yml
-
-      - name: Enregistrer et publier le lot 1.11
+      - name: Créer le commit 1.11
+        if: env.PATCH_MODE == 'APPLY'
         run: |
           set -euo pipefail
           git config user.name "CoordoDiscours CI"
           git config user.email "actions@users.noreply.github.com"
           git commit -m "feat: improve mobile accessibility and client caching"
-          git push origin HEAD:agent/mobile-accessibility-performance
+
+      - name: Publier le commit 1.11
+        if: env.PATCH_MODE == 'APPLY'
+        run: git push origin HEAD:agent/mobile-accessibility-performance
