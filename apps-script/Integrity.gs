@@ -16,6 +16,7 @@ function getDataIntegrityReport_() {
   const plannings = listPlannings('', true);
   const hospitalities = listHospitalities('');
   const invitations = listInvitations('');
+  const availability = listSpeakerAvailability_(true);
 
   const speakerIds = new Set(speakers.map(item => String(item.id)));
   const congregationIds = new Set(congregations.map(item => String(item.id)));
@@ -65,6 +66,8 @@ function getDataIntegrityReport_() {
     }
   });
 
+  validateSpeakerAvailabilityIntegrity_(availability, speakerIds, pushIssue);
+
   APP_CONFIG.inactiveTalks.forEach(function (number) {
     const talk = talks.find(item => Number(item.number) === Number(number));
     if (!talk || talk.active) {
@@ -82,6 +85,7 @@ function getDataIntegrityReport_() {
       plannings: plannings.length,
       hospitalities: hospitalities.length,
       invitations: invitations.length,
+      speakerAvailability: availability.length,
       issues: issues.length
     },
     issues: issues
@@ -89,4 +93,46 @@ function getDataIntegrityReport_() {
 
   logAction_('CONTROLE_INTEGRITE', 'APPLICATION', APP_CONFIG.version, { ok: result.ok, issues: issues.length });
   return result;
+}
+
+function validateSpeakerAvailabilityIntegrity_(entries, speakerIds, pushIssue) {
+  const duplicates = {};
+  const bySpeaker = {};
+  (entries || []).forEach(function (entry) {
+    if (!speakerIds.has(String(entry.speakerId))) {
+      pushIssue('ERREUR', 'DISPONIBILITE_ORATEUR_INTROUVABLE', 'Une période de disponibilité référence un orateur inexistant.', { availabilityId: entry.id, speakerId: entry.speakerId });
+    }
+    if (!SPEAKER_AVAILABILITY_TYPES[entry.type]) {
+      pushIssue('ERREUR', 'DISPONIBILITE_TYPE_INVALIDE', 'Une période utilise un type de disponibilité inconnu.', { availabilityId: entry.id, type: entry.type });
+    }
+    if (!entry.startDate || !entry.endDate || entry.endDate < entry.startDate) {
+      pushIssue('ERREUR', 'DISPONIBILITE_DATES_INVALIDES', 'Une période de disponibilité contient des dates invalides.', { availabilityId: entry.id, startDate: entry.startDate, endDate: entry.endDate });
+    }
+    const duplicateKey = [entry.speakerId, entry.type, entry.startDate, entry.endDate].join('|');
+    if (duplicates[duplicateKey]) {
+      pushIssue('ERREUR', 'DISPONIBILITE_DUPLIQUEE', 'Deux périodes de disponibilité identiques sont enregistrées.', { availabilityIds: [duplicates[duplicateKey], entry.id], key: duplicateKey });
+    } else {
+      duplicates[duplicateKey] = entry.id;
+    }
+    if (!bySpeaker[entry.speakerId]) bySpeaker[entry.speakerId] = [];
+    if (entry.active !== false) bySpeaker[entry.speakerId].push(entry);
+  });
+
+  Object.keys(bySpeaker).forEach(function (speakerId) {
+    const items = bySpeaker[speakerId];
+    items.forEach(function (entry, index) {
+      if (entry.type !== 'INDISPONIBLE') return;
+      items.slice(index + 1).forEach(function (other) {
+        if (other.type === 'INDISPONIBLE') return;
+        const overlap = entry.startDate <= other.endDate && entry.endDate >= other.startDate;
+        if (overlap) {
+          pushIssue('AVERTISSEMENT', 'DISPONIBILITE_CONTRADICTOIRE', 'Une période indisponible chevauche une autre indication de disponibilité.', {
+            speakerId: speakerId,
+            availabilityIds: [entry.id, other.id],
+            types: [entry.type, other.type]
+          });
+        }
+      });
+    });
+  });
 }
