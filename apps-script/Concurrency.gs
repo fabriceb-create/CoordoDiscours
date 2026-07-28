@@ -40,6 +40,22 @@ function advanceEntityVersion_(entity, entityId) {
   return metadata;
 }
 
+function restoreEntityVersion_(entity, entityId, metadata) {
+  const previous = metadata || {};
+  if (!String(previous.version || '').trim()) {
+    removeEntityVersion_(entity, entityId);
+    return;
+  }
+  PropertiesService.getScriptProperties().setProperty(
+    concurrencyKey_(entity, entityId),
+    JSON.stringify({
+      version: String(previous.version),
+      updatedAt: String(previous.updatedAt || ''),
+      updatedBy: String(previous.updatedBy || 'Utilisateur')
+    })
+  );
+}
+
 function removeEntityVersion_(entity, entityId) {
   PropertiesService.getScriptProperties().deleteProperty(concurrencyKey_(entity, entityId));
 }
