@@ -1,4 +1,4 @@
-const RECOMMENDATION_ENGINE_VERSION = '1.2.0';
+const RECOMMENDATION_ENGINE_VERSION = '1.3.0';
 
 function getSpeakerRecommendations(payload) {
   return getSpeakerRecommendationsWithData_(payload, buildPlanningRuleDataset_());
@@ -20,7 +20,7 @@ function getSpeakerRecommendationsWithData_(payload, dataset) {
     return { ready: true, recommendations: [], message: 'Ce discours est introuvable ou inactif.' };
   }
 
-  const weights = getRecommendationWeights_();
+  const weights = resources.recommendationWeights || getRecommendationWeights_();
   const eventDate = new Date(date + 'T12:00:00');
   const monthKey = date.slice(0, 7);
   const plannings = (resources.plannings || []).filter(function (item) {
