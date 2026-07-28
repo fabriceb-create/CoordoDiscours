@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('Styles'); ?>
   <?!= include('MergeStyles'); ?>
+  <?!= include('VersionHistoryStyles'); ?>
   <?!= include('DashboardStyles'); ?>
   <?!= include('ConflictResolutionStyles'); ?>
   <?!= include('AutomaticPlanningStyles'); ?>
@@ -31,6 +32,7 @@
         <button class="nav-button" data-view="congregations">Assemblées</button>
         <button class="nav-button" data-view="talks">Discours</button>
         <button class="nav-button" data-view="history">Historique</button>
+        <button class="nav-button" data-view="versions">Versions</button>
         <button class="nav-button" data-view="backup">Sauvegardes</button>
         <button class="nav-button" data-view="settings">Paramètres</button>
       </nav>
@@ -108,6 +110,21 @@
         <div id="history-list" class="cards-list"><div class="empty-state">Ouvre ce module pour charger l’historique.</div></div>
       </section>
 
+      <section id="view-versions" class="view">
+        <div class="section-header"><div><p class="eyebrow">Traçabilité avancée</p><h2>Historique des versions</h2></div><button id="version-history-refresh" class="secondary-button" type="button">Actualiser</button></div>
+        <div class="version-history-toolbar">
+          <label>Type de fiche<select id="version-history-entity"><option value="">Chargement...</option></select></label>
+          <label>Rechercher une fiche<input id="version-history-search" type="search" placeholder="Nom, date, numéro ou adresse e-mail..."></label>
+        </div>
+        <div class="version-history-layout">
+          <aside class="version-history-panel">
+            <div class="version-history-panel-head"><h3>Fiches</h3><span id="version-history-record-count" class="version-history-count">0 fiche</span></div>
+            <div id="version-history-records" class="version-history-records"><div class="version-history-empty">Ouvre ce module pour charger les fiches.</div></div>
+          </aside>
+          <section class="version-history-panel version-history-detail" id="version-history-detail"><div class="version-history-empty">Sélectionne une fiche pour parcourir ses versions.</div></section>
+        </div>
+      </section>
+
       <section id="view-backup" class="view">
         <div class="section-header"><div><p class="eyebrow">Sécurité des données</p><h2>Sauvegardes et restauration</h2></div><button id="backup-refresh" class="secondary-button" type="button">Actualiser</button></div>
         <div class="backup-grid">
@@ -162,6 +179,7 @@
   <div id="toast" class="toast" hidden></div>
   <?!= include('Scripts'); ?>
   <?!= include('MergeScripts'); ?>
+  <?!= include('VersionHistoryScripts'); ?>
   <?!= include('PlanningScripts'); ?>
   <?!= include('AutomaticPlanningScripts'); ?>
   <?!= include('ConflictResolutionScripts'); ?>
