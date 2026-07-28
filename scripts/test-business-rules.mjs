@@ -12,8 +12,12 @@ const rules = read('RulesEngine.gs');
 assertContains(planning, /evaluatePlanningRules_\(data(?:,\s*dataset)?\)/, 'Planning : le moteur central de règles n’est pas utilisé.');
 assertContains(planning, /validation\.warnings\.length\s*&&\s*!confirmWarnings/, 'Planning : la confirmation des avertissements est absente.');
 assertContains(planning, /status\s*!==\s*['"]ANNULE['"]/, 'Planning : les programmations annulées ne sont pas exclues.');
-['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => assertContains(rules, code, `Règles : ${code} est absente.`));
+['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007','PLAN_008','PLAN_009','PLAN_010'].forEach(code => assertContains(rules, code, `Règles : ${code} est absente.`));
 assertContains(rules, /RULE_SEVERITY[\s\S]*ERROR[\s\S]*WARNING[\s\S]*INFO/, 'Règles : les niveaux de sévérité sont absents.');
+assertContains(rules, /speakerAvailability:\s*speakerAvailability/, 'Règles : les disponibilités ne sont pas préchargées.');
+assertContains(rules, /evaluateSpeakerAvailability_\(planning\.speakerId, planning\.date/, 'Règles : la disponibilité de l’orateur n’est pas évaluée.');
+assertContains(rules, /_speakerAvailability/, 'Règles : les disponibilités ne sont pas conservées dans les brouillons automatiques.');
+assertContains(rules, /_availabilityAdjustments/, 'Règles : les réglages de disponibilité ne participent pas à la signature des brouillons.');
 
 const concurrency = read('Concurrency.gs');
 const planningUi = read('PlanningScripts.html');
@@ -22,6 +26,7 @@ const communicationUi = read('CommunicationScripts.html');
 const settingsUi = read('SettingsScripts.html');
 const accessUi = read('AccessScripts.html');
 const speakerTalkUi = read('SpeakerTalkUI.html');
+const availabilityUi = read('SpeakerAvailabilityUI.html');
 assertContains(concurrency, /function\s+assertEntityVersion_\s*\(/, 'Concurrence : le contrôle de version est absent.');
 assertContains(concurrency, /CONFLIT_VERSION/, 'Concurrence : le code de conflit explicite est absent.');
 assertContains(concurrency, /function\s+advanceEntityVersion_\s*\(/, 'Concurrence : le renouvellement de version est absent.');
@@ -58,6 +63,7 @@ assertContains(automatic, /function\s+commitAutomaticPlanningDraft\s*\(/, 'Plani
 assertContains(automatic, /getSpeakerRecommendationsWithData_\(/, 'Planification automatique : RecommendationEngine n’est pas utilisé.');
 assertContains(automatic, /evaluatePlanningRules_\(/, 'Planification automatique : RulesEngine n’est pas utilisé.');
 assertContains(automatic, /automaticPlanningDatasetSignature_/, 'Planification automatique : la signature du brouillon est absente.');
+assertContains(automatic, /recommendationWeights:\s*resources\.recommendationWeights/, 'Planification automatique : les réglages de recommandation ne participent pas à la signature.');
 assertContains(automatic, /AUTO_PLAN_OBSOLETE\|/, 'Planification automatique : le code de brouillon obsolète est absent.');
 assertContains(automatic, /LockService\.getScriptLock\(\)/, 'Planification automatique : la validation groupée n’est pas verrouillée.');
 assertContains(automatic, /setValues\(/, 'Planification automatique : l’écriture groupée est absente.');
@@ -70,6 +76,22 @@ assertContains(automaticUi, /commitAutomaticPlanningDraft/, 'Interface : la vali
 assertContains(indexUi, /id="automatic-planning"[\s\S]*id="automatic-planning-dialog"/, 'Interface : l’assistant de planification automatique n’est pas accessible.');
 assertContains(indexUi, /AutomaticPlanningStyles[\s\S]*AutomaticPlanningScripts/, 'Interface : le module de planification automatique n’est pas chargé.');
 
+const availability = read('SpeakerAvailability.gs');
+['INDISPONIBLE','DISPONIBLE_SEULEMENT','PREFEREE','A_EVITER'].forEach(type => assertContains(availability, type, `Disponibilités : le type ${type} est absent.`));
+assertContains(availability, /function\s+getSpeakerAvailabilitySchedule\s*\(/, 'Disponibilités : le chargement de la fiche est absent.');
+assertContains(availability, /function\s+saveSpeakerAvailabilitySchedule\s*\(/, 'Disponibilités : l’enregistrement est absent.');
+assertContains(availability, /function\s+evaluateSpeakerAvailability_\s*\(/, 'Disponibilités : le moteur d’évaluation est absent.');
+assertContains(availability, /assertEntityVersion_\(['"]ORATEUR_DISPONIBILITES['"]/, 'Disponibilités : la version attendue n’est pas contrôlée.');
+assertContains(availability, /advanceEntityVersion_\(['"]ORATEUR_DISPONIBILITES['"]/, 'Disponibilités : la version n’est pas renouvelée.');
+assertContains(availability, /LockService\.getScriptLock\(\)/, 'Disponibilités : l’écriture n’est pas verrouillée.');
+assertContains(availability, /restoreSpeakerAvailabilitySnapshot_/, 'Disponibilités : le retour arrière est absent.');
+assertContains(availability, /buildAuditDetails_\(/, 'Disponibilités : le format d’audit avant/après est absent.');
+assertContains(availabilityUi, /name="version"/, 'Interface : les disponibilités ne conservent pas leur version.');
+assertContains(availabilityUi, /saveSpeakerAvailabilitySchedule[\s\S]*elements\.version\.value/, 'Interface : la version des disponibilités n’est pas envoyée.');
+assertContains(availabilityUi, /CONFLIT_VERSION\|[\s\S]*openSpeakerAvailability_/, 'Interface : un conflit de disponibilité ne déclenche pas le rechargement.');
+assertContains(availabilityUi, /manage-speaker-availability/, 'Interface : l’accès aux disponibilités depuis la fiche orateur est absent.');
+assertContains(indexUi, /SpeakerAvailabilityStyles[\s\S]*SpeakerAvailabilityUI/, 'Interface : le module de disponibilité n’est pas chargé.');
+
 [
   ['Speakers.gs', 'ORATEUR'],
   ['Congregations.gs', 'ASSEMBLEE'],
@@ -78,7 +100,8 @@ assertContains(indexUi, /AutomaticPlanningStyles[\s\S]*AutomaticPlanningScripts/
   ['Talks.gs', 'DISCOURS'],
   ['Settings.gs', 'PARAMETRES'],
   ['Access.gs', 'UTILISATEUR'],
-  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS']
+  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS'],
+  ['SpeakerAvailability.gs', 'ORATEUR_DISPONIBILITES']
 ].forEach(([file, entity]) => {
   const source = read(file);
   assertContains(source, new RegExp(`assertEntityVersion_\\(['"]${entity}['"]`), `Concurrence : ${entity} ne vérifie pas la version attendue.`);
@@ -110,9 +133,13 @@ assertContains(recommendations, /rawScore\s*\/\s*weights\.total/, 'Recommandatio
 assertContains(recommendations, /function\s+getSpeakerRecommendationsWithData_\s*\(/, 'Recommandations : le calcul avec données préchargées est absent.');
 assertContains(recommendations, /resources\.speakerTalks/, 'Recommandations : les discours déclarés préchargés ne sont pas réutilisés.');
 assertContains(recommendations, /resources\.recommendationWeights/, 'Recommandations : les pondérations préchargées ne sont pas réutilisées.');
+assertContains(recommendations, /evaluateSpeakerAvailability_/, 'Recommandations : les disponibilités ne sont pas évaluées.');
+assertContains(recommendations, /availability\.blocked[\s\S]*eligible\s*=\s*false/, 'Recommandations : un orateur indisponible n’est pas exclu.');
+assertContains(recommendations, /preferredBonus/, 'Recommandations : le bonus de date préférée est absent.');
+assertContains(recommendations, /avoidPenalty/, 'Recommandations : le malus de date à éviter est absent.');
 
 const settings = read('Settings.gs');
-['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE','AUTO_PLAN_MOIS','AUTO_PLAN_SUIVIS'].forEach(key => assertContains(settings, key, `Paramètres : ${key} est absent.`));
+['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE','AUTO_PLAN_MOIS','AUTO_PLAN_SUIVIS','RECO_BONUS_DATE_PREFEREE','RECO_MALUS_DATE_A_EVITER'].forEach(key => assertContains(settings, key, `Paramètres : ${key} est absent.`));
 assertContains(settings, /validateRecommendationWeights_/, 'Paramètres : la validation des pondérations est absente.');
 
 const dashboard = read('Dashboard.gs');
@@ -133,7 +160,7 @@ assertContains(historyUi, /history-change-head/, 'Audit : le tableau avant/aprè
   ['Planning.gs', 'PROGRAMMATION'], ['Speakers.gs', 'ORATEUR'], ['Congregations.gs', 'ASSEMBLEE'],
   ['Talks.gs', 'DISCOURS'], ['HospitalityInvitations.gs', 'HOSPITALITE'],
   ['HospitalityInvitations.gs', 'INVITATION'], ['Settings.gs', 'PARAMETRES'], ['Access.gs', 'UTILISATEUR'],
-  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS']
+  ['SpeakerTalks.gs', 'ORATEUR_DISCOURS'], ['SpeakerAvailability.gs', 'ORATEUR_DISPONIBILITES']
 ].forEach(([file, entity]) => {
   const source = read(file);
   assertContains(source, /buildAuditDetails_\(/, `Audit : ${file} n’utilise pas le format avant-après.`);
@@ -147,7 +174,7 @@ assertContains(communication, /Une invitation existe déjà pour cette programma
 assertContains(communication, /status\s*===\s*['"]ENVOYEE['"][\s\S]*sentDate/, 'Invitations : la date d’envoi automatique est absente.');
 
 const integrity = read('Integrity.gs');
-['ORATEUR_ASSEMBLEE_INTRouvable','PROGRAMMATION_ORATEUR_INTRouvable','PROGRAMMATION_DISCOURS_INTRouvable','CRENEAU_DUPLIQUE','HOSPITALITE_PROGRAMMATION_INTRouvable','INVITATION_PROGRAMMATION_INTRouvable','DISCOURS_OFFICIEL_INACTIF'].forEach(code => assertContains(integrity, code, `Intégrité : ${code} est absent.`));
+['ORATEUR_ASSEMBLEE_INTRouvable','PROGRAMMATION_ORATEUR_INTRouvable','PROGRAMMATION_DISCOURS_INTRouvable','CRENEAU_DUPLIQUE','HOSPITALITE_PROGRAMMATION_INTRouvable','INVITATION_PROGRAMMATION_INTRouvable','DISCOURS_OFFICIEL_INACTIF','DISPONIBILITE_ORATEUR_INTROUVABLE','DISPONIBILITE_TYPE_INVALIDE','DISPONIBILITE_DATES_INVALIDES','DISPONIBILITE_DUPLIQUEE','DISPONIBILITE_CONTRADICTOIRE'].forEach(code => assertContains(integrity, code, `Intégrité : ${code} est absent.`));
 assertContains(integrity, /assertAccess_\(\s*['"]ADMIN['"]/, 'Intégrité : le rapport n’est pas réservé aux administrateurs.');
 
 const talks = read('Talks.gs');
@@ -157,6 +184,7 @@ const backup = read('Backup.gs');
 assertContains(backup, /LockService\.getScriptLock\(\)/, 'Sauvegarde : le verrou est absent.');
 assertContains(backup, /createDriveSafetyBackup_\(\)/, 'Sauvegarde : la copie de sécurité est absente.');
 assertContains(backup, /500000/, 'Sauvegarde : la limite de cellules est absente.');
+assertContains(backup, /Object\.values\(APP_CONFIG\.sheets\)/, 'Sauvegarde : toutes les feuilles configurées ne sont pas incluses.');
 
 if (failures.length) {
   console.error('\nTests des règles métier : ÉCHEC\n');
