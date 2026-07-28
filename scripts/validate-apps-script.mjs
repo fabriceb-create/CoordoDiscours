@@ -153,7 +153,7 @@ if (fs.existsSync(recommendationPath)) {
   const recommendation = fs.readFileSync(recommendationPath, 'utf8');
   if (!recommendation.includes('getSpeakerRecommendations')) errors.push('Le point d’entrée des recommandations est absent.');
   if (!recommendation.includes('scoreSpeakerRecommendation_')) errors.push('Le calcul du score de recommandation est absent.');
-  if (!recommendation.includes('getSpeakerTalkNumbers_')) errors.push('Les recommandations doivent contrôler les discours déclarés des orateurs extérieurs.');
+  if (!recommendation.includes('resources.speakerTalks') && !recommendation.includes('getSpeakerTalkNumbersMap_')) errors.push('Les recommandations doivent contrôler les discours déclarés des orateurs extérieurs.');
 }
 
 const allFiles = fs.existsSync(root) ? fs.readdirSync(root) : [];
