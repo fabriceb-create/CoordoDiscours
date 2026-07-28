@@ -1,5 +1,5 @@
 <dialog id="speaker-talk-dialog">
-  <form id="speaker-talk-form" method="dialog" class="form-panel">
+  <form id="speaker-talk-form" method="dialog" class="form-panel" data-merge-entity="ORATEUR_DISCOURS">
     <div class="dialog-header">
       <div><p class="eyebrow">Discours déclarés</p><h2 id="speaker-talk-title">Orateur</h2></div>
       <button type="button" class="icon-button" data-close="speaker-talk-dialog">×</button>
@@ -37,12 +37,15 @@
     try {
       state.speakerTalkSelection = await runServer('getSpeakerTalkSelection', speakerId);
       const dialog = document.getElementById('speaker-talk-dialog');
-      dialog.querySelector('[name="speakerId"]').value = speakerId;
-      dialog.querySelector('[name="version"]').value = state.speakerTalkSelection.version || '';
+      const form = document.getElementById('speaker-talk-form');
+      form.elements.speakerId.value = speakerId;
+      form.elements.version.value = state.speakerTalkSelection.version || '';
+      const selected = state.speakerTalkSelection.talks.filter(item => item.selected).map(item => item.number);
+      rememberConcurrentMergeBase_(form, 'ORATEUR_DISCOURS', speakerId, { talkNumbers: selected });
       document.getElementById('speaker-talk-title').textContent = state.speakerTalkSelection.speaker.fullName || state.speakerTalkSelection.speaker.lastName;
       document.getElementById('speaker-talk-search').value = '';
       renderSpeakerTalkSelection();
-      if (!dialog.open) dialog.showModal();
+      dialog.showModal();
     } catch (error) { showError(error); }
   }
 
@@ -62,6 +65,11 @@
       </label>`).join('');
   }
 
+  function invalidatePlanningOptionsAfterSpeakerTalks_() {
+    if (state.planningOptions) state.planningOptions = { speakers: [], talks: [], congregations: [] };
+    if (state.automaticPlanningDraft) state.automaticPlanningDraft = null;
+  }
+
   document.addEventListener('click', event => {
     if (event.target.id === 'manage-speaker-talks') {
       openSpeakerTalks(document.getElementById('speaker-form').elements.id.value);
@@ -79,16 +87,24 @@
 
   document.getElementById('speaker-talk-form').addEventListener('submit', async event => {
     event.preventDefault();
-    const speakerId = event.target.elements.speakerId.value;
+    const form = event.target;
+    const speakerId = form.elements.speakerId.value;
+    const selected = state.speakerTalkSelection.talks.filter(item => item.selected).map(item => item.number);
     try {
-      const selected = state.speakerTalkSelection.talks.filter(item => item.selected).map(item => item.number);
-      await runServer('saveSpeakerTalkSelection', speakerId, selected, event.target.elements.version.value);
+      await runServer('saveSpeakerTalkSelection', speakerId, selected, form.elements.version.value);
       document.getElementById('speaker-talk-dialog').close();
       toast('Liste des discours enregistrée.');
-      if (state.planningOptions) state.planningOptions = { speakers: [], talks: [], congregations: [] };
+      invalidatePlanningOptionsAfterSpeakerTalks_();
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) await openSpeakerTalks(speakerId);
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, { talkNumbers: selected }, {
+          onSaved: async () => {
+            document.getElementById('speaker-talk-dialog').close();
+            toast('Listes de discours fusionnées et enregistrées.');
+            invalidatePlanningOptionsAfterSpeakerTalks_();
+          }
+        });
+      } else showError(error);
     }
   });
 
