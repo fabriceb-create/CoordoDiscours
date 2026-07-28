@@ -9,7 +9,8 @@ const required = [
   'HistoryScripts.html','Settings.gs','SettingsScripts.html','I18n.gs','I18nScripts.html',
   'Backup.gs','BackupScripts.html','BackupStyles.html','Access.gs','AccessScripts.html',
   'HospitalityInvitations.gs','CommunicationScripts.html','Integrity.gs','RulesEngine.gs',
-  'RecommendationEngine.gs','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
+  'RecommendationEngine.gs','ConflictResolution.gs','ConflictResolutionStyles.html',
+  'ConflictResolutionScripts.html','Concurrency.gs','SpeakerTalks.gs','SpeakerTalkUI.html'
 ];
 
 const errors = [];
@@ -36,6 +37,7 @@ if (fs.existsSync(indexPath)) {
     if (!fs.existsSync(path.join(root, `${include}.html`))) errors.push(`Include HTML introuvable : ${include}.html`);
   }
   if (!index.includes('SettingsScripts')) errors.push('Le script des paramètres n’est pas inclus.');
+  if (!index.includes('ConflictResolutionStyles') || !index.includes('ConflictResolutionScripts')) errors.push('Le module de résolution des conflits n’est pas entièrement inclus.');
 }
 
 const codePath = path.join(root, 'Code.gs');
@@ -68,6 +70,7 @@ const protectedFunctions = [
   ['Planning.gs', 'savePlanning', 'COORDINATEUR'],
   ['Planning.gs', 'cancelPlanning', 'COORDINATEUR'],
   ['Planning.gs', 'restorePlanning', 'COORDINATEUR'],
+  ['ConflictResolution.gs', 'getPlanningConflictResolutions', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'saveHospitality', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'setHospitalityStatus', 'COORDINATEUR'],
   ['HospitalityInvitations.gs', 'saveInvitation', 'COORDINATEUR'],
