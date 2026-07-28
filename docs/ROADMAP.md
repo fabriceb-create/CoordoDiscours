@@ -4,7 +4,7 @@
 
 Construire un assistant fiable permettant au coordinateur des discours publics de gérer l’ensemble du processus dans un seul outil, avec des propositions automatiques contrôlées par des règles métier explicites.
 
-## Version 1.9 Stable — en préparation de recette
+## Version 1.10 Stable — en préparation de recette
 
 ### Fondations et sécurité
 
@@ -25,6 +25,9 @@ Construire un assistant fiable permettant au coordinateur des discours publics d
 - Déduplication des instantanés consécutifs identiques.
 - Ajout de l’état actuel lorsqu’il manque dans l’audit.
 - Recherche des fiches versionnées.
+- Chargement progressif par pages de 40 fiches.
+- Construction des chronologies uniquement pour la page visible.
+- Conservation des périodes de disponibilité actives et désactivées dans les instantanés courants.
 - Sélection et comparaison de deux versions.
 - Libellés lisibles pour les relations, discours et disponibilités.
 - Restauration contrôlée d’une ancienne version.
@@ -64,15 +67,14 @@ Construire un assistant fiable permettant au coordinateur des discours publics d
 - Historique des versions.
 - Interface Français / Kréyòl Gwadloup.
 
-## Prochain lot — 1.10
+## Prochain lot — 1.11
 
-- Optimisations UI et responsive.
-- Réduction des lectures Google Sheets répétitives.
-- Chargement progressif ou pagination des historiques volumineux.
-- Amélioration des libellés et résumés de versions.
 - Documentation utilisateur complète.
 - Documentation administrateur et procédure de déploiement.
-- Recette professionnelle consolidée avant le passage en version 2.
+- Recette professionnelle consolidée sur ordinateur et téléphone.
+- Mesure des temps de réponse avec des bases de démonstration volumineuses.
+- Amélioration des libellés et résumés de versions.
+- Réduction supplémentaire des lectures Google Sheets répétitives.
 
 ## Version 2
 

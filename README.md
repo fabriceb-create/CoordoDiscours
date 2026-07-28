@@ -4,7 +4,7 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.9 Stable**
+Version en préparation de recette : **1.10 Stable**
 
 Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques et la documentation d’installation et de recette.
 
@@ -17,7 +17,7 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 - Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
 - Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter.
 - Fusion intelligente des modifications concurrentes.
-- Historique navigable des versions par fiche.
+- Historique navigable des versions par fiche, avec chargement progressif des listes volumineuses.
 - Comparaison de deux versions.
 - Restauration contrôlée d’une ancienne version.
 - Répertoire des orateurs et des assemblées.
@@ -33,7 +33,7 @@ Le dépôt contient le code Apps Script, la base Google Sheets auto-installable,
 
 Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` déjà enregistrés dans la feuille `HISTORIQUE`.
 
-Pour chaque fiche, il permet de :
+Les fiches sont chargées par pages de 40 afin de limiter les calculs et les transferts sur les historiques volumineux. Pour chaque fiche, le module permet de :
 
 - parcourir les versions numérotées ;
 - identifier l’état actuel ;

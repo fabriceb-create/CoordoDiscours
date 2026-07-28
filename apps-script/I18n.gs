@@ -188,7 +188,9 @@ const INTERFACE_TRANSLATIONS = Object.freeze({
     'Appliquer mes choix': 'Apliké chwa an mwen',
     'Aucune valeur conflictuelle n’est choisie sans ton accord.': 'Pon valè ki an konfli pé ké chwazi san dakò a-w.',
     'Choisis une valeur pour chaque champ en conflit.': 'Chwazi on valè pou chak chan ki an konfli.',
-    'Modifications fusionnées et enregistrées.': 'Modifikasyon mété ansanm é anrèjistré.'
+    'Modifications fusionnées et enregistrées.': 'Modifikasyon mété ansanm é anrèjistré.',
+    'Charger plus': 'Chajé plis',
+    'Chargement des fiches...': 'Ka chajé sé fich-la...'
   }
 });
 

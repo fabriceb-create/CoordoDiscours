@@ -6,6 +6,8 @@ import vm from 'node:vm';
 
 const root = path.resolve('apps-script');
 let currentSpeaker = null;
+let currentSpeakers = null;
+let currentAvailabilityEntries = [];
 let historyRows = [];
 let writeResult = { result: {} };
 let writtenCandidate = null;
@@ -70,7 +72,7 @@ const context = {
   normalizeText_: value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(),
   getDatabase_: () => { throw new Error('La base ne doit pas être appelée dans ces scénarios.'); },
   sheetRowsAsObjects_: () => [],
-  listSpeakers: () => currentSpeaker ? [clone(currentSpeaker)] : [],
+  listSpeakers: () => currentSpeakers ? clone(currentSpeakers) : (currentSpeaker ? [clone(currentSpeaker)] : []),
   listCongregations: () => [{ id: 'C1', name: 'Basse-Terre', active: true, version: 'c1' }],
   listTalks: () => [{ number: 1, title: 'Premier discours', active: true, version: 't1' }, { number: 2, title: 'Deuxième discours', active: true, version: 't2' }],
   listPlannings: () => [],
@@ -79,7 +81,8 @@ const context = {
   getApplicationSettings: () => ({ settings: [{ key: 'ASSEMBLEE', value: 'Basse-Terre' }, { key: 'RECO_POIDS_DISCOURS', value: '40' }], settingsVersion: 'settings-v1' }),
   listAccessUsers_: () => [{ email: 'admin@example.test', name: 'Admin', role: 'ADMIN', active: true, version: 'user-v1' }],
   getSpeakerTalkNumbersMap_: () => ({ S1: [1] }),
-  getSpeakerAvailabilityMap_: () => ({ S1: [] }),
+  getSpeakerAvailabilityMap_: () => ({ S1: currentAvailabilityEntries.filter(item => item.active !== false).map(clone) }),
+  listSpeakerAvailability_: () => clone(currentAvailabilityEntries),
   getEntityVersion_: entity => ({ version: `${entity}-v1`, updatedAt: '', updatedBy: '' }),
   logAction_: (action, entity, entityId, details) => actions.push({ action, entity, entityId, details })
 };
@@ -87,7 +90,10 @@ const context = {
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(root, 'MergeEngine.gs'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(root, 'VersionHistory.gs'), 'utf8'), context);
-context.readVersionHistoryRows_ = () => clone(historyRows);
+context.readVersionHistoryRows_ = (entity, entityId) => clone(historyRows).filter(row => {
+  if (entity && String(row.entity) !== String(entity)) return false;
+  return entityId == null || String(row.entityId) === String(entityId);
+});
 context.writeConcurrentMergeEntity_ = (_definition, _entityId, candidate) => {
   writtenCandidate = clone(candidate);
   return clone(writeResult);
@@ -126,6 +132,8 @@ const speakerDefinition = context.getConcurrentMergeDefinition_('ORATEUR');
   assert.equal(timeline.versions[0].snapshot.phone, '0590000000');
   assert.equal(timeline.versions[1].snapshot.phone, '0590999999');
   assert.equal(timeline.currentVersionNumber, 2);
+  assert.equal((timeline.versions[0].changedFields || []).join(','), '');
+  assert.equal((timeline.versions[1].changedFields || []).join(','), 'phone');
 }
 
 // 3. Les instantanés consécutifs identiques doivent être dédupliqués.
@@ -260,4 +268,61 @@ const speakerDefinition = context.getConcurrentMergeDefinition_('ORATEUR');
   assert.throws(() => context.restoreEntityVersion({ entity: 'UTILISATEUR', entityId: 'admin@example.test', versionId: target.id, expectedCurrentVersion: 'user-v1' }), /propre accès administrateur/);
 }
 
-console.log('Tests de l’historique des versions réussis : 13 scénarios contrôlés.');
+
+// 14. L’état courant des disponibilités doit conserver aussi les périodes désactivées.
+{
+  currentSpeaker = null;
+  currentSpeakers = [{
+    id: 'S1', fullName: 'Jean DUPONT', lastName: 'DUPONT', firstName: 'Jean',
+    type: 'LOCAL', congregationId: 'C1', active: true, version: 'speaker-v1'
+  }];
+  currentAvailabilityEntries = [{
+    id: 'A1', speakerId: 'S1', type: 'A_EVITER', startDate: '2026-10-04', endDate: '2026-10-04',
+    reason: 'Ancienne préférence', active: false
+  }];
+  const definition = context.getConcurrentMergeDefinition_('ORATEUR_DISPONIBILITES');
+  const records = context.listCurrentVersionHistoryRecords_(definition);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].data.entries.length, 1);
+  assert.equal(records[0].data.entries[0].active, false);
+}
+
+// 15. La liste paginée doit construire les chronologies uniquement pour la page demandée.
+{
+  currentAvailabilityEntries = [];
+  currentSpeakers = Array.from({ length: 5 }, (_value, index) => ({
+    id: 'S' + (index + 1),
+    fullName: 'Orateur ' + (index + 1),
+    lastName: 'ORATEUR ' + (index + 1),
+    firstName: '', type: 'LOCAL', congregationId: 'C1', phone: '', email: '', active: true, notes: '',
+    version: 'speaker-v' + (index + 1)
+  }));
+  historyRows = [];
+  const originalBuild = context.buildEntityVersionTimeline_;
+  let buildCount = 0;
+  context.buildEntityVersionTimeline_ = function () {
+    buildCount += 1;
+    return originalBuild.apply(null, arguments);
+  };
+  const page = context.listVersionHistoryRecords('ORATEUR', '', { offset: 1, limit: 2 });
+  assert.equal(page.records.length, 2);
+  assert.equal(page.totalCount, 5);
+  assert.equal(page.offset, 1);
+  assert.equal(page.nextOffset, 3);
+  assert.equal(page.hasMore, true);
+  assert.equal(buildCount, 2);
+  const legacy = context.listVersionHistoryRecords('ORATEUR', '');
+  assert.equal(Array.isArray(legacy), true);
+  assert.equal(legacy.length, 5);
+  context.buildEntityVersionTimeline_ = originalBuild;
+}
+
+// 16. Les paramètres de pagination doivent être bornés côté serveur.
+{
+  const request = context.normalizeVersionHistoryListRequest_({ offset: -8, limit: 1000 });
+  assert.equal(request.offset, 0);
+  assert.equal(request.limit, 100);
+  assert.equal(request.paged, true);
+}
+
+console.log('Tests de l’historique des versions réussis : 16 scénarios contrôlés.');

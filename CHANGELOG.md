@@ -4,6 +4,22 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 
 ## [En développement]
 
+## [1.10.0] — en préparation de recette
+
+### Amélioré
+
+- Chargement progressif des fiches dans le module Versions, par pages de 40.
+- Construction des chronologies détaillées limitée aux fiches réellement affichées.
+- Compteur indiquant le nombre de fiches chargées et le total disponible.
+- Retour automatique à la fiche restaurée, même lorsqu’elle se trouve sur une page suivante.
+
+### Corrigé
+
+- Conservation des périodes de disponibilité désactivées dans l’état courant versionné.
+- Attribution des champs modifiés à la version `AFTER` plutôt qu’à l’état `BEFORE` de la même opération.
+- Bornage serveur des paramètres de pagination.
+
+
 ### Ajouté
 
 - Initialisation du dépôt GitHub.
