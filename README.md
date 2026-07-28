@@ -4,56 +4,71 @@ Application Google Apps Script de coordination des discours publics.
 
 ## État du projet
 
-Version en préparation de recette : **1.7 Stable**
+Version en préparation de recette : **1.9 Stable**
 
-Le dépôt contient désormais :
-
-- le code source Apps Script ;
-- la base de données Google Sheets auto-installable ;
-- les modules fonctionnels ;
-- la gestion Français / Kréyòl Gwadloup ;
-- les migrations de structure ;
-- les tests automatiques ;
-- la documentation d’installation et de recette.
+Le dépôt contient le code Apps Script, la base Google Sheets auto-installable, les modules métier, les migrations, les tests automatiques et la documentation d’installation et de recette.
 
 ## Modules disponibles
 
 - Tableau de bord et alertes prioritaires.
 - Programmation des discours.
 - Recommandation automatique des orateurs.
-- Assistant de résolution des conflits avec propositions d’un autre orateur, d’une autre date, d’un autre discours, d’une autre assemblée ou d’une combinaison de changements.
+- Assistant de résolution des conflits métier.
 - Planification automatique de 1 à 6 mois avec comparaison de trois scénarios.
-- Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter de chaque orateur.
-- Répertoire des orateurs.
-- Répertoire des assemblées.
-- Référentiel des discours.
-- Discours déclarés par orateur extérieur.
-- Invitations.
-- Hospitalité.
+- Gestion des disponibilités, indisponibilités, dates préférées et dates à éviter.
+- Fusion intelligente des modifications concurrentes.
+- Historique navigable des versions par fiche.
+- Comparaison de deux versions.
+- Restauration contrôlée d’une ancienne version.
+- Répertoire des orateurs et des assemblées.
+- Référentiel des discours et discours déclarés par orateur extérieur.
+- Invitations et hospitalité.
 - Planning imprimable sur 3 ou 6 mois.
 - Historique détaillé avant/après.
-- Contrôle d’intégrité et diagnostics.
-- Sauvegarde et restauration sécurisées.
+- Contrôle d’intégrité, sauvegarde et restauration sécurisées.
 - Gestion des rôles et des accès.
-- Verrouillage optimiste des fiches collaboratives.
-- Paramètres généraux et pondérations du moteur de recommandation.
-- Choix de la langue de l’interface.
+- Interface Français / Kréyòl Gwadloup.
+
+## Historique des versions
+
+Le module **Versions** reconstruit une chronologie métier à partir des instantanés `before` et `after` déjà enregistrés dans la feuille `HISTORIQUE`.
+
+Pour chaque fiche, il permet de :
+
+- parcourir les versions numérotées ;
+- identifier l’état actuel ;
+- sélectionner exactement deux versions ;
+- comparer leurs champs avec des libellés lisibles ;
+- restaurer une ancienne version lorsque le rôle de l’utilisateur l’autorise.
+
+La restauration repasse par les fonctions d’écriture métier existantes. Elle conserve donc les contrôles d’accès, les verrous, les validations, les règles de disponibilité et l’audit. Une ancienne programmation incompatible avec les règles actuelles reste bloquée. Une restauration réussie crée une nouvelle version au lieu d’effacer l’historique.
+
+## Fusion intelligente
+
+Lorsqu’une fiche change entre son ouverture et son enregistrement, CoordoDiscours compare :
+
+1. la valeur au moment de l’ouverture ;
+2. la modification locale ;
+3. la dernière valeur enregistrée.
+
+Les champs modifiés d’un seul côté sont fusionnés automatiquement. Lorsque le même champ contient deux modifications différentes, l’utilisateur choisit explicitement la valeur à conserver.
+
+Cette protection couvre les orateurs, assemblées, discours, programmations, invitations, hospitalités, paramètres, utilisateurs, listes de discours déclarés et disponibilités.
 
 ## Principes métier validés
 
 - Un orateur local peut présenter tout discours public actif.
 - Un orateur extérieur est limité aux discours déclarés dans sa fiche.
 - Les discours 59, 82, 122 et 123 sont inactifs.
-- Une répétition d’un même discours dans la période configurée déclenche une alerte non bloquante.
-- Une indisponibilité ou une date située hors des fenêtres « Disponible seulement » bloque la programmation.
-- Une date préférée augmente le classement d’un orateur ; une date à éviter produit un avertissement et diminue son score.
-- Une programmation impossible n’est pas enregistrée : l’assistant classe uniquement des propositions qui repassent avec succès dans le moteur central de règles.
-- Les conflits multiples peuvent produire une solution combinée portant sur plusieurs champs.
-- La planification automatique conserve les créneaux existants et exige une validation humaine avant écriture.
-- Un brouillon automatique est refusé lorsque le planning, les référentiels, les disponibilités ou les réglages de classement ont changé depuis sa génération.
-- Une fiche périmée ne peut pas écraser silencieusement la modification d’un autre utilisateur.
+- Une répétition dans la période configurée déclenche une alerte non bloquante.
+- Une indisponibilité ou une date hors des fenêtres « Disponible seulement » bloque la programmation.
+- Une date préférée augmente le classement ; une date à éviter produit un avertissement et diminue le score.
+- Une programmation impossible n’est jamais enregistrée automatiquement.
+- Les créneaux existants sont conservés par la planification automatique.
+- Un brouillon devenu obsolète est refusé.
+- Une fiche périmée ne peut pas écraser silencieusement une version plus récente.
+- Une ancienne version n’est restaurée qu’après contrôle des droits, de la version actuelle et des règles métier.
 - Les modifications importantes sont historisées.
-- L’hospitalité concerne en priorité les orateurs extérieurs.
 
 ## Structure principale
 
@@ -69,6 +84,8 @@ apps-script/
   RecommendationEngine.gs
   ConflictResolution.gs
   AutomaticPlanning.gs
+  MergeEngine.gs
+  VersionHistory.gs
   Concurrency.gs
   Speakers.gs
   SpeakerTalks.gs
@@ -93,14 +110,8 @@ scripts/
   test-conflict-resolution.mjs
   test-automatic-planning.mjs
   test-speaker-availability.mjs
-
-docs/
-  INSTALLATION.md
-  PLAN_TESTS.md
-  ARCHITECTURE.md
-  MODELE_DONNEES.md
-  REGLES_METIER.md
-  ROADMAP.md
+  test-merge-engine.mjs
+  test-version-history.mjs
 ```
 
 ## Installation rapide
@@ -116,14 +127,14 @@ La procédure détaillée se trouve dans `docs/INSTALLATION.md`.
 
 ## Validation
 
-La commande `npm run check` exécute :
+La commande `npm run check` exécute sept niveaux de contrôle :
 
-1. la validation de la structure Apps Script et des contrôles d’accès ;
-2. les contrôles statiques des règles métier ;
-3. les scénarios exécutables de résolution des conflits ;
-4. les scénarios de planification automatique ;
-5. les scénarios de disponibilité des orateurs.
+1. structure Apps Script et droits d’accès ;
+2. contrats statiques des règles métier ;
+3. résolution des conflits ;
+4. planification automatique ;
+5. disponibilités des orateurs ;
+6. fusion intelligente ;
+7. reconstruction, comparaison et restauration des versions.
 
-Le plan complet de vérification fonctionnelle se trouve dans `docs/PLAN_TESTS.md`.
-
-La version ne doit pas encore être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.
+La version ne doit pas être considérée comme définitivement validée avant son exécution réelle dans Google Apps Script et la réussite de la recette fonctionnelle.
