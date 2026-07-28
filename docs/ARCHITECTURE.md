@@ -2,10 +2,10 @@
 
 ## Plateforme
 
-- Google Apps Script.
+- Google Apps Script V8.
 - Google Sheets comme stockage principal.
 - Application web HTML Service.
-- Déploiement exécuté sous le compte du coordinateur.
+- Déploiement exécuté sous le compte du propriétaire du projet.
 - GitHub Actions pour la validation automatique.
 
 ## Structure principale
@@ -16,12 +16,17 @@ apps-script/
   Config.gs
   Database.gs
   Installation.gs
+  ServerCache.gs
+  Performance.gs
+  Help.gs
 
   Planning.gs
   RulesEngine.gs
   RecommendationEngine.gs
   ConflictResolution.gs
   AutomaticPlanning.gs
+  MergeEngine.gs
+  VersionHistory.gs
   Concurrency.gs
 
   Speakers.gs
@@ -32,6 +37,7 @@ apps-script/
   HospitalityInvitations.gs
 
   Dashboard.gs
+  PrintPlanning.gs
   History.gs
   Integrity.gs
   Backup.gs
@@ -43,16 +49,9 @@ apps-script/
   Index.html
   Styles.html
   Scripts.html
-  PlanningScripts.html
-  ConflictResolutionScripts.html
-  ConflictResolutionStyles.html
-  AutomaticPlanningScripts.html
-  AutomaticPlanningStyles.html
-  SpeakerTalkUI.html
-  SpeakerTalkStyles.html
-  SpeakerAvailabilityUI.html
-  SpeakerAvailabilityStyles.html
-  appsscript.json
+  HelpScripts.html
+  HelpStyles.html
+  ...
 ```
 
 ## Principes
@@ -65,10 +64,12 @@ apps-script/
 6. Les identifiants techniques sont stables et indépendants des numéros de ligne.
 7. Chaque modification sensible écrit une entrée structurée dans l’historique.
 8. Les droits sont contrôlés côté serveur, sans dépendre uniquement de l’affichage des boutons.
-9. Les écritures collaboratives utilisent un verrou serveur et un numéro de version optimiste.
-10. Les assistants ne contournent jamais les règles métier : chaque proposition est revalidée par `RulesEngine`.
-11. Les moteurs travaillant sur plusieurs hypothèses réutilisent un jeu de données préchargé afin de limiter les lectures Google Sheets.
+9. Les écritures collaboratives utilisent un verrou serveur et une version optimiste.
+10. Les assistants ne contournent jamais les règles métier.
+11. Les calculs composites réutilisent des jeux de données préchargés.
 12. Une écriture groupée doit pouvoir revenir à l’état précédent lorsqu’une étape échoue.
+13. Un cache est toujours une optimisation facultative, jamais la source de vérité.
+14. Une écriture au résultat réseau incertain ne doit pas être répétée automatiquement.
 
 ## Pipeline de programmation
 
@@ -85,7 +86,7 @@ chargement d’un jeu de données partagé
    └─ paramètres et pondérations
    ↓
 RulesEngine
-   ├─ valide → confirmation éventuelle des avertissements → écriture
+   ├─ valide → confirmation éventuelle → écriture
    └─ bloqué → ConflictResolution
                      ↓
               génération d’hypothèses
@@ -95,121 +96,137 @@ RulesEngine
               classement et affichage
 ```
 
-`buildPlanningRuleDataset_()` charge une seule fois les orateurs, discours, assemblées, programmations, discours déclarés et disponibilités. Le même jeu de données est ensuite réutilisé pour évaluer plusieurs hypothèses sans relire Google Sheets à chaque proposition.
+`buildPlanningRuleDataset_()` charge les référentiels une seule fois. `listPlanningsWithResources_()`, `listHospitalitiesWithPlannings_()` et `listInvitationsWithPlannings_()` permettent aux modules composites de réutiliser ces données sans relancer les mêmes lectures.
+
+## Cache serveur court
+
+`ServerCache.gs` utilise `CacheService.getScriptCache()` avec une durée par défaut de 60 secondes.
+
+Les entrées actuellement mises en cache sont :
+
+```text
+SETTINGS_SNAPSHOT_V1
+PLANNING_OPTIONS_V1
+COMMUNICATION_OPTIONS_V1
+VERSION_DISPLAY_CONTEXT_V1
+```
+
+Chaque clé finale comprend le nom et la version de l’application. Une nouvelle version ne réutilise donc pas automatiquement les valeurs d’une version précédente.
+
+### Stratégie de cohérence
+
+- une lecture vérifie d’abord le cache ;
+- en absence de valeur valide, la source Google Sheets est lue ;
+- l’échec du cache est journalisé dans la console mais ne bloque pas la lecture directe ;
+- une écriture invalide uniquement les caches qui dépendent de la donnée modifiée ;
+- une installation ou une restauration complète invalide tous les caches.
+
+Les paramètres, options de programmation et options de communication tolèrent une cohérence de quelques secondes. Les validations métier et les écritures continuent, elles, à relire les données nécessaires sous verrou lorsqu’une décision définitive est prise.
+
+## Observabilité serveur
+
+`Performance.gs` fournit `measureServerOperation_(operation, callback, context)`.
+
+Le moteur enregistre temporairement :
+
+- le nombre d’appels ;
+- le cumul, la moyenne, le minimum, le maximum et la dernière durée ;
+- le nombre d’appels atteignant 1 500 ms ;
+- le nombre d’erreurs ;
+- la dernière date d’appel ;
+- un contexte simple et borné.
+
+Les mesures sont agrégées dans le cache du script pendant six heures. Elles sont de type « meilleur effort » : une saturation ou une indisponibilité de `CacheService` ne doit pas faire échouer l’opération métier.
+
+Le rapport et sa réinitialisation exigent le rôle Administrateur. La réinitialisation crée l’action d’audit `REINITIALISATION_PERFORMANCE`.
+
+## Guide intégré
+
+`Help.gs` contient les sujets documentaires sous forme de données structurées :
+
+```text
+sujet
+  ├─ identifiant
+  ├─ catégorie
+  ├─ titre et résumé
+  ├─ étapes
+  ├─ conseils
+  ├─ mots-clés
+  ├─ vue associée
+  └─ rôle minimal
+```
+
+`getHelpBootstrap()` filtre les sujets selon le rôle renvoyé par le contrôle serveur. `HelpScripts.html` gère la recherche, l’aide contextuelle, le raccourci `?`, l’ouverture du guide complet et la restitution du focus.
+
+Les correspondances entre vues et sujets sont centralisées dans `HELP_VIEW_TOPICS`. Un module qui n’est pas autorisé pour l’utilisateur ne reçoit pas de sujet contextuel inaccessible.
+
+## Fiabilité des appels client
+
+`Scripts.html` contient une liste explicite des fonctions de lecture. `runServer()` applique la stratégie suivante :
+
+```text
+appel serveur
+   ↓
+succès → retour normal
+   ↓ échec
+lecture + erreur transitoire + première tentative
+   → attendre 500 ms → relancer une fois
+sinon
+   → retourner l’erreur à l’interface
+```
+
+Une écriture n’est jamais relancée automatiquement. Lorsqu’une coupure intervient pendant une écriture, le panneau de reprise demande de recharger et de vérifier l’état actuel avant toute nouvelle tentative.
+
+Cette stratégie complète, sans les remplacer :
+
+- les contrôles de doublons ;
+- les verrous serveur ;
+- le verrouillage optimiste ;
+- la fusion intelligente ;
+- l’audit.
+
+## Concurrence et fusion intelligente
+
+`Concurrency.gs` conserve la version technique de chaque fiche. `MergeEngine.gs` compare l’état d’ouverture, la modification locale et la dernière version distante.
+
+- champs modifiés d’un seul côté : fusion automatique ;
+- même valeur appliquée des deux côtés : conservation sans arbitrage ;
+- même champ modifié différemment : choix explicite ;
+- nouvelle modification pendant l’arbitrage : recalcul avant écriture.
+
+Les écritures finales repassent par les fonctions métier existantes.
+
+## Historique des versions
+
+`VersionHistory.gs` reconstruit les instantanés depuis `HISTORIQUE`, déduplique les états consécutifs identiques, ajoute l’état courant lorsqu’il manque, compare deux versions et restaure une ancienne version par les fonctions métier.
+
+La liste des fiches est paginée par défaut à 40 éléments. Le contexte lisible des relations utilise un cache de 30 secondes afin d’éviter de reconstruire immédiatement les mêmes dictionnaires d’orateurs, d’assemblées, de discours et de programmations.
 
 ## Disponibilités des orateurs
 
-`SpeakerAvailability.gs` gère quatre types de période :
+`SpeakerAvailability.gs` gère :
 
-- `INDISPONIBLE` : bloque les dates comprises dans la période ;
-- `DISPONIBLE_SEULEMENT` : lorsqu’au moins une fenêtre existe, les dates extérieures à toutes les fenêtres sont bloquées ;
-- `PREFEREE` : ajoute une information positive et un bonus configurable au classement ;
-- `A_EVITER` : produit un avertissement et un malus configurable.
+- `INDISPONIBLE` ;
+- `DISPONIBLE_SEULEMENT` ;
+- `PREFEREE` ;
+- `A_EVITER`.
 
-Les périodes d’un orateur sont enregistrées comme une fiche collaborative unique, identifiée par l’orateur. L’interface transmet la version de l’ensemble de ses périodes. Le serveur prend un verrou, compare la version, remplace les lignes de cet orateur et restaure un instantané de la feuille si l’écriture échoue.
+Les périodes sont consommées par `RulesEngine`, `RecommendationEngine`, `ConflictResolution`, `AutomaticPlanning`, `Integrity`, `MergeEngine` et `VersionHistory`.
 
-Les disponibilités sont consommées par :
+## Installation et migrations
 
-- `RulesEngine` pour les règles `PLAN_008`, `PLAN_009` et `PLAN_010` ;
-- `RecommendationEngine` pour exclure, favoriser ou pénaliser un orateur ;
-- `ConflictResolution` par la revalidation systématique des hypothèses ;
-- `AutomaticPlanning` par le jeu de données et les pondérations préchargés ;
-- `Integrity` pour les relations cassées, doublons, dates invalides et contradictions.
+`installCoordoDiscours()` :
 
-## Résolution des conflits
+1. crée ou retrouve la base ;
+2. crée les feuilles manquantes ;
+3. ajoute les paramètres ;
+4. migre les anciennes clés ;
+5. invalide les caches ;
+6. exécute la recette interne ;
+7. journalise le résultat.
 
-`ConflictResolution.gs` teste d’abord les changements portant sur un seul champ :
+Le schéma reste en version `1.8.0`, car la version 1.12 n’ajoute aucune feuille obligatoire.
 
-- orateur ;
-- date ;
-- discours ;
-- assemblée d’origine.
+## Validation automatique
 
-Lorsque plusieurs blocages sont indépendants, le moteur évalue des combinaisons de deux, trois ou quatre changements. Une proposition n’est conservée que lorsqu’elle ne génère plus aucune règle de niveau `ERROR`. Les avertissements restent visibles et diminuent le score.
-
-L’interface applique uniquement les valeurs dans le formulaire. L’enregistrement final reste une action explicite du coordinateur.
-
-## Planification automatique
-
-`AutomaticPlanning.gs` prépare trois scénarios sur une période de 1 à 6 mois :
-
-- Équilibré ;
-- Renouvellement des discours ;
-- Rotation des orateurs.
-
-Le moteur crée un planning virtuel au fur et à mesure de la génération, de sorte que chaque nouvelle proposition tient compte des précédentes. Les créneaux existants sont conservés. Les orateurs indisponibles sont exclus par `RecommendationEngine` et `RulesEngine`.
-
-Le brouillon porte une signature SHA-256 calculée à partir du planning, des référentiels, des versions, des discours déclarés, des disponibilités, des réglages de classement et des suivis de communication. Toute modification de ces éléments impose de générer un nouveau brouillon avant validation.
-
-## Concurrence
-
-`Concurrency.gs` conserve les versions dans les propriétés du script. Pour une modification :
-
-1. l’interface transmet la version lue ;
-2. le serveur prend un `ScriptLock` ;
-3. la version attendue est comparée à la version courante ;
-4. l’écriture est refusée en cas d’écart ;
-5. une nouvelle version est générée après succès.
-
-## Installation
-
-La fonction d’installation crée ou vérifie automatiquement les feuilles nécessaires sans demander à l’utilisateur de modifier un identifiant dans le code. La migration `1.8.0` crée notamment `ORATEUR_DISPONIBILITES` et ajoute les réglages de bonus et de malus.
-
-## Évolutivité
-
-L’architecture prépare :
-
-- la fusion intelligente des champs ;
-- l’historique navigable des versions ;
-- un portail orateur ;
-- la déclaration d’indisponibilités avec validation du coordinateur ;
-- l’envoi de courriels ;
-- la génération de PDF ;
-- une migration future vers une base de données externe.
-
-## Navigation et performance client — version 1.11
-
-### Changement central de vue
-
-`Scripts.html` reste le seul module autorisé à activer une vue. Après chaque navigation, il émet :
-
-```text
-coordodiscours:viewchange
-```
-
-Les modules Tableau de bord, Programmation, Invitations, Hospitalité, Impression, Historique, Versions, Sauvegarde et Paramètres chargent leurs données en réaction à cet événement. Cette organisation prend également en charge les ancres d’URL et évite que plusieurs gestionnaires remplacent directement `showView`.
-
-### Navigation mobile
-
-Sous 820 pixels, la barre latérale devient un tiroir :
-
-- l’état est porté par la classe `navigation-open` du document ;
-- `aria-expanded` expose l’état du bouton d’ouverture ;
-- le menu fermé devient `inert` afin de quitter le parcours clavier ;
-- le focus est contenu dans le tiroir ouvert ;
-- Échap, le voile de fond ou le bouton de fermeture referment le tiroir.
-
-### Caches client courts
-
-Deux caches de 60 secondes limitent les appels Google Apps Script répétés :
-
-```text
-getPlanningOptions
-getCommunicationOptions
-```
-
-Chaque cache conserve :
-
-- les dernières données ;
-- l’heure de chargement ;
-- la promesse de la demande actuellement en cours.
-
-Une seconde demande identique réutilise donc la même promesse. `invalidatePlanningDependentCaches_()` invalide les données après toute écriture susceptible de modifier les listes proposées.
-
-### Réponses devenues obsolètes
-
-Les recherches de programmations, invitations et hospitalités utilisent un identifiant croissant. Une réponse n’est rendue que si son identifiant correspond encore à la demande la plus récente. Une requête lente ne peut donc plus remplacer les résultats d’une saisie plus récente.
-
-### Protection contre les doubles actions
-
-`withBusyElement_()` place l’élément déclencheur en état `aria-busy`, le désactive pendant la promesse, puis rétablit son état initial. Les principales écritures et actions rapides utilisent ce garde-fou sans remplacer les verrous serveur, qui restent la protection définitive.
+`npm run check` exécute neuf suites. Le validateur contrôle notamment 64 fichiers essentiels, 35 fonctions sensibles, la syntaxe des fichiers Apps Script, les protections d’accès, le guide, le cache serveur, l’observabilité et la stratégie réseau.

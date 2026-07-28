@@ -79,7 +79,7 @@ assertContains(automatic, /LockService\.getScriptLock\(\)/, 'Planification autom
 assertContains(automatic, /setValues\(/, 'Planification automatique : l’écriture groupée est absente.');
 assertContains(automatic, /rollbackAutomaticPlanningWrites_/, 'Planification automatique : le retour arrière est absent.');
 assertContains(automatic, /buildAutomaticPlanningFollowUps_/, 'Planification automatique : la préparation des invitations et hospitalités est absente.');
-assertContains(automatic, /listHospitalities\(''\)[\s\S]*listInvitations\(''\)/, 'Planification automatique : la charge de communication existante n’est pas analysée.');
+assertContains(automatic, /listHospitalitiesWithPlannings_\(''\s*,\s*dataset\.plannings\)[\s\S]*listInvitationsWithPlannings_\(''\s*,\s*dataset\.plannings\)/, 'Planification automatique : la charge de communication existante ne réutilise pas le planning préchargé.');
 assertContains(automaticUi, /renderAutomaticPlanningDraft_/, 'Interface : la comparaison des scénarios est absente.');
 assertContains(automaticUi, /data-auto-item-index/, 'Interface : les dates du brouillon ne peuvent pas être désélectionnées.');
 assertContains(automaticUi, /commitAutomaticPlanningDraft/, 'Interface : la validation explicite du brouillon est absente.');
@@ -233,6 +233,55 @@ assertContains(backup, /LockService\.getScriptLock\(\)/, 'Sauvegarde : le verrou
 assertContains(backup, /createDriveSafetyBackup_\(\)/, 'Sauvegarde : la copie de sécurité est absente.');
 assertContains(backup, /500000/, 'Sauvegarde : la limite de cellules est absente.');
 assertContains(backup, /Object\.values\(APP_CONFIG\.sheets\)/, 'Sauvegarde : toutes les feuilles configurées ne sont pas incluses.');
+
+
+const serverCache = read('ServerCache.gs');
+const performance = read('Performance.gs');
+const help = read('Help.gs');
+const helpUi = read('HelpScripts.html');
+const dashboardServer = read('Dashboard.gs');
+const integrityServer = read('Integrity.gs');
+const installation = read('Installation.gs');
+const versionServer = read('VersionHistory.gs');
+const codeServer = read('Code.gs');
+
+assertContains(serverCache, /SERVER_CACHE_TTL_SECONDS\s*=\s*60/, 'Cache serveur : la durée courte de 60 secondes est absente.');
+['SETTINGS','PLANNING_OPTIONS','COMMUNICATION_OPTIONS','VERSION_DISPLAY_CONTEXT'].forEach(key => assertContains(serverCache, key, `Cache serveur : la clé ${key} est absente.`));
+assertContains(serverCache, /function\s+getCachedServerValue_\s*\(/, 'Cache serveur : le chargeur générique est absent.');
+assertContains(serverCache, /function\s+getSettingsSnapshot_\s*\(/, 'Cache serveur : l’instantané des paramètres est absent.');
+assertContains(serverCache, /function\s+invalidateAllServerCaches_\s*\(/, 'Cache serveur : l’invalidation globale est absente.');
+assertContains(settings, /getSettingsSnapshot_\(\)/, 'Paramètres : les lectures répétitives ne réutilisent pas l’instantané mis en cache.');
+assertContains(settings, /invalidateSettingsCache_\(\)/, 'Paramètres : le cache serveur n’est pas invalidé après écriture.');
+assertContains(planning, /getCachedServerValue_\(SERVER_CACHE_KEYS\.PLANNING_OPTIONS/, 'Planning : les options partagées ne sont pas mises en cache côté serveur.');
+assertContains(planning, /function\s+listPlanningsWithResources_\s*\(/, 'Planning : la lecture avec référentiels préchargés est absente.');
+assertContains(communication, /function\s+listHospitalitiesWithPlannings_\s*\(/, 'Hospitalité : la lecture avec planning préchargé est absente.');
+assertContains(communication, /function\s+listInvitationsWithPlannings_\s*\(/, 'Invitations : la lecture avec planning préchargé est absente.');
+assertContains(dashboardServer, /listPlanningsWithResources_[\s\S]*listHospitalitiesWithPlannings_[\s\S]*listInvitationsWithPlannings_/, 'Tableau de bord : les référentiels et suivis ne sont pas partagés entre les calculs.');
+assertContains(integrityServer, /listPlanningsWithResources_[\s\S]*listHospitalitiesWithPlannings_[\s\S]*listInvitationsWithPlannings_/, 'Intégrité : les lectures ne réutilisent pas le planning préchargé.');
+assertContains(versionServer, /getCachedServerValue_\(SERVER_CACHE_KEYS\.VERSION_DISPLAY_CONTEXT/, 'Versions : le contexte d’affichage n’est pas mis en cache côté serveur.');
+assertContains(codeServer, /measureServerOperation_\(['"]getAppBootstrap['"]/, 'Observabilité : le bootstrap principal n’est pas mesuré.');
+
+assertContains(performance, /function\s+measureServerOperation_\s*\(/, 'Observabilité : le chronométrage générique est absent.');
+assertContains(performance, /SERVER_PERFORMANCE_SLOW_THRESHOLD_MS/, 'Observabilité : le seuil d’appel lent est absent.');
+assertContains(performance, /function\s+getServerPerformanceReport\s*\([^)]+\)|function\s+getServerPerformanceReport\s*\(\)/, 'Observabilité : le rapport administrateur est absent.');
+assertContains(performance, /assertAdminAccess_\(\)/, 'Observabilité : le rapport de performance n’est pas réservé aux administrateurs.');
+assertContains(performance, /sanitizeServerPerformanceContext_/, 'Observabilité : le contexte des mesures n’est pas filtré.');
+assertContains(performance, /REINITIALISATION_PERFORMANCE/, 'Observabilité : la réinitialisation n’est pas auditée.');
+assertContains(settingsUi, /getServerPerformanceReport[\s\S]*resetServerPerformanceReport/, 'Paramètres : le diagnostic de performance serveur est incomplet.');
+
+assertContains(help, /function\s+getHelpBootstrap\s*\(/, 'Guide : le point d’entrée est absent.');
+assertContains(help, /assertAccess_\(\s*['"]CONSULTATION['"]/, 'Guide : l’accès minimal n’est pas contrôlé.');
+assertContains(help, /minimumRole:\s*['"]COORDINATEUR['"]/, 'Guide : les sujets métier ne sont pas filtrés par rôle.');
+assertContains(help, /minimumRole:\s*['"]ADMIN['"]/, 'Guide : les sujets administrateur sont absents.');
+assertContains(help, /measureServerOperation_\(['"]getHelpBootstrap['"]/, 'Guide : le chargement n’est pas mesuré.');
+assertContains(helpUi, /data-help-topic-id/, 'Guide UI : la navigation entre les sujets est absente.');
+assertContains(helpUi, /openContextualHelp_/, 'Guide UI : l’aide contextuelle est absente.');
+assertContains(helpUi, /event\.key === ['"]\?['"]/, 'Guide UI : le raccourci clavier ? est absent.');
+assertContains(indexUi, /data-view="help"[\s\S]*id="view-help"/, 'Guide UI : le menu et l’espace de travail sont absents.');
+assertContains(indexUi, /id="global-help-button"[\s\S]*id="help-dialog"/, 'Guide UI : le bouton global ou la fenêtre contextuelle est absent.');
+
+assertContains(installation, /getHelpBootstrap/, 'Recette : le guide intégré n’est pas vérifié.');
+assertContains(installation, /measureServerOperation_[\s\S]*getCachedServerValue_/, 'Recette : l’observabilité et le cache serveur ne sont pas vérifiés.');
 
 if (failures.length) {
   console.error('\nTests des règles métier : ÉCHEC\n');

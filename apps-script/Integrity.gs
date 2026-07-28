@@ -1,6 +1,8 @@
 function getDataIntegrityReport() {
   assertAccess_('ADMIN');
-  return getDataIntegrityReport_();
+  return measureServerOperation_('getDataIntegrityReport', function () {
+    return getDataIntegrityReport_();
+  });
 }
 
 function getDataIntegrityReport_() {
@@ -10,12 +12,12 @@ function getDataIntegrityReport_() {
     issues.push({ severity: severity, code: code, message: message, details: details || {} });
   };
 
-  const speakers = listSpeakers('', true);
   const congregations = listCongregations('', true);
+  const speakers = listSpeakersWithCongregations_('', true, congregations);
   const talks = listTalks('', true);
-  const plannings = listPlannings('', true);
-  const hospitalities = listHospitalities('');
-  const invitations = listInvitations('');
+  const plannings = listPlanningsWithResources_('', true, speakers, talks);
+  const hospitalities = listHospitalitiesWithPlannings_('', plannings);
+  const invitations = listInvitationsWithPlannings_('', plannings);
   const availability = listSpeakerAvailability_(true);
 
   const speakerIds = new Set(speakers.map(item => String(item.id)));

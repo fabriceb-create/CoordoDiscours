@@ -19,25 +19,36 @@ const SETTINGS_DEFINITIONS = Object.freeze([
 
 function getApplicationSettings() {
   assertAccess_('ADMIN');
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
-  const stored = {};
-  if (sheet && sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getValues().forEach(row => { stored[String(row[0] || '').trim()] = { value: String(row[1] ?? ''), description: String(row[2] || '') }; });
-  const metadata = getEntityVersion_('PARAMETRES', 'APPLICATION');
-  return {
-    settings: SETTINGS_DEFINITIONS.map(definition => ({ ...definition, value: stored[definition.key] && stored[definition.key].value !== '' ? stored[definition.key].value : definition.defaultValue })),
-    diagnostics: getSettingsDiagnostics_(),
-    spreadsheetUrl: ss.getUrl(),
-    version: APP_CONFIG.version,
-    language: getInterfaceLanguage(),
-    settingsVersion: metadata.version,
-    settingsUpdatedAt: metadata.updatedAt,
-    settingsUpdatedBy: metadata.updatedBy
-  };
+  return measureServerOperation_('getApplicationSettings', function () {
+    const ss = getDatabase_();
+    const stored = getSettingsSnapshot_();
+    const metadata = getEntityVersion_('PARAMETRES', 'APPLICATION');
+    return {
+      settings: SETTINGS_DEFINITIONS.map(function (definition) {
+        const value = Object.prototype.hasOwnProperty.call(stored, definition.key) && stored[definition.key] !== ''
+          ? String(stored[definition.key])
+          : definition.defaultValue;
+        return Object.assign({}, definition, { value: value });
+      }),
+      diagnostics: getSettingsDiagnostics_(),
+      spreadsheetUrl: ss.getUrl(),
+      version: APP_CONFIG.version,
+      language: getInterfaceLanguage(),
+      settingsVersion: metadata.version,
+      settingsUpdatedAt: metadata.updatedAt,
+      settingsUpdatedBy: metadata.updatedBy
+    };
+  });
 }
 
 function settingsAsMap_() {
-  return getApplicationSettings().settings.reduce(function (map, item) { map[item.key] = item.value; return map; }, {});
+  const stored = getSettingsSnapshot_();
+  return SETTINGS_DEFINITIONS.reduce(function (map, definition) {
+    map[definition.key] = Object.prototype.hasOwnProperty.call(stored, definition.key) && stored[definition.key] !== ''
+      ? String(stored[definition.key])
+      : definition.defaultValue;
+    return map;
+  }, {});
 }
 
 function saveApplicationSettings(payload) {
@@ -71,6 +82,7 @@ function saveApplicationSettings_(values, action, expectedVersion) {
     });
     validateRecommendationWeights_(saved);
     SETTINGS_DEFINITIONS.forEach(definition => upsertSetting_(sheet, definition.key, saved[definition.key], definition.description));
+    invalidateSettingsCache_();
     advanceEntityVersion_('PARAMETRES', 'APPLICATION');
     const result = getApplicationSettings();
     const after = result.settings.reduce(function (map, item) { map[item.key] = item.value; return map; }, {});

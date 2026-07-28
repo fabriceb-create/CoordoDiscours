@@ -7,85 +7,87 @@ const VERSION_HISTORY_ENTITY_KEYS = Object.freeze([
 ]);
 
 function getVersionHistoryBootstrap() {
-  assertAccess_('CONSULTATION', 'getVersionHistoryBootstrap');
-  const current = getCurrentUserAccess();
-  const entities = VERSION_HISTORY_ENTITY_KEYS.map(function (entity) {
-    const definition = getConcurrentMergeDefinition_(entity);
-    return {
-      key: entity,
-      label: definition.label,
-      viewRole: versionHistoryViewRole_(definition),
-      restoreRole: definition.minimumRole,
-      canView: versionHistoryRoleAllowed_(current.role, versionHistoryViewRole_(definition)),
-      canRestore: versionHistoryRoleAllowed_(current.role, definition.minimumRole)
-    };
-  }).filter(function (item) { return item.canView; });
-  return {
-    engineVersion: VERSION_HISTORY_ENGINE_VERSION,
-    entities: entities,
-    defaultEntity: entities.length ? entities[0].key : '',
-    currentAccess: current
-  };
+  return measureServerOperation_('getVersionHistoryBootstrap', function () {
+      const current = assertAccess_('CONSULTATION', 'getVersionHistoryBootstrap');
+      const entities = VERSION_HISTORY_ENTITY_KEYS.map(function (entity) {
+        const definition = getConcurrentMergeDefinition_(entity);
+        return {
+          key: entity,
+          label: definition.label,
+          viewRole: versionHistoryViewRole_(definition),
+          restoreRole: definition.minimumRole,
+          canView: versionHistoryRoleAllowed_(current.role, versionHistoryViewRole_(definition)),
+          canRestore: versionHistoryRoleAllowed_(current.role, definition.minimumRole)
+        };
+      }).filter(function (item) { return item.canView; });
+      return {
+        engineVersion: VERSION_HISTORY_ENGINE_VERSION,
+        entities: entities,
+        defaultEntity: entities.length ? entities[0].key : '',
+        currentAccess: current
+      };
+  });
 }
 
 function listVersionHistoryRecords(entity, searchText, options) {
-  const definition = getConcurrentMergeDefinition_(entity);
-  assertAccess_(versionHistoryViewRole_(definition), 'listVersionHistoryRecords');
-  const request = normalizeVersionHistoryListRequest_(options);
-  const query = normalizeText_(searchText);
-  const historyRows = readVersionHistoryRows_(definition.entity);
-  const groupedRows = historyRows.reduce(function (map, row) {
-    const id = String(row.entityId || '');
-    if (!map[id]) map[id] = [];
-    map[id].push(row);
-    return map;
-  }, {});
-  const currentRecords = listCurrentVersionHistoryRecords_(definition);
-  const currentMap = currentRecords.reduce(function (map, record) {
-    map[String(record.entityId)] = record;
-    return map;
-  }, {});
-  const ids = Array.from(new Set(Object.keys(groupedRows).concat(Object.keys(currentMap))));
-  const currentAccess = getCurrentUserAccess();
-  const summaries = ids.map(function (id) {
-    const current = currentMap[id] || null;
-    const label = current ? current.label : versionHistoryHistoricalLabelFromRows_(definition, id, groupedRows[id] || []);
-    return { id: id, current: current, label: label };
-  }).filter(function (summary) {
-    return !query || normalizeText_([summary.label, summary.id].join(' ')).includes(query);
-  }).sort(function (a, b) {
-    return String(a.label || '').localeCompare(String(b.label || ''), 'fr');
-  });
+  return measureServerOperation_('listVersionHistoryRecords', function () {
+      const definition = getConcurrentMergeDefinition_(entity);
+      const currentAccess = assertAccess_(versionHistoryViewRole_(definition), 'listVersionHistoryRecords');
+      const request = normalizeVersionHistoryListRequest_(options);
+      const query = normalizeText_(searchText);
+      const historyRows = readVersionHistoryRows_(definition.entity);
+      const groupedRows = historyRows.reduce(function (map, row) {
+        const id = String(row.entityId || '');
+        if (!map[id]) map[id] = [];
+        map[id].push(row);
+        return map;
+      }, {});
+      const currentRecords = listCurrentVersionHistoryRecords_(definition);
+      const currentMap = currentRecords.reduce(function (map, record) {
+        map[String(record.entityId)] = record;
+        return map;
+      }, {});
+      const ids = Array.from(new Set(Object.keys(groupedRows).concat(Object.keys(currentMap))));
+      const summaries = ids.map(function (id) {
+        const current = currentMap[id] || null;
+        const label = current ? current.label : versionHistoryHistoricalLabelFromRows_(definition, id, groupedRows[id] || []);
+        return { id: id, current: current, label: label };
+      }).filter(function (summary) {
+        return !query || normalizeText_([summary.label, summary.id].join(' ')).includes(query);
+      }).sort(function (a, b) {
+        return String(a.label || '').localeCompare(String(b.label || ''), 'fr');
+      });
 
-  const totalCount = summaries.length;
-  const selected = request.paged
-    ? summaries.slice(request.offset, request.offset + request.limit)
-    : summaries;
-  const records = selected.map(function (summary) {
-    const timeline = buildEntityVersionTimeline_(definition, summary.id, groupedRows[summary.id] || [], summary.current);
-    return {
-      entity: definition.entity,
-      entityId: versionHistoryEntityIdOutput_(definition, summary.id),
-      label: summary.label,
-      versionCount: timeline.versions.length,
-      currentVersionNumber: timeline.currentVersionNumber,
-      currentTechnicalVersion: timeline.currentTechnicalVersion,
-      lastVersionAt: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].date : '',
-      lastDisplayDate: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].displayDate : '',
-      canRestore: Boolean(summary.current && versionHistoryRoleAllowed_(currentAccess.role, definition.minimumRole))
-    };
-  });
+      const totalCount = summaries.length;
+      const selected = request.paged
+        ? summaries.slice(request.offset, request.offset + request.limit)
+        : summaries;
+      const records = selected.map(function (summary) {
+        const timeline = buildEntityVersionTimeline_(definition, summary.id, groupedRows[summary.id] || [], summary.current);
+        return {
+          entity: definition.entity,
+          entityId: versionHistoryEntityIdOutput_(definition, summary.id),
+          label: summary.label,
+          versionCount: timeline.versions.length,
+          currentVersionNumber: timeline.currentVersionNumber,
+          currentTechnicalVersion: timeline.currentTechnicalVersion,
+          lastVersionAt: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].date : '',
+          lastDisplayDate: timeline.versions.length ? timeline.versions[timeline.versions.length - 1].displayDate : '',
+          canRestore: Boolean(summary.current && versionHistoryRoleAllowed_(currentAccess.role, definition.minimumRole))
+        };
+      });
 
-  if (!request.paged) return records;
-  const nextOffset = Math.min(totalCount, request.offset + records.length);
-  return {
-    records: records,
-    totalCount: totalCount,
-    offset: request.offset,
-    limit: request.limit,
-    nextOffset: nextOffset,
-    hasMore: nextOffset < totalCount
-  };
+      if (!request.paged) return records;
+      const nextOffset = Math.min(totalCount, request.offset + records.length);
+      return {
+        records: records,
+        totalCount: totalCount,
+        offset: request.offset,
+        limit: request.limit,
+        nextOffset: nextOffset,
+        hasMore: nextOffset < totalCount
+      };
+  }, { entity: String(entity || ''), paged: Boolean(options) });
 }
 
 function normalizeVersionHistoryListRequest_(options) {
@@ -119,25 +121,26 @@ function versionHistoryLatestSnapshotFromRows_(definition, rows) {
 }
 
 function getEntityVersionTimeline(entity, entityId) {
-  const definition = getConcurrentMergeDefinition_(entity);
-  assertAccess_(versionHistoryViewRole_(definition), 'getEntityVersionTimeline');
-  const normalizedId = normalizeConcurrentMergeEntityId_(definition, entityId);
-  const current = readCurrentVersionHistoryRecord_(definition, normalizedId, false);
-  const historyRows = readVersionHistoryRows_(definition.entity, normalizedId);
-  const timeline = buildEntityVersionTimeline_(definition, normalizedId, historyRows, current);
-  const access = getCurrentUserAccess();
-  return {
-    engineVersion: VERSION_HISTORY_ENGINE_VERSION,
-    entity: definition.entity,
-    entityLabel: definition.label,
-    entityId: normalizedId,
-    recordLabel: current ? current.label : versionHistoryHistoricalLabel_(definition, normalizedId, timeline),
-    versions: timeline.versions.slice().reverse(),
-    currentVersionNumber: timeline.currentVersionNumber,
-    currentTechnicalVersion: timeline.currentTechnicalVersion,
-    canRestore: Boolean(current && versionHistoryRoleAllowed_(access.role, definition.minimumRole)),
-    restoreRole: definition.minimumRole
-  };
+  return measureServerOperation_('getEntityVersionTimeline', function () {
+      const definition = getConcurrentMergeDefinition_(entity);
+      const access = assertAccess_(versionHistoryViewRole_(definition), 'getEntityVersionTimeline');
+      const normalizedId = normalizeConcurrentMergeEntityId_(definition, entityId);
+      const current = readCurrentVersionHistoryRecord_(definition, normalizedId, false);
+      const historyRows = readVersionHistoryRows_(definition.entity, normalizedId);
+      const timeline = buildEntityVersionTimeline_(definition, normalizedId, historyRows, current);
+      return {
+        engineVersion: VERSION_HISTORY_ENGINE_VERSION,
+        entity: definition.entity,
+        entityLabel: definition.label,
+        entityId: normalizedId,
+        recordLabel: current ? current.label : versionHistoryHistoricalLabel_(definition, normalizedId, timeline),
+        versions: timeline.versions.slice().reverse(),
+        currentVersionNumber: timeline.currentVersionNumber,
+        currentTechnicalVersion: timeline.currentTechnicalVersion,
+        canRestore: Boolean(current && versionHistoryRoleAllowed_(access.role, definition.minimumRole)),
+        restoreRole: definition.minimumRole
+      };
+  }, { entity: String(entity || '') });
 }
 
 function compareEntityVersions(entity, entityId, leftVersionId, rightVersionId) {
@@ -466,12 +469,18 @@ function formatVersionHistoryValue_(field, value, context) {
 }
 
 function buildVersionHistoryDisplayContext_() {
-  return {
-    speakers: listSpeakers('', true).reduce(function (map, item) { map[item.id] = item.fullName || item.lastName; return map; }, {}),
-    congregations: listCongregations('', true).reduce(function (map, item) { map[item.id] = item.name; return map; }, {}),
-    talks: listTalks('', true).reduce(function (map, item) { map[String(item.number)] = item; return map; }, {}),
-    plannings: listPlannings('', true).reduce(function (map, item) { map[item.id] = item.displayDate + ' - ' + item.speakerName + ' - n° ' + item.talkNumber; return map; }, {})
-  };
+  return getCachedServerValue_(SERVER_CACHE_KEYS.VERSION_DISPLAY_CONTEXT, function () {
+    const congregations = listCongregations('', true);
+    const speakers = listSpeakersWithCongregations_('', true, congregations);
+    const talks = listTalks('', true);
+    const plannings = listPlanningsWithResources_('', true, speakers, talks);
+    return {
+      speakers: speakers.reduce(function (map, item) { map[item.id] = item.fullName || item.lastName; return map; }, {}),
+      congregations: congregations.reduce(function (map, item) { map[item.id] = item.name; return map; }, {}),
+      talks: talks.reduce(function (map, item) { map[String(item.number)] = item; return map; }, {}),
+      plannings: plannings.reduce(function (map, item) { map[item.id] = item.displayDate + ' - ' + item.speakerName + ' - n° ' + item.talkNumber; return map; }, {})
+    };
+  }, SERVER_CACHE_TTL_SECONDS);
 }
 
 function versionHistoryHistoricalLabel_(definition, entityId, timeline) {

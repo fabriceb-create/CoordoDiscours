@@ -1,11 +1,23 @@
 function getCommunicationOptions() {
-  return { plannings: listPlannings('', false).filter(function (item) { return item.date && item.status !== 'ANNULE'; }) };
+  return measureServerOperation_('getCommunicationOptions', function () {
+    return getCachedServerValue_(SERVER_CACHE_KEYS.COMMUNICATION_OPTIONS, function () {
+      return {
+        plannings: listPlannings('', false).filter(function (item) {
+          return item.date && item.status !== 'ANNULE';
+        })
+      };
+    }, SERVER_CACHE_TTL_SECONDS);
+  });
 }
 
 function listHospitalities(searchText) {
+  return listHospitalitiesWithPlannings_(searchText, listPlannings('', true));
+}
+
+function listHospitalitiesWithPlannings_(searchText, planningList) {
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.hospitality);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const planningMap = listPlannings('', true).reduce(function (map, item) { map[item.id] = item; return map; }, {});
+  const planningMap = (planningList || []).reduce(function (map, item) { map[item.id] = item; return map; }, {});
   const query = normalizeText_(searchText);
   return sheetRowsAsObjects_(sheet).map(function (row) {
     const id = String(row.ID || '');
@@ -62,9 +74,13 @@ function setHospitalityStatus(id, status, expectedVersion) {
 }
 
 function listInvitations(searchText) {
+  return listInvitationsWithPlannings_(searchText, listPlannings('', true));
+}
+
+function listInvitationsWithPlannings_(searchText, planningList) {
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.invitations);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const planningMap = listPlannings('', true).reduce(function (map, item) { map[item.id] = item; return map; }, {});
+  const planningMap = (planningList || []).reduce(function (map, item) { map[item.id] = item; return map; }, {});
   const query = normalizeText_(searchText);
   return sheetRowsAsObjects_(sheet).map(function (row) {
     const id = String(row.ID || '');

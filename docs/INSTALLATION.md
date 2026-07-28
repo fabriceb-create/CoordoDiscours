@@ -1,85 +1,127 @@
-# Installation de CoordoDiscours
+# Installation de CoordoDiscours 1.12
 
-## 1. Créer le projet Apps Script
+## 1. Préparer les fichiers
+
+À la racine du dépôt :
+
+```bash
+npm install
+npm run check
+npm run predeploy:check
+```
+
+`npm run check` doit terminer les neuf suites sans erreur. `predeploy:check` peut signaler l’absence de `.clasp.json` tant que le projet Apps Script n’a pas encore été associé.
+
+## 2. Créer le projet Apps Script
 
 1. Ouvrir Google Drive.
-2. Créer un nouveau projet **Google Apps Script**.
+2. Créer un projet **Google Apps Script** autonome.
 3. Nommer le projet `CoordoDiscours`.
-4. Dans les paramètres du projet, activer l’affichage du fichier manifeste `appsscript.json`.
-5. Vérifier que le fuseau horaire est `America/Guadeloupe`.
+4. Afficher le manifeste `appsscript.json`.
+5. Vérifier le fuseau `America/Guadeloupe`.
 
-## 2. Copier les fichiers
+## 3. Copier ou pousser le code
 
-Créer dans Apps Script tous les fichiers présents dans le dossier `apps-script/` du dépôt GitHub.
+### Copie manuelle
 
-- Les fichiers `.gs` doivent être créés comme fichiers **Script**.
-- Les fichiers `.html` doivent être créés comme fichiers **HTML**.
-- Le contenu de `appsscript.json` doit remplacer le manifeste du projet.
+Créer tous les fichiers du dossier `apps-script/` avec leurs noms exacts.
 
-Les noms doivent être reproduits exactement, sans extension affichée dans l’éditeur Apps Script.
+- `.gs` : fichiers Script ;
+- `.html` : fichiers HTML ;
+- `appsscript.json` : manifeste.
 
-## 3. Première installation
+### Avec clasp
 
-1. Dans la liste des fonctions, choisir `installCoordoDiscours`.
-2. Cliquer sur **Exécuter**.
-3. Accepter les autorisations demandées par Google.
-4. Vérifier dans le journal d’exécution que la propriété `success` vaut `true`.
-5. Ouvrir l’URL de la base Google Sheets indiquée dans le résultat.
+```bash
+cp .clasp.json.example .clasp.json
+```
 
-Cette opération :
+Renseigner le `scriptId`, puis :
 
-- crée ou retrouve la base de données ;
+```bash
+npm run clasp:login
+npm run clasp:status
+npm run clasp:push
+```
+
+Ne jamais publier `.clasp.json` ou `.clasprc.json`.
+
+## 4. Première installation
+
+Dans Apps Script :
+
+1. choisir `installCoordoDiscours` ;
+2. cliquer sur **Exécuter** ;
+3. accepter les autorisations ;
+4. vérifier `success: true` ;
+5. ouvrir l’URL de la base Google Sheets renvoyée.
+
+L’installation :
+
+- crée ou retrouve la base ;
 - crée les feuilles manquantes ;
-- ajoute les paramètres par défaut ;
-- applique les migrations de structure ;
-- lance les tests automatiques.
+- ajoute les paramètres ;
+- migre les anciennes clés ;
+- invalide les caches ;
+- exécute la recette interne.
 
-## 4. Vérification
+La version 1.12 n’ajoute aucune feuille : le schéma reste `1.8.0`.
 
-Exécuter ensuite `runAcceptanceTests`.
+## 5. Vérification
 
-Le résultat attendu est :
+Exécuter :
 
-- `success: true` ;
-- aucune feuille manquante ;
-- tous les tests réussis.
+```text
+getInstallationStatus
+runAcceptanceTests
+```
 
-La fonction `getInstallationStatus` permet de retrouver à tout moment :
+Le résultat attendu est `success: true`. Les tests non bloquants du guide et de l’observabilité doivent également être examinés.
 
-- le nom et l’identifiant de la base ;
-- l’URL de la base ;
-- la version installée ;
-- la version du schéma ;
-- les éventuelles feuilles manquantes.
+Vérifier ensuite manuellement :
 
-## 5. Déployer l’application web
+1. ouverture du guide ;
+2. création d’une assemblée et d’un orateur ;
+3. programmation d’une date ;
+4. invitation et hospitalité ;
+5. impression ;
+6. historique et versions ;
+7. sauvegarde ;
+8. intégrité ;
+9. performance serveur ;
+10. affichage mobile.
 
-1. Cliquer sur **Déployer** puis **Nouveau déploiement**.
-2. Choisir le type **Application Web**.
-3. Donner un nom au déploiement, par exemple `CoordoDiscours 1.4 test`.
-4. Choisir l’utilisateur qui exécutera l’application selon le mode de partage retenu.
-5. Limiter l’accès aux personnes autorisées pendant la phase de test.
-6. Cliquer sur **Déployer** puis conserver l’URL fournie.
+## 6. Déployer l’application Web
 
-Pour une autre assemblée, créer de préférence une nouvelle copie du projet et une nouvelle base afin que ses données restent séparées.
+1. Ouvrir **Déployer > Nouveau déploiement**.
+2. Choisir **Application Web**.
+3. Nommer la version, par exemple `CoordoDiscours 1.12 recette`.
+4. Exécuter l’application avec le compte du propriétaire.
+5. Limiter l’accès aux utilisateurs autorisés.
+6. Déployer et conserver l’URL.
 
-## 6. Mise à jour ultérieure
+Le manifeste fourni limite l’accès au propriétaire. Élargir l’accès uniquement après validation de l’organisation retenue.
 
-Après avoir remplacé les fichiers modifiés :
+## 7. Mise à jour d’une installation existante
 
-1. exécuter `installCoordoDiscours` une nouvelle fois ;
-2. vérifier le résultat des migrations ;
-3. exécuter `runAcceptanceTests` ;
-4. créer une nouvelle version du déploiement web.
+1. Créer une sauvegarde depuis l’application.
+2. Noter la version Apps Script déployée.
+3. Remplacer ou pousser les fichiers.
+4. Exécuter `installCoordoDiscours`.
+5. Exécuter `runAcceptanceTests`.
+6. Créer une nouvelle version du déploiement Web.
+7. Effectuer la recette.
 
-La migration ne supprime pas les données existantes. Elle ajoute uniquement les feuilles ou paramètres manquants et met à jour les numéros de version.
+Les migrations ne suppriment pas les données existantes.
 
-## 7. Retour arrière
+## 8. Retour arrière
 
-Avant toute mise à jour importante :
+### Code
 
-1. ouvrir la base Google Sheets ;
-2. utiliser **Fichier > Créer une copie** ;
-3. conserver cette copie avec la date et la version de l’application.
+Redéployer la version Apps Script précédente.
 
-Le retour arrière consiste à restaurer l’ancienne version du code et à reconnecter la copie de sauvegarde si nécessaire.
+### Données
+
+Restaurer une sauvegarde uniquement si les données ont été altérées. La restauration crée une copie de sécurité Drive avant toute modification.
+
+Après un retour arrière, relancer les contrôles d’installation et d’intégrité.

@@ -22,26 +22,28 @@ function getAutomaticPlanningDefaults() {
 
 function generateAutomaticPlanningDraft(payload) {
   assertEditAccess_();
-  const request = normalizeAutomaticPlanningRequest_(payload);
-  const dataset = buildAutomaticPlanningDataset_();
-  const dates = buildAutomaticPlanningDates_(request.startDate, request.months);
-  const sourceSignature = automaticPlanningDatasetSignature_(dataset);
-  const scenarios = Object.keys(AUTOMATIC_PLANNING_SCENARIOS).map(function (key) {
-    return buildAutomaticPlanningScenario_(AUTOMATIC_PLANNING_SCENARIOS[key], request, dates, dataset);
-  });
-  const recommendedScenario = selectRecommendedAutomaticPlanningScenario_(scenarios);
-  return {
-    ready: true,
-    version: AUTOMATIC_PLANNING_ENGINE_VERSION,
-    generatedAt: new Date().toISOString(),
-    sourceSignature: sourceSignature,
-    request: request,
-    scenarios: scenarios,
-    recommendedScenario: recommendedScenario,
-    message: scenarios.some(function (scenario) { return scenario.items.length; })
-      ? 'Trois scénarios ont été préparés. Vérifie les propositions avant validation.'
-      : 'Aucune programmation automatique n’a pu être proposée avec les données actuelles.'
-  };
+  return measureServerOperation_('generateAutomaticPlanningDraft', function () {
+      const request = normalizeAutomaticPlanningRequest_(payload);
+      const dataset = buildAutomaticPlanningDataset_();
+      const dates = buildAutomaticPlanningDates_(request.startDate, request.months);
+      const sourceSignature = automaticPlanningDatasetSignature_(dataset);
+      const scenarios = Object.keys(AUTOMATIC_PLANNING_SCENARIOS).map(function (key) {
+        return buildAutomaticPlanningScenario_(AUTOMATIC_PLANNING_SCENARIOS[key], request, dates, dataset);
+      });
+      const recommendedScenario = selectRecommendedAutomaticPlanningScenario_(scenarios);
+      return {
+        ready: true,
+        version: AUTOMATIC_PLANNING_ENGINE_VERSION,
+        generatedAt: new Date().toISOString(),
+        sourceSignature: sourceSignature,
+        request: request,
+        scenarios: scenarios,
+        recommendedScenario: recommendedScenario,
+        message: scenarios.some(function (scenario) { return scenario.items.length; })
+          ? 'Trois scénarios ont été préparés. Vérifie les propositions avant validation.'
+          : 'Aucune programmation automatique n’a pu être proposée avec les données actuelles.'
+      };
+  }, { months: Number(payload && payload.months) || 0 });
 }
 
 function commitAutomaticPlanningDraft(payload, confirmWarnings) {
@@ -147,6 +149,7 @@ function commitAutomaticPlanningDraft(payload, confirmWarnings) {
     });
 
     safeAutomaticPlanningAudit_(created, followUps, scenarioKey, sourceSignature);
+    invalidatePlanningServerCaches_();
     return {
       saved: true,
       scenario: scenarioKey,
@@ -166,8 +169,8 @@ function commitAutomaticPlanningDraft(payload, confirmWarnings) {
 
 function buildAutomaticPlanningDataset_() {
   const dataset = buildPlanningRuleDataset_();
-  dataset.hospitalities = listHospitalities('');
-  dataset.invitations = listInvitations('');
+  dataset.hospitalities = listHospitalitiesWithPlannings_('', dataset.plannings);
+  dataset.invitations = listInvitationsWithPlannings_('', dataset.plannings);
   return dataset;
 }
 

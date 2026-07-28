@@ -1,7 +1,10 @@
 function listSpeakers(searchText, includeArchived) {
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.speakers);
-  const congregations = listCongregations('', true).reduce(function (map, item) {
+  return listSpeakersWithCongregations_(searchText, includeArchived, listCongregations('', true));
+}
+
+function listSpeakersWithCongregations_(searchText, includeArchived, congregationList) {
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.speakers);
+  const congregations = (congregationList || []).reduce(function (map, item) {
     map[item.id] = item.name;
     return map;
   }, {});
@@ -51,6 +54,7 @@ function saveSpeaker(payload) {
     const version = advanceEntityVersion_('ORATEUR', id);
     const after = Object.assign({}, getSpeaker(id), version);
     logAction_(existingRow ? 'MODIFICATION' : 'CREATION', 'ORATEUR', id, buildAuditDetails_(before, after));
+    invalidateReferenceServerCaches_();
     return after;
   } finally {
     lock.releaseLock();

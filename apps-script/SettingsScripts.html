@@ -1,5 +1,5 @@
 <style>
-  .integrity-panel{margin-top:18px;padding-top:18px;border-top:1px solid #e4e8ef}.integrity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.integrity-summary{margin:12px 0;padding:12px;border-radius:10px;background:#f5f7fa}.integrity-summary.ok{background:#ecfdf3}.integrity-summary.error{background:#fef3f2}.integrity-list{display:grid;gap:8px;margin-top:12px}.integrity-item{padding:10px;border:1px solid #e4e8ef;border-radius:10px;background:#fff}.integrity-item strong{display:block;margin-bottom:4px}.integrity-item small{color:#667085;word-break:break-word}
+  .integrity-panel{margin-top:18px;padding-top:18px;border-top:1px solid #e4e8ef}.integrity-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.integrity-summary{margin:12px 0;padding:12px;border-radius:10px;background:#f5f7fa}.integrity-summary.ok{background:#ecfdf3}.integrity-summary.error{background:#fef3f2}.integrity-list{display:grid;gap:8px;margin-top:12px}.integrity-item{padding:10px;border:1px solid #e4e8ef;border-radius:10px;background:#fff}.integrity-item strong{display:block;margin-bottom:4px}.integrity-item small{color:#667085;word-break:break-word}.performance-panel{margin-top:18px;padding-top:18px;border-top:1px solid #e4e8ef}.performance-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.performance-actions{display:flex;gap:8px;flex-wrap:wrap}.performance-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.performance-metric{padding:10px;border:1px solid #e4e8ef;border-radius:10px;background:#f8fafc}.performance-metric strong,.performance-metric small{display:block}.performance-metric strong{font-size:1.15rem}.performance-metric small{margin-top:3px;color:#667085}.performance-list{display:grid;gap:8px}.performance-item{padding:11px;border:1px solid #e4e8ef;border-radius:10px;background:#fff}.performance-item.slow{border-color:#f0c36b;background:#fffaf0}.performance-item.error{border-color:#f2a3a3;background:#fff5f5}.performance-item-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.performance-item dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 0}.performance-item dl div{display:grid;gap:2px}.performance-item dt{font-size:.75rem;color:#667085}.performance-item dd{margin:0;font-weight:700}.performance-empty{padding:14px;border:1px dashed #cfd8e8;border-radius:10px;color:#667085}.performance-note{display:block;margin-top:10px;color:#667085;line-height:1.4}
 </style>
 <script>
   let settingsLoaded = false;
@@ -105,7 +105,7 @@
           </dl>
           ${(diagnostic.missingSheets || []).length ? `<div class="warning-box"><strong>${t('Feuilles manquantes')}</strong><br>${diagnostic.missingSheets.map(escapeHtml).join(', ')}</div>` : '<div class="settings-success">' + t('Toutes les feuilles nécessaires sont présentes.') + '</div>'}
           <a class="secondary-button settings-database-link" href="${escapeHtml(data.spreadsheetUrl || '#')}" target="_blank">${t('Ouvrir la base de données')}</a>
-          ${canAdminister ? `<section class="integrity-panel"><div class="integrity-head"><div><p class="eyebrow">${t('Intégrité')}</p><strong>${t('Contrôle des données')}</strong></div><button id="run-integrity-check" type="button" class="secondary-button">${t('Analyser')}</button></div><div id="integrity-results" class="integrity-summary">${t('Aucun contrôle lancé.')}</div></section>` : ''}
+          ${canAdminister ? `<section class="integrity-panel"><div class="integrity-head"><div><p class="eyebrow">${t('Intégrité')}</p><strong>${t('Contrôle des données')}</strong></div><button id="run-integrity-check" type="button" class="secondary-button">${t('Analyser')}</button></div><div id="integrity-results" class="integrity-summary">${t('Aucun contrôle lancé.')}</div></section><section class="performance-panel"><div class="performance-head"><div><p class="eyebrow">${t('Performance serveur')}</p><strong>${t('Durée des appels')}</strong></div><div class="performance-actions"><button id="server-performance-refresh" type="button" class="secondary-button">${t('Actualiser')}</button><button id="server-performance-reset" type="button" class="secondary-button">${t('Réinitialiser')}</button></div></div><div id="server-performance-results" class="performance-empty">${t('Chargement des mesures...')}</div><small class="performance-note">${t('Les mesures sont temporaires et servent à repérer les appels à examiner, pas à établir un engagement de temps de réponse.')}</small></section>` : ''}
         </aside>
       </form>`;
 
@@ -116,6 +116,11 @@
     document.getElementById('settings-reset').addEventListener('click', resetSettings_);
     const integrityButton = document.getElementById('run-integrity-check');
     if (integrityButton) integrityButton.addEventListener('click', runIntegrityCheck_);
+    const performanceRefresh = document.getElementById('server-performance-refresh');
+    if (performanceRefresh) performanceRefresh.addEventListener('click', () => loadServerPerformance_(false, performanceRefresh));
+    const performanceReset = document.getElementById('server-performance-reset');
+    if (performanceReset) performanceReset.addEventListener('click', () => resetServerPerformance_(performanceReset));
+    if (canAdminister) loadServerPerformance_(false, null);
   }
 
   function renderSettingField_(setting) {
@@ -154,6 +159,70 @@
     } finally {
       button.disabled = false;
     }
+  }
+
+  function formatServerPerformanceDate_(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? String(value) : date.toLocaleString('fr-FR');
+  }
+
+  function renderServerPerformance_(report) {
+    const container = document.getElementById('server-performance-results');
+    if (!container) return;
+    const totals = report && report.totals || {};
+    const operations = report && report.operations || [];
+    const summary = `
+      <div class="performance-summary">
+        <div class="performance-metric"><strong>${escapeHtml(totals.calls || 0)}</strong><small>${t('Appels')}</small></div>
+        <div class="performance-metric"><strong>${escapeHtml(totals.operations || 0)}</strong><small>${t('Opérations')}</small></div>
+        <div class="performance-metric"><strong>${escapeHtml(totals.slowCalls || 0)}</strong><small>${t('Appels lents')}</small></div>
+        <div class="performance-metric"><strong>${escapeHtml(totals.errors || 0)}</strong><small>${t('Erreurs')}</small></div>
+      </div>`;
+    const items = operations.length ? `<div class="performance-list">${operations.map(item => `
+      <article class="performance-item ${item.status === 'ERROR' ? 'error' : item.status === 'SLOW' ? 'slow' : ''}">
+        <div class="performance-item-head"><strong>${escapeHtml(item.operation)}</strong><span class="status-badge ${item.status === 'ERROR' ? 'refused' : item.status === 'SLOW' ? 'pending' : 'confirmed'}">${item.status === 'ERROR' ? t('Erreur') : item.status === 'SLOW' ? t('À surveiller') : t('Normal')}</span></div>
+        <dl>
+          <div><dt>${t('Appels')}</dt><dd>${escapeHtml(item.count)}</dd></div>
+          <div><dt>${t('Moyenne')}</dt><dd>${escapeHtml(item.averageMs)} ms</dd></div>
+          <div><dt>${t('Maximum')}</dt><dd>${escapeHtml(item.maxMs)} ms</dd></div>
+          <div><dt>${t('Lents / erreurs')}</dt><dd>${escapeHtml(item.slowCount)} / ${escapeHtml(item.errorCount)}</dd></div>
+        </dl>
+        <small>${item.lastAt ? t('Dernier appel') + ' : ' + escapeHtml(formatServerPerformanceDate_(item.lastAt)) + ' — ' : ''}${t('Dernière durée')} : ${escapeHtml(item.lastMs)} ms</small>
+      </article>`).join('')}</div>` : `<div class="performance-empty">${t('Aucune mesure enregistrée pour le moment.')}</div>`;
+    container.className = '';
+    container.innerHTML = summary + items + `<small class="performance-note">${t('Seuil d’appel lent')} : ${escapeHtml(report.slowThresholdMs || 0)} ms — ${t('Fenêtre commencée')} : ${escapeHtml(formatServerPerformanceDate_(report.windowStartedAt))}</small>`;
+    applyTranslations(container);
+  }
+
+  async function loadServerPerformance_(force, button) {
+    const container = document.getElementById('server-performance-results');
+    if (!container) return;
+    const execute = async () => {
+      if (force || !container.dataset.loaded) container.innerHTML = '<div class="performance-empty">' + t('Chargement des mesures...') + '</div>';
+      try {
+        const report = await runServer('getServerPerformanceReport');
+        container.dataset.loaded = 'true';
+        renderServerPerformance_(report);
+      } catch (error) {
+        showError(error);
+        container.className = 'performance-empty';
+        container.textContent = t('Impossible de charger les mesures serveur.');
+      }
+    };
+    if (button) return withBusyElement_(button, execute);
+    return execute();
+  }
+
+  async function resetServerPerformance_(button) {
+    if (!window.confirm(t('Réinitialiser toutes les mesures de performance serveur ?'))) return;
+    await withBusyElement_(button, async () => {
+      try {
+        const report = await runServer('resetServerPerformanceReport');
+        renderServerPerformance_(report);
+        toast(t('Mesures de performance réinitialisées.'));
+      } catch (error) { showError(error); }
+    });
   }
 
   async function applySettingsSaveResult_(data, requestedLanguage, message) {

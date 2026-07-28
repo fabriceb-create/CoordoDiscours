@@ -51,6 +51,8 @@ const context = {
     { key: 'RECO_POIDS_DISCOURS', label: 'Poids discours', type: 'number' }
   ],
   APP_CONFIG: { sheets: { history: 'HISTORIQUE' } },
+  SERVER_CACHE_KEYS: { VERSION_DISPLAY_CONTEXT: 'VERSION_DISPLAY_CONTEXT_V1' },
+  SERVER_CACHE_TTL_SECONDS: 60,
   Utilities: {
     DigestAlgorithm: { SHA_256: 'SHA_256' },
     Charset: { UTF_8: 'UTF_8' },
@@ -62,6 +64,8 @@ const context = {
     getActiveUser: () => ({ getEmail: () => 'admin@example.test' })
   },
   assertAccess_: () => true,
+  measureServerOperation_: (_operation, callback) => callback(),
+  getCachedServerValue_: (_key, loader) => loader(),
   getCurrentUserAccess: () => ({ email: 'admin@example.test', role: 'ADMIN', active: true, canEdit: true, canAdminister: true }),
   requiredText_: (value, label) => {
     const text = String(value || '').trim();
@@ -73,9 +77,11 @@ const context = {
   getDatabase_: () => { throw new Error('La base ne doit pas être appelée dans ces scénarios.'); },
   sheetRowsAsObjects_: () => [],
   listSpeakers: () => currentSpeakers ? clone(currentSpeakers) : (currentSpeaker ? [clone(currentSpeaker)] : []),
+  listSpeakersWithCongregations_: () => currentSpeakers ? clone(currentSpeakers) : (currentSpeaker ? [clone(currentSpeaker)] : []),
   listCongregations: () => [{ id: 'C1', name: 'Basse-Terre', active: true, version: 'c1' }],
   listTalks: () => [{ number: 1, title: 'Premier discours', active: true, version: 't1' }, { number: 2, title: 'Deuxième discours', active: true, version: 't2' }],
   listPlannings: () => [],
+  listPlanningsWithResources_: () => [],
   listHospitalities: () => [],
   listInvitations: () => [],
   getApplicationSettings: () => ({ settings: [{ key: 'ASSEMBLEE', value: 'Basse-Terre' }, { key: 'RECO_POIDS_DISCOURS', value: '40' }], settingsVersion: 'settings-v1' }),

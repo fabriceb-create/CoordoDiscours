@@ -4,6 +4,32 @@ Toutes les modifications importantes de CoordoDiscours sont consignées dans ce 
 
 ## [En développement]
 
+## [1.12.0] — en préparation de recette
+
+### Ajouté
+
+- Module **Aide** avec recherche, sujets filtrés par rôle et aide contextuelle par écran.
+- Bouton d’aide global, boutons contextuels et raccourci clavier `?`.
+- Guide utilisateur et guide administrateur détaillés.
+- Mesure agrégée et temporaire des durées d’appels serveur.
+- Diagnostic administrateur des appels, lenteurs et erreurs.
+- Nouvelle suite `test-help-observability.mjs`.
+
+### Amélioré
+
+- Cache serveur court pour les paramètres, options de programmation, options de communication et libellés de versions.
+- Réutilisation des référentiels et programmations préchargés dans le tableau de bord, l’intégrité, la planification automatique et l’historique des versions.
+- Une lecture interrompue par une erreur transitoire est relancée une seule fois.
+- Le panneau de reprise distingue désormais une lecture relançable d’une écriture au résultat incertain.
+- La validation automatique contrôle 64 fichiers essentiels et 35 fonctions sensibles.
+
+### Sécurité et fiabilité
+
+- Les écritures ne sont jamais répétées automatiquement après une coupure réseau.
+- Les caches sont invalidés après les écritures concernées et ignorés sans bloquer l’application en cas d’indisponibilité.
+- Le rapport de performance et sa réinitialisation sont réservés aux administrateurs.
+- Les contextes de mesure sont filtrés et bornés avant stockage temporaire.
+
 ## [1.11.0] — en préparation de recette
 
 ### Ajouté

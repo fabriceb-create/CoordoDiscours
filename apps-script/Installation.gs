@@ -23,9 +23,10 @@ function runDatabaseMigrations_() {
   const ss = getDatabase_();
   const sheet = ss.getSheetByName(APP_CONFIG.sheets.settings);
   const applied = [];
+  invalidateSettingsCache_();
+  const stored = getSettingsSnapshot_();
 
   const defaults = {
-    LANGUE_INTERFACE: 'fr',
     HEURE_REUNION_DEFAUT: '09:30',
     DUREE_IMPRESSION_MOIS: '3',
     HORIZON_ACTIONS_JOURS: '14',
@@ -41,21 +42,22 @@ function runDatabaseMigrations_() {
     RECO_MALUS_DATE_A_EVITER: '18'
   };
 
+  if (!String(stored.LANGUE_INTERFACE || '').trim()) {
+    const language = String(stored.LANGUE || '').trim() || 'fr';
+    upsertSetting_(sheet, 'LANGUE_INTERFACE', language, 'Langue utilisée dans l’interface.');
+    applied.push(stored.LANGUE ? 'Migration du paramètre LANGUE vers LANGUE_INTERFACE' : 'Ajout du paramètre LANGUE_INTERFACE');
+  }
+
   Object.keys(defaults).forEach(function (key) {
-    if (!String(getSetting_(key) || '').trim()) {
+    if (!String(stored[key] || '').trim()) {
       upsertSetting_(sheet, key, defaults[key], 'Valeur ajoutée automatiquement lors de la migration.');
       applied.push('Ajout du paramètre ' + key);
     }
   });
 
-  const legacyLanguage = String(getSetting_('LANGUE') || '').trim();
-  if (legacyLanguage && !String(getSetting_('LANGUE_INTERFACE') || '').trim()) {
-    upsertSetting_(sheet, 'LANGUE_INTERFACE', legacyLanguage, 'Langue de l’interface migrée automatiquement.');
-    applied.push('Migration du paramètre LANGUE vers LANGUE_INTERFACE');
-  }
-
   upsertSetting_(sheet, 'SCHEMA_VERSION', INSTALLATION_SCHEMA_VERSION, 'Version de structure de la base.');
   upsertSetting_(sheet, 'VERSION', APP_CONFIG.version, 'Version installée de l’application.');
+  invalidateSettingsCache_();
 
   return {
     schemaVersion: INSTALLATION_SCHEMA_VERSION,
@@ -198,6 +200,25 @@ function runAcceptanceTests() {
     if (parsed.product !== APP_CONFIG.name) throw new Error('Produit de sauvegarde incorrect.');
     return 'Format ' + parsed.formatVersion;
   });
+
+  test('Guide intégré disponible', function () {
+    if (typeof getHelpBootstrap !== 'function' || typeof helpRoleAllowed_ !== 'function') {
+      throw new Error('Module d’aide intégré incomplet.');
+    }
+    const help = getHelpBootstrap();
+    if (!help || !help.topics || !help.topics.length) throw new Error('Aucun sujet d’aide disponible.');
+    return help.topics.length + ' sujet(s) accessible(s)';
+  }, false);
+
+  test('Observabilité serveur disponible', function () {
+    if (typeof measureServerOperation_ !== 'function' || typeof getServerPerformanceReport !== 'function') {
+      throw new Error('Module de mesure des appels serveur incomplet.');
+    }
+    if (typeof getCachedServerValue_ !== 'function' || typeof invalidateAllServerCaches_ !== 'function') {
+      throw new Error('Cache serveur incomplet.');
+    }
+    return 'Mesures et caches disponibles';
+  }, false);
 
   test('Disponibilité de l’impression', function () {
     if (typeof getPrintablePlanning !== 'function' && typeof buildPrintablePlanning !== 'function') {

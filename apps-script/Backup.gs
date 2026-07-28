@@ -23,14 +23,16 @@ function getBackupSummary() {
 
 function createApplicationBackup() {
   assertAccess_('ADMIN');
-  const payload = buildBackupPayload_();
-  const json = JSON.stringify(payload, null, 2);
-  const fileName = buildBackupFileName_();
-  logAction_('SAUVEGARDE', 'APPLICATION', fileName, {
-    sheets: payload.sheets.length,
-    rows: payload.sheets.reduce((sum, item) => sum + Math.max(0, item.values.length - 1), 0)
+  return measureServerOperation_('createApplicationBackup', function () {
+    const payload = buildBackupPayload_();
+    const json = JSON.stringify(payload, null, 2);
+    const fileName = buildBackupFileName_();
+    logAction_('SAUVEGARDE', 'APPLICATION', fileName, {
+      sheets: payload.sheets.length,
+      rows: payload.sheets.reduce(function (sum, item) { return sum + Math.max(0, item.values.length - 1); }, 0)
+    });
+    return { fileName: fileName, mimeType: 'application/json', content: json, summary: backupSummaryFromPayload_(payload) };
   });
-  return { fileName, mimeType: 'application/json', content: json, summary: backupSummaryFromPayload_(payload) };
 }
 
 function inspectApplicationBackup(content) {
@@ -64,6 +66,7 @@ function restoreApplicationBackup(content, confirmation) {
     });
 
     setupDatabase_();
+    invalidateAllServerCaches_();
     logAction_('RESTAURATION', 'APPLICATION', payload.createdAt || 'SAUVEGARDE', {
       sourceVersion: payload.applicationVersion,
       formatVersion: payload.formatVersion,

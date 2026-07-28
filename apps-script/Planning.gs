@@ -1,12 +1,20 @@
 function listPlannings(query, includeCancelled) {
-  const ss = getDatabase_();
-  const sheet = ss.getSheetByName(APP_CONFIG.sheets.events);
+  return measureServerOperation_('listPlannings', function () {
+    const congregations = listCongregations('', true);
+    const speakers = listSpeakersWithCongregations_('', true, congregations);
+    const talks = listTalks('', true);
+    return listPlanningsWithResources_(query, includeCancelled, speakers, talks);
+  }, { filtered: Boolean(query), includeCancelled: Boolean(includeCancelled) });
+}
+
+function listPlanningsWithResources_(query, includeCancelled, speakerList, talkList) {
+  const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const speakers = listSpeakers('', true).reduce((map, item) => { map[item.id] = item; return map; }, {});
-  const talks = listTalks('', true).reduce((map, item) => { map[String(item.number)] = item; return map; }, {});
+  const speakers = (speakerList || []).reduce(function (map, item) { map[item.id] = item; return map; }, {});
+  const talks = (talkList || []).reduce(function (map, item) { map[String(item.number)] = item; return map; }, {});
   const normalizedQuery = normalizeText_(query);
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getValues()
-    .map(row => {
+    .map(function (row) {
       const speaker = speakers[String(row[3])] || {};
       const talk = talks[String(row[4])] || {};
       const status = String(row[5] || 'PROGRAMME').toUpperCase();
@@ -30,13 +38,26 @@ function listPlannings(query, includeCancelled) {
         updatedBy: version.updatedBy
       };
     })
-    .filter(item => includeCancelled || item.status !== 'ANNULE')
-    .filter(item => !normalizedQuery || normalizeText_([item.displayDate, item.speakerName, item.talkNumber, item.talkTitle, item.status, item.notes].join(' ')).includes(normalizedQuery))
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time)));
+    .filter(function (item) { return includeCancelled || item.status !== 'ANNULE'; })
+    .filter(function (item) {
+      return !normalizedQuery || normalizeText_([item.displayDate, item.speakerName, item.talkNumber, item.talkTitle, item.status, item.notes].join(' ')).includes(normalizedQuery);
+    })
+    .sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || String(a.time).localeCompare(String(b.time));
+    });
 }
 
 function getPlanningOptions() {
-  return { speakers: listSpeakers('', false), talks: listTalks('', false).filter(item => item.active), congregations: listCongregations('', false) };
+  return measureServerOperation_('getPlanningOptions', function () {
+    return getCachedServerValue_(SERVER_CACHE_KEYS.PLANNING_OPTIONS, function () {
+      const congregations = listCongregations('', false);
+      return {
+        speakers: listSpeakersWithCongregations_('', false, congregations),
+        talks: listTalks('', false).filter(function (item) { return item.active; }),
+        congregations: congregations
+      };
+    }, SERVER_CACHE_TTL_SECONDS);
+  });
 }
 
 function validatePlanning(payload) {
@@ -109,6 +130,7 @@ function savePlanning(payload, confirmWarnings) {
   if (result && result.blocked) {
     result.resolution = buildPlanningConflictResolution_(data, evaluation, dataset);
   }
+  if (result && result.saved) invalidatePlanningServerCaches_();
   return result;
 }
 
@@ -129,6 +151,7 @@ function setPlanningStatus_(id, status, expectedVersion) {
     const version = advanceEntityVersion_('PROGRAMMATION', id);
     const after = Object.assign({}, before, { status: status }, version);
     logAction_('CHANGEMENT_STATUT', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { concurrency: version }));
+    invalidatePlanningServerCaches_();
     return { id: id, status: status, version: version.version };
   } finally {
     lock.releaseLock();

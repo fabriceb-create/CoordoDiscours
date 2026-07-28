@@ -1,6 +1,6 @@
 const APP_CONFIG = Object.freeze({
   name: 'CoordoDiscours',
-  version: '1.11 Stable',
+  version: '1.12 Stable',
   spreadsheetProperty: 'COORDODISCOURS_SPREADSHEET_ID',
   sheets: {
     settings: 'PARAMETRES',
