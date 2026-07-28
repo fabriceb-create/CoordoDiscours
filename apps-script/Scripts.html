@@ -60,16 +60,32 @@
     return input;
   }
 
+  function mergeEntityIdForForm_(form, item) {
+    const entity = String(form.dataset.mergeEntity || '').toUpperCase();
+    if (!item) return '';
+    if (entity === 'DISCOURS') return item.number;
+    if (entity === 'UTILISATEUR') return item.email;
+    if (entity === 'PARAMETRES') return 'APPLICATION';
+    return item.id || '';
+  }
+
   function fillForm(form, item) {
     ensureVersionField_(form);
     form.reset();
     if (form.elements.active) form.elements.active.checked = true;
-    if (!item) { form.elements.version.value = ''; return; }
+    if (!item) {
+      form.elements.version.value = '';
+      form._concurrentMerge = null;
+      return;
+    }
     Object.keys(item).forEach(key => {
       if (!form.elements[key]) return;
       if (form.elements[key].type === 'checkbox') form.elements[key].checked = Boolean(item[key]);
       else form.elements[key].value = item[key] ?? '';
     });
+    if (form.dataset.mergeEntity && typeof rememberConcurrentMergeBase_ === 'function') {
+      rememberConcurrentMergeBase_(form, form.dataset.mergeEntity, mergeEntityIdForForm_(form, item), item);
+    }
   }
 
   async function loadCongregations() {
@@ -144,50 +160,108 @@
 
     const toggleSpeaker = event.target.closest('[data-toggle-speaker]');
     if (toggleSpeaker) {
-      try { await runServer(toggleSpeaker.dataset.active === 'true' ? 'archiveSpeaker' : 'restoreSpeaker', toggleSpeaker.dataset.toggleSpeaker, toggleSpeaker.dataset.version); toast('Fiche orateur mise à jour.'); await loadSpeakers(); }
-      catch (error) { showError(error); await loadSpeakers(); }
+      const item = state.speakers.find(entry => entry.id === toggleSpeaker.dataset.toggleSpeaker);
+      const active = toggleSpeaker.dataset.active !== 'true';
+      try {
+        await runServer(active ? 'restoreSpeaker' : 'archiveSpeaker', item.id, toggleSpeaker.dataset.version);
+        toast('Fiche orateur mise à jour.');
+        await loadSpeakers();
+      } catch (error) {
+        if (isConcurrentVersionConflict_(error) && item) {
+          await handleConcurrentMerge_({
+            entity: 'ORATEUR', entityId: item.id, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
+            onSaved: loadSpeakers
+          });
+        } else showError(error);
+      }
     }
     const toggleCongregation = event.target.closest('[data-toggle-congregation]');
     if (toggleCongregation) {
-      try { await runServer(toggleCongregation.dataset.active === 'true' ? 'archiveCongregation' : 'restoreCongregation', toggleCongregation.dataset.toggleCongregation, toggleCongregation.dataset.version); toast('Fiche assemblée mise à jour.'); await loadCongregations(); }
-      catch (error) { showError(error); await loadCongregations(); }
+      const item = state.congregations.find(entry => entry.id === toggleCongregation.dataset.toggleCongregation);
+      const active = toggleCongregation.dataset.active !== 'true';
+      try {
+        await runServer(active ? 'restoreCongregation' : 'archiveCongregation', item.id, toggleCongregation.dataset.version);
+        toast('Fiche assemblée mise à jour.');
+        await loadCongregations();
+      } catch (error) {
+        if (isConcurrentVersionConflict_(error) && item) {
+          await handleConcurrentMerge_({
+            entity: 'ASSEMBLEE', entityId: item.id, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
+            onSaved: loadCongregations
+          });
+        } else showError(error);
+      }
     }
     const toggleTalk = event.target.closest('[data-toggle-talk]');
     if (toggleTalk) {
+      const item = state.talks.find(entry => entry.number === Number(toggleTalk.dataset.toggleTalk));
+      const active = toggleTalk.dataset.active !== 'true';
       try {
-        await runServer('setTalkActive', Number(toggleTalk.dataset.toggleTalk), toggleTalk.dataset.active !== 'true', toggleTalk.dataset.version);
+        await runServer('setTalkActive', item.number, active, toggleTalk.dataset.version);
         toast('Statut du discours mis à jour.');
         await loadTalks();
       } catch (error) {
-        showError(error);
-        if (String(error.message || error).includes('CONFLIT_VERSION|')) await loadTalks();
+        if (isConcurrentVersionConflict_(error) && item) {
+          await handleConcurrentMerge_({
+            entity: 'DISCOURS', entityId: item.number, base: item, local: Object.assign({}, item, { active: active }), operation: 'STATUS',
+            onSaved: loadTalks
+          });
+        } else showError(error);
       }
     }
   });
 
   document.getElementById('speaker-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try { await runServer('saveSpeaker', formToObject(event.target)); document.getElementById('speaker-dialog').close(); toast('Orateur enregistré.'); await loadSpeakers(); }
-    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('speaker-dialog').close(); await loadSpeakers(); } }
+    const form = event.target;
+    const payload = formToObject(form);
+    try {
+      await runServer('saveSpeaker', payload);
+      document.getElementById('speaker-dialog').close();
+      toast('Orateur enregistré.');
+      await loadSpeakers();
+    } catch (error) {
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, payload, {
+          onSaved: async () => { document.getElementById('speaker-dialog').close(); await loadSpeakers(); }
+        });
+      } else showError(error);
+    }
   });
+
   document.getElementById('congregation-form').addEventListener('submit', async event => {
     event.preventDefault();
-    try { await runServer('saveCongregation', formToObject(event.target)); document.getElementById('congregation-dialog').close(); toast('Assemblée enregistrée.'); await loadCongregations(); }
-    catch (error) { showError(error); if (String(error.message || error).includes('CONFLIT_VERSION|')) { document.getElementById('congregation-dialog').close(); await loadCongregations(); } }
+    const form = event.target;
+    const payload = formToObject(form);
+    try {
+      await runServer('saveCongregation', payload);
+      document.getElementById('congregation-dialog').close();
+      toast('Assemblée enregistrée.');
+      await loadCongregations();
+    } catch (error) {
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, payload, {
+          onSaved: async () => { document.getElementById('congregation-dialog').close(); await loadCongregations(); }
+        });
+      } else showError(error);
+    }
   });
+
   document.getElementById('talk-form').addEventListener('submit', async event => {
     event.preventDefault();
+    const form = event.target;
+    const payload = formToObject(form);
     try {
-      await runServer('saveTalk', formToObject(event.target));
+      await runServer('saveTalk', payload);
       document.getElementById('talk-dialog').close();
       toast('Discours enregistré.');
       await loadTalks();
     } catch (error) {
-      showError(error);
-      if (String(error.message || error).includes('CONFLIT_VERSION|')) {
-        document.getElementById('talk-dialog').close();
-        await loadTalks();
-      }
+      if (isConcurrentVersionConflict_(error)) {
+        await handleConcurrentFormConflict_(form, payload, {
+          onSaved: async () => { document.getElementById('talk-dialog').close(); await loadTalks(); }
+        });
+      } else showError(error);
     }
   });
 
