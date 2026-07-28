@@ -1,0 +1,308 @@
+<script>
+  const versionHistoryState = {
+    bootstrap: null,
+    records: [],
+    selectedRecordIndex: -1,
+    timeline: null,
+    selectedVersionIds: [],
+    comparison: null,
+    loading: false
+  };
+
+  async function loadVersionHistoryView_() {
+    if (versionHistoryState.loading) return;
+    const records = document.getElementById('version-history-records');
+    const detail = document.getElementById('version-history-detail');
+    if (!records || !detail) return;
+    versionHistoryState.loading = true;
+    try {
+      if (!versionHistoryState.bootstrap) {
+        versionHistoryState.bootstrap = await runServer('getVersionHistoryBootstrap');
+        renderVersionHistoryEntityOptions_();
+      }
+      await loadVersionHistoryRecords_();
+    } catch (error) {
+      showError(error);
+      records.innerHTML = '<div class="version-history-empty">Impossible de charger l’historique des versions.</div>';
+      detail.innerHTML = '<div class="version-history-empty">Une erreur empêche l’affichage des versions.</div>';
+    } finally {
+      versionHistoryState.loading = false;
+    }
+  }
+
+  function renderVersionHistoryEntityOptions_() {
+    const select = document.getElementById('version-history-entity');
+    if (!select) return;
+    const current = select.value;
+    const entities = versionHistoryState.bootstrap && versionHistoryState.bootstrap.entities || [];
+    select.innerHTML = entities.map(item => `<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join('');
+    select.value = entities.some(item => item.key === current) ? current : (versionHistoryState.bootstrap.defaultEntity || '');
+  }
+
+  async function loadVersionHistoryRecords_() {
+    const entity = document.getElementById('version-history-entity').value;
+    const search = document.getElementById('version-history-search').value;
+    const container = document.getElementById('version-history-records');
+    const detail = document.getElementById('version-history-detail');
+    container.innerHTML = '<div class="version-history-loading">Chargement des fiches...</div>';
+    detail.innerHTML = '<div class="version-history-empty">Sélectionne une fiche pour parcourir ses versions.</div>';
+    versionHistoryState.selectedRecordIndex = -1;
+    versionHistoryState.timeline = null;
+    versionHistoryState.selectedVersionIds = [];
+    versionHistoryState.comparison = null;
+    try {
+      versionHistoryState.records = await runServer('listVersionHistoryRecords', entity, search);
+      renderVersionHistoryRecords_();
+    } catch (error) {
+      showError(error);
+      versionHistoryState.records = [];
+      renderVersionHistoryRecords_();
+    }
+  }
+
+  function renderVersionHistoryRecords_() {
+    const container = document.getElementById('version-history-records');
+    const count = document.getElementById('version-history-record-count');
+    const records = versionHistoryState.records || [];
+    count.textContent = records.length + ' fiche' + (records.length > 1 ? 's' : '');
+    if (!records.length) {
+      container.innerHTML = '<div class="version-history-empty">Aucune fiche trouvée pour ce module.</div>';
+      return;
+    }
+    container.innerHTML = records.map((record, index) => `
+      <button type="button" class="version-history-record ${index === versionHistoryState.selectedRecordIndex ? 'selected' : ''}" data-version-history-record-index="${index}">
+        <strong>${escapeHtml(record.label || record.entityId)}</strong>
+        <small>${record.versionCount} version${record.versionCount > 1 ? 's' : ''}${record.lastDisplayDate ? '<br>Dernier état : ' + escapeHtml(record.lastDisplayDate) : ''}</small>
+      </button>`).join('');
+  }
+
+  async function openVersionHistoryRecord_(index) {
+    const record = versionHistoryState.records[index];
+    if (!record) return;
+    versionHistoryState.selectedRecordIndex = index;
+    versionHistoryState.selectedVersionIds = [];
+    versionHistoryState.comparison = null;
+    renderVersionHistoryRecords_();
+    const detail = document.getElementById('version-history-detail');
+    detail.innerHTML = '<div class="version-history-loading">Reconstruction de la chronologie...</div>';
+    try {
+      versionHistoryState.timeline = await runServer('getEntityVersionTimeline', record.entity, record.entityId);
+      const versions = versionHistoryState.timeline.versions || [];
+      versionHistoryState.selectedVersionIds = versions.slice(0, 2).map(item => item.id);
+      renderVersionHistoryTimeline_();
+    } catch (error) {
+      showError(error);
+      detail.innerHTML = '<div class="version-history-empty">Impossible de reconstruire les versions de cette fiche.</div>';
+    }
+  }
+
+  function renderVersionHistoryTimeline_() {
+    const detail = document.getElementById('version-history-detail');
+    const timeline = versionHistoryState.timeline;
+    if (!timeline) {
+      detail.innerHTML = '<div class="version-history-empty">Sélectionne une fiche pour parcourir ses versions.</div>';
+      return;
+    }
+    const versions = timeline.versions || [];
+    const current = versions.find(item => item.isCurrent);
+    detail.innerHTML = `
+      <div class="version-history-detail-head">
+        <div><p class="eyebrow">${escapeHtml(timeline.entityLabel || timeline.entity)}</p><h3>${escapeHtml(timeline.recordLabel || timeline.entityId)}</h3><p>${versions.length} version${versions.length > 1 ? 's' : ''} reconstituée${versions.length > 1 ? 's' : ''} à partir de l’audit.</p></div>
+        <div class="version-history-actions"><button id="version-history-compare" type="button" class="primary-button">Comparer les versions sélectionnées</button></div>
+      </div>
+      <div class="version-history-selection"><p>Sélectionne exactement deux versions pour afficher leurs différences.</p><button id="version-history-clear-selection" type="button" class="secondary-button">Effacer la sélection</button></div>
+      <div id="version-history-restore-message"></div>
+      <div class="version-history-timeline">${versions.map(version => renderVersionHistoryVersion_(version, timeline)).join('')}</div>
+      <section id="version-history-comparison" class="version-history-compare" hidden></section>`;
+    const compareButton = document.getElementById('version-history-compare');
+    compareButton.disabled = versionHistoryState.selectedVersionIds.length !== 2;
+    if (versionHistoryState.comparison) renderVersionHistoryComparison_(versionHistoryState.comparison);
+    if (!current && timeline.canRestore) {
+      document.getElementById('version-history-restore-message').innerHTML = '<div class="version-history-restore-warning">La fiche actuelle n’existe plus. Les anciennes versions restent consultables, mais leur recréation automatique n’est pas disponible dans ce lot.</div>';
+    }
+  }
+
+  function renderVersionHistoryVersion_(version, timeline) {
+    const checked = versionHistoryState.selectedVersionIds.includes(version.id);
+    const fields = (version.changedFields || []).map(versionHistoryFieldLabel_);
+    return `
+      <article class="version-history-version ${version.isCurrent ? 'current' : ''}">
+        <input type="checkbox" data-version-history-select="${escapeHtml(version.id)}" ${checked ? 'checked' : ''} aria-label="Sélectionner la version ${version.number}">
+        <div>
+          <h4>Version ${version.number}${version.isCurrent ? ' — actuelle' : ''}</h4>
+          <small>${escapeHtml(version.displayDate || '')}${version.user ? ' — ' + escapeHtml(version.user) : ''}<br>${escapeHtml(version.action || 'État enregistré')}</small>
+          <div class="version-history-badges">
+            ${version.isCurrent ? '<span class="version-history-badge current">Version actuelle</span>' : ''}
+            ${fields.slice(0, 4).map(field => `<span class="version-history-badge">${escapeHtml(field)}</span>`).join('')}
+            ${fields.length > 4 ? `<span class="version-history-badge">+${fields.length - 4}</span>` : ''}
+          </div>
+        </div>
+        <div class="record-actions">
+          ${timeline.canRestore && !version.isCurrent ? `<button type="button" class="secondary-button" data-version-history-restore="${escapeHtml(version.id)}" data-version-number="${version.number}">Restaurer</button>` : ''}
+        </div>
+      </article>`;
+  }
+
+  function versionHistoryFieldLabel_(field) {
+    const labels = {
+      lastName: 'Nom', firstName: 'Prénom', type: 'Type', congregationId: 'Assemblée', phone: 'Téléphone', email: 'E-mail', active: 'Statut', notes: 'Notes',
+      name: 'Nom', coordinator: 'Coordinateur', address: 'Adresse', meetingDay: 'Jour', meetingTime: 'Heure', title: 'Titre', date: 'Date', time: 'Heure',
+      speakerId: 'Orateur', talkNumber: 'Discours', status: 'Statut', originCongregationId: 'Assemblée d’origine', planningId: 'Programmation', group: 'Groupe',
+      contact: 'Contact', sentDate: 'Date d’envoi', recipient: 'Destinataire', role: 'Rôle', talkNumbers: 'Discours déclarés', entries: 'Disponibilités'
+    };
+    return labels[field] || String(field || '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+
+  function toggleVersionHistorySelection_(versionId, checked) {
+    const selected = versionHistoryState.selectedVersionIds.slice();
+    const index = selected.indexOf(versionId);
+    if (checked && index < 0) {
+      if (selected.length >= 2) {
+        toast('Deux versions sont déjà sélectionnées.');
+        renderVersionHistoryTimeline_();
+        return;
+      }
+      selected.push(versionId);
+    } else if (!checked && index >= 0) {
+      selected.splice(index, 1);
+    }
+    versionHistoryState.selectedVersionIds = selected;
+    versionHistoryState.comparison = null;
+    const button = document.getElementById('version-history-compare');
+    if (button) button.disabled = selected.length !== 2;
+    const comparison = document.getElementById('version-history-comparison');
+    if (comparison) comparison.hidden = true;
+  }
+
+  async function compareSelectedEntityVersions_() {
+    if (!versionHistoryState.timeline || versionHistoryState.selectedVersionIds.length !== 2) {
+      toast('Sélectionne exactement deux versions.');
+      return;
+    }
+    const versions = versionHistoryState.timeline.versions || [];
+    const selected = versionHistoryState.selectedVersionIds.map(id => versions.find(item => item.id === id)).filter(Boolean).sort((a, b) => a.number - b.number);
+    if (selected.length !== 2) return;
+    const section = document.getElementById('version-history-comparison');
+    section.hidden = false;
+    section.innerHTML = '<div class="version-history-loading">Comparaison des versions...</div>';
+    try {
+      versionHistoryState.comparison = await runServer(
+        'compareEntityVersions',
+        versionHistoryState.timeline.entity,
+        versionHistoryState.timeline.entityId,
+        selected[0].id,
+        selected[1].id
+      );
+      renderVersionHistoryComparison_(versionHistoryState.comparison);
+    } catch (error) {
+      showError(error);
+      section.innerHTML = '<div class="version-history-empty">Impossible de comparer les versions sélectionnées.</div>';
+    }
+  }
+
+  function renderVersionHistoryComparison_(comparison) {
+    const section = document.getElementById('version-history-comparison');
+    if (!section) return;
+    const differences = comparison.differences || [];
+    section.hidden = false;
+    section.innerHTML = `
+      <div class="version-history-compare-head"><div><p class="eyebrow">Comparaison</p><h3>Version ${comparison.left.number} → Version ${comparison.right.number}</h3></div><button id="version-history-close-comparison" type="button" class="secondary-button">Fermer la comparaison</button></div>
+      ${differences.length ? `<div class="version-history-compare-grid">${differences.map(item => `
+        <article class="version-history-difference">
+          <strong>${escapeHtml(item.label || item.field)}</strong>
+          <div class="version-history-value"><strong>Version ${comparison.left.number}</strong>${escapeHtml(item.leftDisplay || 'Valeur vide')}</div>
+          <div class="version-history-value"><strong>Version ${comparison.right.number}</strong>${escapeHtml(item.rightDisplay || 'Valeur vide')}</div>
+        </article>`).join('')}</div>` : '<div class="empty-state">Ces deux versions ne présentent aucune différence métier.</div>'}`;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function restoreSelectedEntityVersion_(versionId, versionNumber, confirmWarnings) {
+    const timeline = versionHistoryState.timeline;
+    if (!timeline || !timeline.canRestore) return;
+    if (!confirmWarnings && !window.confirm('Restaurer la version ' + versionNumber + ' ? La version actuelle restera dans l’historique et une nouvelle version sera créée.')) return;
+    const message = document.getElementById('version-history-restore-message');
+    message.innerHTML = '<div class="version-history-restore-warning">Restauration et validation en cours...</div>';
+    try {
+      const result = await runServer('restoreEntityVersion', {
+        entity: timeline.entity,
+        entityId: timeline.entityId,
+        versionId: versionId,
+        expectedCurrentVersion: timeline.currentTechnicalVersion,
+        confirmWarnings: Boolean(confirmWarnings)
+      });
+      await handleVersionHistoryRestoreResult_(result, versionId, versionNumber);
+    } catch (error) {
+      showError(error);
+      message.innerHTML = '<div class="version-history-restore-warning">La restauration a échoué : ' + escapeHtml(error && error.message ? error.message : String(error)) + '</div>';
+    }
+  }
+
+  async function handleVersionHistoryRestoreResult_(result, versionId, versionNumber) {
+    const message = document.getElementById('version-history-restore-message');
+    if (result.saved) {
+      toast(result.message || 'Version restaurée.');
+      await loadVersionHistoryRecords_();
+      const index = versionHistoryState.records.findIndex(item => String(item.entityId) === String(result.timeline && result.timeline.entityId || versionHistoryState.timeline.entityId));
+      if (index >= 0) await openVersionHistoryRecord_(index);
+      return;
+    }
+    if (result.stale) {
+      toast(result.message || 'La fiche a changé. La chronologie a été actualisée.');
+      versionHistoryState.timeline = result.timeline;
+      versionHistoryState.selectedVersionIds = (result.timeline.versions || []).slice(0, 2).map(item => item.id);
+      versionHistoryState.comparison = null;
+      renderVersionHistoryTimeline_();
+      return;
+    }
+    if (result.validation) {
+      if (result.validation.requiresConfirmation) {
+        const warnings = result.validation.warnings || [];
+        message.innerHTML = '<div class="version-history-restore-warning"><strong>Avertissements métier</strong><br>' + warnings.map(escapeHtml).join('<br>') + '</div>';
+        if (window.confirm(warnings.join('\n') + '\n\nRestaurer malgré ces avertissements ?')) {
+          await restoreSelectedEntityVersion_(versionId, versionNumber, true);
+        }
+        return;
+      }
+      const errors = result.validation.errors || ['Cette ancienne version n’est plus compatible avec les règles actuelles.'];
+      message.innerHTML = '<div class="version-history-restore-warning"><strong>Restauration bloquée</strong><br>' + errors.map(escapeHtml).join('<br>') + '</div>';
+      return;
+    }
+    message.innerHTML = '<div class="version-history-restore-warning">' + escapeHtml(result.message || 'La restauration n’a pas pu être effectuée.') + '</div>';
+  }
+
+  document.addEventListener('click', async event => {
+    const navigation = event.target.closest('[data-view="versions"], [data-open="versions"]');
+    if (navigation) await loadVersionHistoryView_();
+
+    const record = event.target.closest('[data-version-history-record-index]');
+    if (record) await openVersionHistoryRecord_(Number(record.dataset.versionHistoryRecordIndex));
+
+    const restore = event.target.closest('[data-version-history-restore]');
+    if (restore) await restoreSelectedEntityVersion_(restore.dataset.versionHistoryRestore, restore.dataset.versionNumber, false);
+
+    if (event.target.id === 'version-history-refresh') await loadVersionHistoryRecords_();
+    if (event.target.id === 'version-history-compare') await compareSelectedEntityVersions_();
+    if (event.target.id === 'version-history-clear-selection') {
+      versionHistoryState.selectedVersionIds = [];
+      versionHistoryState.comparison = null;
+      renderVersionHistoryTimeline_();
+    }
+    if (event.target.id === 'version-history-close-comparison') {
+      versionHistoryState.comparison = null;
+      const comparison = document.getElementById('version-history-comparison');
+      if (comparison) comparison.hidden = true;
+    }
+  });
+
+  document.addEventListener('change', async event => {
+    if (event.target.id === 'version-history-entity') await loadVersionHistoryRecords_();
+    if (event.target.matches('[data-version-history-select]')) toggleVersionHistorySelection_(event.target.dataset.versionHistorySelect, event.target.checked);
+  });
+
+  let versionHistorySearchTimer;
+  document.addEventListener('input', event => {
+    if (event.target.id !== 'version-history-search') return;
+    clearTimeout(versionHistorySearchTimer);
+    versionHistorySearchTimer = setTimeout(loadVersionHistoryRecords_, 300);
+  });
+</script>

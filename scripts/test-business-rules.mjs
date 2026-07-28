@@ -4,8 +4,16 @@ import path from 'node:path';
 const root = path.resolve('apps-script');
 const failures = [];
 let assertions = 0;
-function read(file) { const filePath = path.join(root, file); if (!fs.existsSync(filePath)) { failures.push(`Fichier introuvable : ${file}`); return ''; } return fs.readFileSync(filePath, 'utf8'); }
-function assertContains(source, pattern, message) { assertions += 1; const ok = pattern instanceof RegExp ? pattern.test(source) : source.includes(pattern); if (!ok) failures.push(message); }
+function read(file) {
+  const filePath = path.join(root, file);
+  if (!fs.existsSync(filePath)) { failures.push(`Fichier introuvable : ${file}`); return ''; }
+  return fs.readFileSync(filePath, 'utf8');
+}
+function assertContains(source, pattern, message) {
+  assertions += 1;
+  const ok = pattern instanceof RegExp ? pattern.test(source) : source.includes(pattern);
+  if (!ok) failures.push(message);
+}
 
 const planning = read('Planning.gs');
 const rules = read('RulesEngine.gs');
@@ -30,11 +38,13 @@ const availabilityUi = read('SpeakerAvailabilityUI.html');
 assertContains(concurrency, /function\s+assertEntityVersion_\s*\(/, 'Concurrence : le contrôle de version est absent.');
 assertContains(concurrency, /CONFLIT_VERSION/, 'Concurrence : le code de conflit explicite est absent.');
 assertContains(concurrency, /function\s+advanceEntityVersion_\s*\(/, 'Concurrence : le renouvellement de version est absent.');
+assertContains(concurrency, /function\s+restoreEntityVersion_\s*\(/, 'Concurrence : la restauration d’une version technique est absente.');
 assertContains(planning, /assertEntityVersion_\(['"]PROGRAMMATION['"]/, 'Planning : la version attendue n’est pas contrôlée.');
 assertContains(planning, /LockService\.getScriptLock\(\)/, 'Planning : la vérification et l’écriture ne sont pas protégées par un verrou.');
 assertContains(planning, /version:\s*String\(data\.version/, 'Planning : la version du formulaire n’est pas normalisée.');
 assertContains(planningUi, /ensurePlanningVersionField_/, 'Interface : le champ de version de la programmation est absent.');
-assertContains(planningUi, /handlePlanningVersionConflict_/, 'Interface : aucun traitement du conflit de version n’est prévu.');
+assertContains(planningUi, /handleConcurrentFormConflict_/, 'Interface : la programmation ne déclenche pas la fusion intelligente en cas de conflit.');
+assertContains(planningUi, /handleConcurrentMerge_/, 'Interface : les changements rapides de statut ne déclenchent pas la fusion intelligente.');
 assertContains(planningUi, /data-version=/, 'Interface : les changements de statut ne transmettent pas la version.');
 
 const conflictResolver = read('ConflictResolution.gs');
@@ -88,9 +98,38 @@ assertContains(availability, /restoreSpeakerAvailabilitySnapshot_/, 'Disponibili
 assertContains(availability, /buildAuditDetails_\(/, 'Disponibilités : le format d’audit avant/après est absent.');
 assertContains(availabilityUi, /name="version"/, 'Interface : les disponibilités ne conservent pas leur version.');
 assertContains(availabilityUi, /saveSpeakerAvailabilitySchedule[\s\S]*elements\.version\.value/, 'Interface : la version des disponibilités n’est pas envoyée.');
-assertContains(availabilityUi, /CONFLIT_VERSION\|[\s\S]*openSpeakerAvailability_/, 'Interface : un conflit de disponibilité ne déclenche pas le rechargement.');
+assertContains(availabilityUi, /handleConcurrentFormConflict_/, 'Interface : les conflits de disponibilité ne déclenchent pas la fusion intelligente.');
 assertContains(availabilityUi, /manage-speaker-availability/, 'Interface : l’accès aux disponibilités depuis la fiche orateur est absent.');
 assertContains(indexUi, /SpeakerAvailabilityStyles[\s\S]*SpeakerAvailabilityUI/, 'Interface : le module de disponibilité n’est pas chargé.');
+
+const merge = read('MergeEngine.gs');
+const mergeUi = read('MergeScripts.html');
+assertContains(merge, /function\s+prepareConcurrentMerge\s*\(/, 'Fusion : le point d’entrée de préparation est absent.');
+assertContains(merge, /function\s+applyConcurrentMergeResolution\s*\(/, 'Fusion : le point d’entrée d’arbitrage est absent.');
+assertContains(merge, /mergeConcurrentScalar_/, 'Fusion : la comparaison à trois voies des champs simples est absente.');
+assertContains(merge, /mergeConcurrentSet_/, 'Fusion : la fusion des ensembles est absente.');
+assertContains(merge, /mergeConcurrentCollection_/, 'Fusion : la fusion des collections est absente.');
+assertContains(merge, /FUSION_AUTOMATIQUE/, 'Fusion : l’audit automatique est absent.');
+assertContains(merge, /FUSION_RESOLUE/, 'Fusion : l’audit après arbitrage est absent.');
+assertContains(mergeUi, /prepareConcurrentMerge/, 'Fusion UI : la préparation serveur n’est pas appelée.');
+assertContains(mergeUi, /applyConcurrentMergeResolution/, 'Fusion UI : l’application des choix n’est pas appelée.');
+assertContains(mergeUi, /data-merge-choice/, 'Fusion UI : les choix local/distant sont absents.');
+assertContains(indexUi, /MergeStyles[\s\S]*MergeScripts/, 'Interface : le module de fusion intelligente n’est pas chargé.');
+
+const versions = read('VersionHistory.gs');
+const versionsUi = read('VersionHistoryScripts.html');
+assertContains(versions, /function\s+getVersionHistoryBootstrap\s*\(/, 'Versions : le bootstrap est absent.');
+assertContains(versions, /function\s+listVersionHistoryRecords\s*\(/, 'Versions : la liste des fiches est absente.');
+assertContains(versions, /function\s+getEntityVersionTimeline\s*\(/, 'Versions : la chronologie est absente.');
+assertContains(versions, /function\s+compareEntityVersions\s*\(/, 'Versions : la comparaison est absente.');
+assertContains(versions, /function\s+restoreEntityVersion\s*\(/, 'Versions : la restauration est absente.');
+assertContains(versions, /details\.before[\s\S]*details\.after/, 'Versions : les instantanés avant/après ne sont pas reconstruits.');
+assertContains(versions, /versionHistorySnapshotHash_/, 'Versions : le hachage des instantanés est absent.');
+assertContains(versions, /RESTAURATION_VERSION/, 'Versions : la restauration n’est pas auditée.');
+assertContains(versionsUi, /compareEntityVersions/, 'Versions UI : la comparaison de deux versions est absente.');
+assertContains(versionsUi, /restoreEntityVersion/, 'Versions UI : la restauration est absente.');
+assertContains(indexUi, /VersionHistoryStyles[\s\S]*VersionHistoryScripts/, 'Interface : le module d’historique des versions n’est pas chargé.');
+assertContains(indexUi, /data-view="versions"[\s\S]*id="view-versions"/, 'Interface : le menu Versions ou son espace de travail est absent.');
 
 [
   ['Speakers.gs', 'ORATEUR'],
@@ -109,19 +148,21 @@ assertContains(indexUi, /SpeakerAvailabilityStyles[\s\S]*SpeakerAvailabilityUI/,
   assertContains(source, /LockService\.getScriptLock\(\)/, `Concurrence : ${file} n’utilise pas de verrou pendant l’écriture.`);
 });
 assertContains(scriptsUi, /ensureVersionField_/, 'Interface : les formulaires du répertoire ne transmettent pas la version.');
+assertContains(scriptsUi, /handleConcurrentFormConflict_/, 'Interface : les formulaires du répertoire ne déclenchent pas la fusion intelligente.');
 assertContains(scriptsUi, /data-toggle-talk=[\s\S]*data-version=/, 'Interface : les actions rapides des discours ne transmettent pas la version.');
 assertContains(scriptsUi, /setTalkActive[\s\S]*dataset\.version/, 'Interface : la version du discours n’est pas envoyée au serveur.');
 assertContains(communicationUi, /data-version=/, 'Interface : les actions rapides de communication ne transmettent pas la version.');
-assertContains(communicationUi, /CONFLIT_VERSION\|/, 'Interface : les conflits de communication ne déclenchent pas le rechargement.');
+assertContains(communicationUi, /handleConcurrentFormConflict_/, 'Interface : les formulaires de communication ne déclenchent pas la fusion intelligente.');
+assertContains(communicationUi, /handleConcurrentMerge_/, 'Interface : les changements rapides de communication ne déclenchent pas la fusion intelligente.');
 assertContains(settingsUi, /name="version"[\s\S]*settingsVersion/, 'Interface : les paramètres ne conservent pas leur version.');
 assertContains(settingsUi, /resetApplicationSettings[\s\S]*expectedVersion/, 'Interface : la réinitialisation des paramètres ne transmet pas la version.');
-assertContains(settingsUi, /CONFLIT_VERSION\|[\s\S]*loadSettings/, 'Interface : les conflits de paramètres ne déclenchent pas le rechargement.');
+assertContains(settingsUi, /handleConcurrentFormConflict_/, 'Interface : les conflits de paramètres ne déclenchent pas la fusion intelligente.');
 assertContains(accessUi, /data-access-toggle=[\s\S]*data-version=/, 'Interface : les actions utilisateur ne transmettent pas la version.');
 assertContains(accessUi, /setAccessUserActive[\s\S]*dataset\.version/, 'Interface : la version utilisateur n’est pas envoyée au serveur.');
-assertContains(accessUi, /CONFLIT_VERSION\|[\s\S]*renderAccessManagement_/, 'Interface : les conflits utilisateur ne déclenchent pas le rechargement.');
+assertContains(accessUi, /handleConcurrentFormConflict_|handleConcurrentMerge_/, 'Interface : les conflits utilisateur ne déclenchent pas la fusion intelligente.');
 assertContains(speakerTalkUi, /name="version"/, 'Interface : la sélection des discours ne conserve pas sa version.');
 assertContains(speakerTalkUi, /saveSpeakerTalkSelection[\s\S]*elements\.version\.value/, 'Interface : la version de la sélection des discours n’est pas envoyée.');
-assertContains(speakerTalkUi, /CONFLIT_VERSION\|[\s\S]*openSpeakerTalks/, 'Interface : les conflits de sélection des discours ne déclenchent pas le rechargement.');
+assertContains(speakerTalkUi, /handleConcurrentFormConflict_/, 'Interface : les conflits de sélection des discours ne déclenchent pas la fusion intelligente.');
 
 const recommendations = read('RecommendationEngine.gs');
 assertContains(recommendations, /function\s+getSpeakerRecommendations\s*\(/, 'Recommandations : le point d’entrée est absent.');
