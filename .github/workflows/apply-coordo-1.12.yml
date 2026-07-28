@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           cat .github/patches/coordo-1.12.xz.* > /tmp/coordo-1.12.patch.xz.b64
           base64 --decode /tmp/coordo-1.12.patch.xz.b64 > /tmp/coordo-1.12.patch.xz
-          echo "75d9ca238d60329a5ddee8e86af75d72162bea9b70bcdfebb1c22642df0cc4ed  /tmp/coordo-1.12.patch.xz" | sha256sum --check
+          echo "c7c48dc0623e74bfcd350391373f556620b93630282108d508e0c6651a0c93d0  /tmp/coordo-1.12.patch.xz" | sha256sum --check
           xz --decompress --stdout /tmp/coordo-1.12.patch.xz > /tmp/coordo-1.12.patch
           echo "da773e6d66649fe7d6f5fd75a34cb97aea3e89af256d46f2f3ee40132194335e  /tmp/coordo-1.12.patch" | sha256sum --check
 
