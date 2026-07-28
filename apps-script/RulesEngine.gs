@@ -38,6 +38,7 @@ function buildPlanningRuleDataset_() {
   const speakerAvailability = getSpeakerAvailabilityMap_();
   const recommendationWeights = getRecommendationWeights_();
   recommendationWeights._speakerAvailability = speakerAvailability;
+  recommendationWeights._availabilityAdjustments = getAvailabilityRecommendationAdjustments_();
   return {
     speakers: listSpeakers('', true),
     talks: listTalks('', true),
