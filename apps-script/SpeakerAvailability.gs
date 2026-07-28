@@ -11,16 +11,8 @@ function getSpeakerAvailabilitySchedule(speakerId) {
   speakerId = requiredText_(speakerId, 'L’orateur');
   const speaker = getSpeaker(speakerId);
   const metadata = getEntityVersion_('ORATEUR_DISPONIBILITES', speakerId);
-  return {
-    speaker: speaker,
-    entries: listSpeakerAvailability_(true).filter(function (entry) { return entry.speakerId === speakerId; }),
-    types: Object.keys(SPEAKER_AVAILABILITY_TYPES).map(function (key) {
-      return { key: key, label: SPEAKER_AVAILABILITY_TYPES[key].label, severity: SPEAKER_AVAILABILITY_TYPES[key].severity };
-    }),
-    version: metadata.version,
-    updatedAt: metadata.updatedAt,
-    updatedBy: metadata.updatedBy
-  };
+  const entries = listSpeakerAvailability_(true).filter(function (entry) { return entry.speakerId === speakerId; });
+  return speakerAvailabilityScheduleResponse_(speaker, entries, metadata);
 }
 
 function saveSpeakerAvailabilitySchedule(speakerId, entries, expectedVersion) {
@@ -30,9 +22,11 @@ function saveSpeakerAvailabilitySchedule(speakerId, entries, expectedVersion) {
   lock.waitLock(15000);
   let sheet;
   let snapshot;
+  let previousMetadata;
+  let versionAdvanced = false;
   try {
     const speaker = getSpeaker(speakerId);
-    assertEntityVersion_('ORATEUR_DISPONIBILITES', speakerId, expectedVersion);
+    previousMetadata = assertEntityVersion_('ORATEUR_DISPONIBILITES', speakerId, expectedVersion);
     const normalized = normalizeSpeakerAvailabilityEntries_(speakerId, entries);
     sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.speakerAvailability);
     if (!sheet) throw new Error('La feuille des disponibilités des orateurs est introuvable.');
@@ -44,18 +38,36 @@ function saveSpeakerAvailabilitySchedule(speakerId, entries, expectedVersion) {
 
     replaceSpeakerAvailabilityRows_(sheet, speakerId, normalized);
     const metadata = advanceEntityVersion_('ORATEUR_DISPONIBILITES', speakerId);
+    versionAdvanced = true;
     const after = { speakerId: speakerId, entries: normalized };
     logAction_('MISE_A_JOUR_DISPONIBILITES', 'ORATEUR_DISPONIBILITES', speakerId, buildAuditDetails_(before, after, {
       nom: speaker.fullName || speaker.lastName,
       concurrency: metadata
     }));
-    return getSpeakerAvailabilitySchedule(speakerId);
+    return speakerAvailabilityScheduleResponse_(speaker, normalized, metadata);
   } catch (error) {
     if (sheet && snapshot) restoreSpeakerAvailabilitySnapshot_(sheet, snapshot);
+    if (versionAdvanced) {
+      try { restoreEntityVersion_('ORATEUR_DISPONIBILITES', speakerId, previousMetadata); }
+      catch (versionError) { console.error('Impossible de restaurer la version des disponibilités : ' + versionError.message); }
+    }
     throw error;
   } finally {
     lock.releaseLock();
   }
+}
+
+function speakerAvailabilityScheduleResponse_(speaker, entries, metadata) {
+  return {
+    speaker: speaker,
+    entries: (entries || []).slice().sort(compareSpeakerAvailabilityEntries_),
+    types: Object.keys(SPEAKER_AVAILABILITY_TYPES).map(function (key) {
+      return { key: key, label: SPEAKER_AVAILABILITY_TYPES[key].label, severity: SPEAKER_AVAILABILITY_TYPES[key].severity };
+    }),
+    version: String(metadata && metadata.version || ''),
+    updatedAt: String(metadata && metadata.updatedAt || ''),
+    updatedBy: String(metadata && metadata.updatedBy || '')
+  };
 }
 
 function listSpeakerAvailability_(includeInactive) {
@@ -120,7 +132,7 @@ function evaluateSpeakerAvailability_(speakerId, isoDate, availabilityMap) {
   if (onlyWindows.length && !allowedWindows.length) {
     return speakerAvailabilityEvaluation_(
       'HORS_PERIODE_AUTORISEE', true, preferred.length > 0, avoid.length > 0,
-      [], allowedWindows, preferred, avoid,
+      [], onlyWindows, preferred, avoid,
       speakerAvailabilityMessage_('HORS_PERIODE_AUTORISEE', null, date)
     );
   }
@@ -230,7 +242,8 @@ function restoreSpeakerAvailabilitySnapshot_(sheet, snapshot) {
 
 function normalizeSpeakerAvailabilityDate_(value, label) {
   const iso = speakerAvailabilityDateToIso_(value);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || isNaN(new Date(iso + 'T12:00:00').getTime())) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + 'T12:00:00') : null;
+  if (!date || isNaN(date.getTime()) || Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd') !== iso) {
     throw new Error(label + ' est invalide.');
   }
   return iso;
@@ -241,7 +254,7 @@ function speakerAvailabilityDateToIso_(value) {
     return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
   const text = String(value || '').trim();
-  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return iso ? iso[1] + '-' + iso[2] + '-' + iso[3] : '';
 }
 
