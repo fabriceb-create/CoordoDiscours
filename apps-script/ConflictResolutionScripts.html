@@ -1,0 +1,97 @@
+<script>
+  state.planningConflictResolution = null;
+
+  function ensurePlanningConflictPanel_() {
+    let panel = document.getElementById('planning-conflict-resolution');
+    if (panel) return panel;
+    panel = document.createElement('section');
+    panel.id = 'planning-conflict-resolution';
+    panel.className = 'conflict-resolution-panel';
+    panel.hidden = true;
+    const warning = document.getElementById('planning-warning');
+    warning.insertAdjacentElement('afterend', panel);
+    return panel;
+  }
+
+  function clearPlanningConflictResolution_() {
+    state.planningConflictResolution = null;
+    const panel = document.getElementById('planning-conflict-resolution');
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = '';
+    }
+  }
+
+  function renderPlanningConflictResolution_(resolution) {
+    state.planningConflictResolution = resolution || null;
+    const panel = ensurePlanningConflictPanel_();
+    const suggestions = resolution && resolution.suggestions ? resolution.suggestions : [];
+    panel.hidden = false;
+    if (!suggestions.length) {
+      panel.innerHTML = `
+        <div class="conflict-resolution-head">
+          <div><p class="eyebrow">${conflictTranslate_('Assistant de résolution')}</p><h3>${conflictTranslate_('Aucune solution automatique')}</h3></div>
+        </div>
+        <div class="conflict-resolution-empty">${escapeHtml(resolution && resolution.message ? resolution.message : 'Modifie les champs concernés puis relance l’enregistrement.')}</div>`;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="conflict-resolution-head">
+        <div><p class="eyebrow">${conflictTranslate_('Assistant de résolution')}</p><h3>${conflictTranslate_('Solutions proposées')}</h3><p class="conflict-resolution-summary">${escapeHtml(resolution.message || '')}</p></div>
+        <span class="version-badge">${suggestions.length} solution${suggestions.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="conflict-resolution-grid">${suggestions.map((item, index) => `
+        <article class="conflict-resolution-card">
+          <div class="conflict-resolution-topline"><span class="conflict-resolution-type">${escapeHtml(conflictResolutionTypeLabel_(item.type))}</span><span class="conflict-resolution-score">${escapeHtml(item.score)} / 100</span></div>
+          <div><h4>${escapeHtml(item.label)}</h4><p>${escapeHtml(item.description || '')}</p></div>
+          <div class="conflict-resolution-reasons">
+            ${(item.reasons || []).slice(0, 2).map(reason => `<span>✓ ${escapeHtml(reason)}</span>`).join('')}
+            ${(item.warnings || []).slice(0, 1).map(warning => `<span class="conflict-resolution-warning">⚠ ${escapeHtml(warning)}</span>`).join('')}
+          </div>
+          <button type="button" class="secondary-button" data-apply-conflict-suggestion="${index}">${conflictTranslate_('Appliquer')}</button>
+        </article>`).join('')}</div>`;
+    if (typeof applyTranslations === 'function') applyTranslations(panel);
+  }
+
+  function conflictResolutionTypeLabel_(type) {
+    const labels = {
+      SPEAKER: 'Autre orateur',
+      DATE: 'Autre date',
+      TALK: 'Autre discours',
+      CONGREGATION: 'Autre assemblée',
+      COMBINATION: 'Solution combinée'
+    };
+    return conflictTranslate_(labels[type] || 'Solution');
+  }
+
+  function conflictTranslate_(text) {
+    return typeof t === 'function' ? t(text) : text;
+  }
+
+  async function applyPlanningConflictSuggestion_(suggestion) {
+    if (!suggestion || !suggestion.changes) return;
+    const form = document.getElementById('planning-form');
+    Object.keys(suggestion.changes).forEach(key => {
+      if (form.elements[key]) form.elements[key].value = suggestion.changes[key] == null ? '' : suggestion.changes[key];
+    });
+    clearPlanningConflictResolution_();
+    const warning = document.getElementById('planning-warning');
+    warning.hidden = true;
+    await refreshSpeakerRecommendations_();
+    toast(conflictTranslate_('Solution appliquée. Vérifie la proposition puis enregistre.'));
+  }
+
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-apply-conflict-suggestion]');
+    if (!button || !state.planningConflictResolution) return;
+    const suggestion = (state.planningConflictResolution.suggestions || [])[Number(button.dataset.applyConflictSuggestion)];
+    await applyPlanningConflictSuggestion_(suggestion);
+  });
+
+  document.getElementById('planning-form').addEventListener('input', event => {
+    if (event.target.name && event.target.name !== 'notes') clearPlanningConflictResolution_();
+  });
+
+  document.addEventListener('DOMContentLoaded', ensurePlanningConflictPanel_);
+</script>
