@@ -1,4 +1,4 @@
-const CONCURRENT_MERGE_ENGINE_VERSION = '1.0.0';
+const CONCURRENT_MERGE_ENGINE_VERSION = '1.1.0';
 const CONCURRENT_MERGE_STRATEGIES = Object.freeze({
   SCALAR: 'SCALAR',
   SET: 'SET',
@@ -19,15 +19,17 @@ function applyConcurrentMergeResolution(request) {
   assertAccess_(definition.minimumRole, 'applyConcurrentMergeResolution');
   const normalized = normalizeConcurrentMergeRequest_(definition, request);
   const remote = readConcurrentMergeEntity_(definition, normalized.entityId);
-  const plan = buildConcurrentMergePlan_(definition, normalized.base, normalized.local, remote.data);
 
   if (String(request.remoteVersion || '') !== String(remote.version || '')) {
-    return concurrentMergePlanResponse_(definition, normalized, remote, plan, {
+    const latestPlan = buildConcurrentMergePlan_(definition, normalized.base, normalized.local, remote.data);
+    if (!latestPlan.conflicts.length) return prepareConcurrentMergeInternal_(definition, normalized, 0);
+    return concurrentMergePlanResponse_(definition, normalized, remote, latestPlan, {
       stale: true,
       message: 'La fiche a encore changé pendant l’arbitrage. Les différences ont été recalculées.'
     });
   }
 
+  const plan = buildConcurrentMergePlan_(definition, normalized.base, normalized.local, remote.data);
   const choices = request.choices || {};
   const candidate = applyConcurrentMergeChoices_(definition, plan, choices);
   return saveConcurrentMergeCandidate_(definition, normalized, remote, plan, candidate, {
@@ -127,8 +129,14 @@ function saveConcurrentMergeCandidate_(definition, request, remote, plan, candid
 
 function getConcurrentMergeDefinition_(entity) {
   const key = String(entity || '').trim().toUpperCase();
-  const scalar = function (name, label, type) {
-    return { name: name, label: label, strategy: CONCURRENT_MERGE_STRATEGIES.SCALAR, type: type || 'STRING' };
+  const scalar = function (name, label, type, defaultValue) {
+    return {
+      name: name,
+      label: label,
+      strategy: CONCURRENT_MERGE_STRATEGIES.SCALAR,
+      type: type || 'STRING',
+      defaultValue: defaultValue
+    };
   };
   const definitions = {
     ORATEUR: {
@@ -186,9 +194,10 @@ function getConcurrentMergeDefinition_(entity) {
       fields: [{
         name: 'entries', label: 'Périodes de disponibilité', strategy: CONCURRENT_MERGE_STRATEGIES.COLLECTION,
         itemId: 'id',
+        identityFields: ['type', 'startDate', 'endDate'],
         itemFields: [
           scalar('id', 'Identifiant'), scalar('type', 'Type'), scalar('startDate', 'Date de début'),
-          scalar('endDate', 'Date de fin'), scalar('reason', 'Motif'), scalar('active', 'Active', 'BOOLEAN')
+          scalar('endDate', 'Date de fin'), scalar('reason', 'Motif'), scalar('active', 'Active', 'BOOLEAN', true)
         ]
       }]
     }
@@ -381,9 +390,8 @@ function buildConcurrentMergePlan_(definition, base, local, remote) {
 
     const scalarResult = mergeConcurrentScalar_(base[field.name], local[field.name], remote[field.name]);
     if (scalarResult.conflict) {
-      const conflictId = 'FIELD::' + field.name;
       conflicts.push({
-        id: conflictId,
+        id: 'FIELD::' + field.name,
         field: field.name,
         path: field.name,
         label: field.label,
@@ -451,44 +459,116 @@ function mergeConcurrentCollection_(field, baseValues, localValues, remoteValues
     const base = hasBase ? maps.base[key] : null;
     const local = hasLocal ? maps.local[key] : null;
     const remote = hasRemote ? maps.remote[key] : null;
-    const scalar = mergeConcurrentScalar_(hasBase ? base : null, hasLocal ? local : null, hasRemote ? remote : null);
-    if (scalar.conflict) {
-      const conflictId = 'COLLECTION::' + field.name + '::' + key;
-      conflicts.push({
-        id: conflictId,
-        field: field.name,
-        path: field.name + '[' + key + ']',
-        collectionKey: key,
-        label: field.label + ' — ' + concurrentMergeCollectionItemLabel_(local || remote || base),
-        strategy: 'COLLECTION_ITEM',
-        base: base,
-        local: local,
-        remote: remote
-      });
-    } else if (scalar.value) {
-      resultMap[key] = scalar.value;
+
+    if (!hasBase) {
+      if (hasLocal && !hasRemote) resultMap[key] = local;
+      else if (!hasLocal && hasRemote) resultMap[key] = remote;
+      else if (hasLocal && hasRemote) {
+        const added = mergeConcurrentCollectionItemFields_(field, null, local, remote, key);
+        resultMap[key] = added.value;
+        added.conflicts.forEach(function (conflict) { conflicts.push(conflict); });
+      }
+      return;
     }
+
+    if (!hasLocal && !hasRemote) return;
+    if (!hasLocal && hasRemote) {
+      if (mergeValuesEqual_(remote, base)) return;
+      conflicts.push(concurrentMergeCollectionItemConflict_(field, key, base, null, remote));
+      resultMap[key] = remote;
+      return;
+    }
+    if (hasLocal && !hasRemote) {
+      if (mergeValuesEqual_(local, base)) return;
+      conflicts.push(concurrentMergeCollectionItemConflict_(field, key, base, local, null));
+      resultMap[key] = local;
+      return;
+    }
+
+    const itemResult = mergeConcurrentCollectionItemFields_(field, base, local, remote, key);
+    resultMap[key] = itemResult.value;
+    itemResult.conflicts.forEach(function (conflict) { conflicts.push(conflict); });
   });
 
+  const localChanged = !mergeValuesEqual_(normalizeConcurrentMergeFieldValue_(field, baseValues), normalizeConcurrentMergeFieldValue_(field, localValues));
+  const remoteChanged = !mergeValuesEqual_(normalizeConcurrentMergeFieldValue_(field, baseValues), normalizeConcurrentMergeFieldValue_(field, remoteValues));
   return {
-    value: deduplicateConcurrentCollection_(Object.keys(resultMap).map(function (key) { return resultMap[key]; })),
+    value: concurrentMergeCollectionValues_(field, resultMap),
     conflicts: conflicts,
-    status: conflicts.length ? 'CONFLICT' : (!mergeValuesEqual_(baseValues, localValues) && !mergeValuesEqual_(baseValues, remoteValues) ? 'AUTO_MERGED' : !mergeValuesEqual_(baseValues, localValues) ? 'LOCAL_ONLY' : !mergeValuesEqual_(baseValues, remoteValues) ? 'REMOTE_ONLY' : 'UNCHANGED'),
+    status: conflicts.length ? 'CONFLICT' : localChanged && remoteChanged ? 'AUTO_MERGED' : localChanged ? 'LOCAL_ONLY' : remoteChanged ? 'REMOTE_ONLY' : 'UNCHANGED',
+    _field: field,
     _maps: maps,
     _resultMap: resultMap
+  };
+}
+
+function mergeConcurrentCollectionItemFields_(field, base, local, remote, key) {
+  const value = {};
+  const conflicts = [];
+  const baseItem = base || defaultConcurrentMergeCollectionItem_(field, local || remote || {});
+  (field.itemFields || []).forEach(function (itemField) {
+    const scalar = mergeConcurrentScalar_(baseItem[itemField.name], local[itemField.name], remote[itemField.name]);
+    if (scalar.conflict) {
+      value[itemField.name] = remote[itemField.name];
+      conflicts.push({
+        id: 'COLLECTION_FIELD::' + field.name + '::' + key + '::' + itemField.name,
+        field: field.name,
+        itemField: itemField.name,
+        path: field.name + '[' + key + '].' + itemField.name,
+        collectionKey: key,
+        label: field.label + ' — ' + concurrentMergeCollectionItemLabel_(local || remote || base) + ' — ' + itemField.label,
+        strategy: 'COLLECTION_FIELD',
+        base: baseItem[itemField.name],
+        local: local[itemField.name],
+        remote: remote[itemField.name]
+      });
+    } else {
+      value[itemField.name] = scalar.value;
+    }
+  });
+  return { value: value, conflicts: conflicts };
+}
+
+function defaultConcurrentMergeCollectionItem_(field, reference) {
+  const source = reference || {};
+  return (field.itemFields || []).reduce(function (result, itemField) {
+    if ((field.identityFields || []).includes(itemField.name)) result[itemField.name] = source[itemField.name];
+    else result[itemField.name] = defaultConcurrentMergeFieldValue_(itemField);
+    return result;
+  }, {});
+}
+
+function defaultConcurrentMergeFieldValue_(field) {
+  if (field.defaultValue !== undefined) return field.defaultValue;
+  if (field.strategy === CONCURRENT_MERGE_STRATEGIES.SET || field.strategy === CONCURRENT_MERGE_STRATEGIES.COLLECTION) return [];
+  if (field.type === 'BOOLEAN') return false;
+  return '';
+}
+
+function concurrentMergeCollectionItemConflict_(field, key, base, local, remote) {
+  return {
+    id: 'COLLECTION_ITEM::' + field.name + '::' + key,
+    field: field.name,
+    path: field.name + '[' + key + ']',
+    collectionKey: key,
+    label: field.label + ' — ' + concurrentMergeCollectionItemLabel_(local || remote || base),
+    strategy: 'COLLECTION_ITEM',
+    base: base,
+    local: local,
+    remote: remote
   };
 }
 
 function buildConcurrentCollectionMaps_(field, baseValues, localValues, remoteValues) {
   const base = concurrentCollectionMap_(field, baseValues, null);
   const remote = concurrentCollectionMap_(field, remoteValues, null);
-  const remoteNewBySignature = {};
+  const remoteNewByIdentity = {};
   Object.keys(remote).forEach(function (key) {
     if (!Object.prototype.hasOwnProperty.call(base, key)) {
-      remoteNewBySignature[concurrentMergeCollectionContentSignature_(remote[key])] = key;
+      remoteNewByIdentity[concurrentMergeCollectionIdentity_(field, remote[key])] = key;
     }
   });
-  const local = concurrentCollectionMap_(field, localValues, remoteNewBySignature);
+  const local = concurrentCollectionMap_(field, localValues, remoteNewByIdentity);
   return { base: base, local: local, remote: remote };
 }
 
@@ -496,17 +576,21 @@ function concurrentCollectionMap_(field, values, aliases) {
   return (Array.isArray(values) ? values : []).reduce(function (map, item) {
     const canonical = canonicalizeConcurrentMergeCollectionItem_(field, item || {});
     const id = String(canonical[field.itemId || 'id'] || '').trim();
-    const signature = concurrentMergeCollectionContentSignature_(canonical);
-    const key = id ? 'ID:' + id : (aliases && aliases[signature] ? aliases[signature] : 'NEW:' + signature);
+    const identity = concurrentMergeCollectionIdentity_(field, canonical);
+    const key = id ? 'ID:' + id : (aliases && aliases[identity] ? aliases[identity] : 'NEW:' + identity);
     map[key] = canonical;
     return map;
   }, {});
 }
 
-function concurrentMergeCollectionContentSignature_(item) {
-  const copy = Object.assign({}, item || {});
-  delete copy.id;
-  return stableConcurrentMergeStringify_(copy);
+function concurrentMergeCollectionIdentity_(field, item) {
+  const names = field.identityFields && field.identityFields.length
+    ? field.identityFields
+    : (field.itemFields || []).map(function (itemField) { return itemField.name; }).filter(function (name) { return name !== (field.itemId || 'id'); });
+  return stableConcurrentMergeStringify_(names.reduce(function (result, name) {
+    result[name] = item && item[name];
+    return result;
+  }, {}));
 }
 
 function concurrentMergeCollectionSortKey_(item) {
@@ -524,44 +608,46 @@ function concurrentMergeCollectionItemLabel_(item) {
   return item.id ? 'élément ' + item.id : 'nouvel élément';
 }
 
-function deduplicateConcurrentCollection_(values) {
-  const bySignature = {};
-  (values || []).forEach(function (item) {
-    const signature = concurrentMergeCollectionContentSignature_(item);
-    const existing = bySignature[signature];
-    if (!existing || (!existing.id && item.id)) bySignature[signature] = item;
+function concurrentMergeCollectionValues_(field, map) {
+  const byIdentity = {};
+  Object.keys(map || {}).forEach(function (key) {
+    const item = map[key];
+    if (!item) return;
+    const identity = concurrentMergeCollectionIdentity_(field, item);
+    const existing = byIdentity[identity];
+    if (!existing || (!existing[field.itemId || 'id'] && item[field.itemId || 'id'])) byIdentity[identity] = item;
   });
-  return Object.keys(bySignature).map(function (key) { return bySignature[key]; }).sort(function (a, b) {
+  return Object.keys(byIdentity).map(function (identity) { return byIdentity[identity]; }).sort(function (a, b) {
     return concurrentMergeCollectionSortKey_(a).localeCompare(concurrentMergeCollectionSortKey_(b));
   });
 }
 
 function applyConcurrentMergeChoices_(definition, plan, choices) {
   const result = JSON.parse(JSON.stringify(plan.merged));
+  const collectionMaps = {};
+  Object.keys(plan._collectionStates || {}).forEach(function (fieldName) {
+    collectionMaps[fieldName] = Object.assign({}, plan._collectionStates[fieldName]._resultMap);
+  });
+
   plan.conflicts.forEach(function (conflict) {
     const choice = String(choices[conflict.id] || '').toUpperCase();
-    if (choice !== 'LOCAL' && choice !== 'REMOTE') {
-      throw new Error('Choisis une valeur pour chaque champ en conflit.');
-    }
+    if (choice !== 'LOCAL' && choice !== 'REMOTE') throw new Error('Choisis une valeur pour chaque champ en conflit.');
     const selected = choice === 'LOCAL' ? conflict.local : conflict.remote;
     if (conflict.strategy === CONCURRENT_MERGE_STRATEGIES.SCALAR) {
       result[conflict.field] = selected;
-      return;
+    } else if (conflict.strategy === 'COLLECTION_ITEM') {
+      if (selected) collectionMaps[conflict.field][conflict.collectionKey] = selected;
+      else delete collectionMaps[conflict.field][conflict.collectionKey];
+    } else if (conflict.strategy === 'COLLECTION_FIELD') {
+      const item = Object.assign({}, collectionMaps[conflict.field][conflict.collectionKey] || {});
+      item[conflict.itemField] = selected;
+      collectionMaps[conflict.field][conflict.collectionKey] = item;
     }
-    if (conflict.strategy === 'COLLECTION_ITEM') {
-      const state = plan._collectionStates[conflict.field];
-      const map = Object.assign({}, state._resultMap);
-      plan.conflicts.filter(function (item) {
-        return item.field === conflict.field && item.strategy === 'COLLECTION_ITEM';
-      }).forEach(function (item) {
-        const itemChoice = String(choices[item.id] || '').toUpperCase();
-        if (itemChoice !== 'LOCAL' && itemChoice !== 'REMOTE') throw new Error('Choisis une valeur pour chaque période en conflit.');
-        const value = itemChoice === 'LOCAL' ? item.local : item.remote;
-        if (value) map[item.collectionKey] = value;
-        else delete map[item.collectionKey];
-      });
-      result[conflict.field] = deduplicateConcurrentCollection_(Object.keys(map).map(function (key) { return map[key]; }));
-    }
+  });
+
+  Object.keys(collectionMaps).forEach(function (fieldName) {
+    const state = plan._collectionStates[fieldName];
+    result[fieldName] = concurrentMergeCollectionValues_(state._field, collectionMaps[fieldName]);
   });
   return canonicalizeConcurrentMergeData_(definition, result);
 }
