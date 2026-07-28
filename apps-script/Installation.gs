@@ -1,4 +1,4 @@
-const INSTALLATION_SCHEMA_VERSION = '1.7.0';
+const INSTALLATION_SCHEMA_VERSION = '1.8.0';
 
 function installCoordoDiscours() {
   const startedAt = new Date();
@@ -36,7 +36,9 @@ function runDatabaseMigrations_() {
     RECO_POIDS_ANCIENNETE: '30',
     RECO_POIDS_MOIS: '15',
     RECO_POIDS_LOCAL: '10',
-    RECO_POIDS_EQUILIBRE: '5'
+    RECO_POIDS_EQUILIBRE: '5',
+    RECO_BONUS_DATE_PREFEREE: '10',
+    RECO_MALUS_DATE_A_EVITER: '18'
   };
 
   Object.keys(defaults).forEach(function (key) {
@@ -115,7 +117,7 @@ function runAcceptanceTests() {
   });
 
   test('Paramètres essentiels', function () {
-    const required = ['ASSEMBLEE', 'LANGUE_INTERFACE', 'ALERTE_REPETITION_MOIS', 'AUTO_PLAN_MOIS', 'AUTO_PLAN_SUIVIS', 'SCHEMA_VERSION'];
+    const required = ['ASSEMBLEE', 'LANGUE_INTERFACE', 'ALERTE_REPETITION_MOIS', 'AUTO_PLAN_MOIS', 'AUTO_PLAN_SUIVIS', 'RECO_BONUS_DATE_PREFEREE', 'RECO_MALUS_DATE_A_EVITER', 'SCHEMA_VERSION'];
     const missing = required.filter(function (key) { return !String(getSetting_(key) || '').trim(); });
     if (missing.length) throw new Error('Paramètres manquants : ' + missing.join(', '));
     return required.join(', ');
@@ -132,6 +134,16 @@ function runAcceptanceTests() {
     if (!defaults || defaults.months < 1 || defaults.months > 6) throw new Error('Paramètres de planification automatique invalides.');
     if (typeof generateAutomaticPlanningDraft !== 'function' || typeof commitAutomaticPlanningDraft !== 'function') throw new Error('Moteur de planification automatique incomplet.');
     return defaults.months + ' mois par défaut';
+  });
+
+  test('Disponibilités des orateurs disponibles', function () {
+    if (typeof getSpeakerAvailabilitySchedule !== 'function' || typeof saveSpeakerAvailabilitySchedule !== 'function') {
+      throw new Error('Module de disponibilité des orateurs incomplet.');
+    }
+    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.speakerAvailability);
+    if (!sheet) throw new Error('Feuille des disponibilités introuvable.');
+    const map = getSpeakerAvailabilityMap_();
+    return Object.keys(map).length + ' orateur(s) avec contraintes actives';
   });
 
   test('Langue configurée', function () {
@@ -163,6 +175,7 @@ function runAcceptanceTests() {
     listPlannings('', true);
     listHospitalities('');
     listInvitations('');
+    listSpeakerAvailability_(true);
     return 'Tous les modules métier sont accessibles';
   });
 
