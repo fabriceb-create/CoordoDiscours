@@ -61,6 +61,10 @@ function setupDatabase_() {
   ensureSheet_(ss, APP_CONFIG.sheets.speakerTalks, [
     'ORATEUR_ID', 'DISCOURS_NUMERO', 'FAVORI', 'DATE_AJOUT'
   ]);
+  ensureSheet_(ss, APP_CONFIG.sheets.speakerAvailability, [
+    'ID', 'ORATEUR_ID', 'TYPE', 'DATE_DEBUT', 'DATE_FIN',
+    'MOTIF', 'ACTIF', 'DATE_MISE_A_JOUR'
+  ]);
   ensureSheet_(ss, APP_CONFIG.sheets.events, [
     'ID', 'DATE', 'HEURE', 'ORATEUR_ID', 'DISCOURS_NUMERO',
     'STATUT', 'ASSEMBLEE_ORIGINE_ID', 'NOTES'
