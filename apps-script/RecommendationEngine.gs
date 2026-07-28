@@ -21,6 +21,8 @@ function getSpeakerRecommendationsWithData_(payload, dataset) {
   }
 
   const weights = resources.recommendationWeights || getRecommendationWeights_();
+  const availabilityMap = resources.speakerAvailability || weights._speakerAvailability || getSpeakerAvailabilityMap_();
+  const availabilityAdjustments = weights._availabilityAdjustments || getAvailabilityRecommendationAdjustments_();
   const eventDate = new Date(date + 'T12:00:00');
   const monthKey = date.slice(0, 7);
   const plannings = (resources.plannings || []).filter(function (item) {
@@ -46,7 +48,8 @@ function getSpeakerRecommendationsWithData_(payload, dataset) {
       maxCount,
       weights,
       resources.speakerTalks || {},
-      resources.speakerAvailability || {}
+      availabilityMap,
+      availabilityAdjustments
     );
   }).filter(function (item) {
     return item.eligible;
@@ -59,7 +62,7 @@ function getSpeakerRecommendationsWithData_(payload, dataset) {
     version: RECOMMENDATION_ENGINE_VERSION,
     date: date,
     talkNumber: talkNumber,
-    weights: weights,
+    weights: recommendationWeightsForResponse_(weights),
     recommendations: recommendations,
     message: recommendations.length ? '' : 'Aucun orateur actif et disponible ne peut actuellement présenter ce discours.'
   };
@@ -90,7 +93,7 @@ function recommendationWeight_(key, fallback) {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-function scoreSpeakerRecommendation_(speaker, talkNumber, isoDate, eventDate, monthKey, plannings, speakerCounts, maxCount, weights, speakerTalks, speakerAvailability) {
+function scoreSpeakerRecommendation_(speaker, talkNumber, isoDate, eventDate, monthKey, plannings, speakerCounts, maxCount, weights, speakerTalks, speakerAvailability, availabilityAdjustments) {
   const reasons = [];
   const cautions = [];
   let rawScore = 0;
@@ -157,9 +160,10 @@ function scoreSpeakerRecommendation_(speaker, talkNumber, isoDate, eventDate, mo
   rawScore += weights.balance * balanceRatio;
   if (count === 0) reasons.push('Orateur encore peu sollicité dans le planning.');
 
+  const adjustments = availabilityAdjustments || getAvailabilityRecommendationAdjustments_();
   let score = Math.round((rawScore / weights.total) * 100);
-  if (availability.preferred) score += recommendationAvailabilitySetting_('RECO_BONUS_DATE_PREFEREE', 10);
-  if (availability.avoid) score -= recommendationAvailabilitySetting_('RECO_MALUS_DATE_A_EVITER', 18);
+  if (availability.preferred) score += adjustments.preferredBonus;
+  if (availability.avoid) score -= adjustments.avoidPenalty;
   score = Math.max(0, Math.min(100, score));
   return {
     speakerId: speaker.id,
@@ -176,7 +180,25 @@ function scoreSpeakerRecommendation_(speaker, talkNumber, isoDate, eventDate, mo
   };
 }
 
+function getAvailabilityRecommendationAdjustments_() {
+  return {
+    preferredBonus: recommendationAvailabilitySetting_('RECO_BONUS_DATE_PREFEREE', 10),
+    avoidPenalty: recommendationAvailabilitySetting_('RECO_MALUS_DATE_A_EVITER', 18)
+  };
+}
+
 function recommendationAvailabilitySetting_(key, fallback) {
   const value = Number(getSetting_(key));
   return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function recommendationWeightsForResponse_(weights) {
+  return {
+    talk: Number(weights.talk) || 0,
+    recency: Number(weights.recency) || 0,
+    month: Number(weights.month) || 0,
+    local: Number(weights.local) || 0,
+    balance: Number(weights.balance) || 0,
+    total: Number(weights.total) || 0
+  };
 }
