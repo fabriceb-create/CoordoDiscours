@@ -118,7 +118,7 @@ const baseDataset = {
   speakers,
   talks: [{ number: 1, title: 'Discours', active: true }],
   congregations: [{ id: 'C1', name: 'Basse-Terre', active: true }],
-  plannings: [],
+  plannings: [{ id: 'H1', date: '2026-07-26', displayDate: '26/07/2026', time: '10:00', speakerId: 'flexible', speakerName: 'Orateur Flexible', talkNumber: 1, status: 'PROGRAMME' }],
   speakerTalks: {},
   speakerAvailability: map,
   repetitionMonths: 12,
