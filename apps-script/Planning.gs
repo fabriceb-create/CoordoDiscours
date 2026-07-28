@@ -41,7 +41,12 @@ function getPlanningOptions() {
 
 function validatePlanning(payload) {
   const data = normalizePlanningPayload_(payload);
-  const evaluation = evaluatePlanningRules_(data);
+  const dataset = buildPlanningRuleDataset_();
+  const evaluation = evaluatePlanningRules_(data, dataset);
+  return planningValidationResponse_(data, evaluation);
+}
+
+function planningValidationResponse_(data, evaluation) {
   return {
     valid: evaluation.valid,
     errors: ruleMessages_(evaluation.errors),
@@ -54,39 +59,57 @@ function validatePlanning(payload) {
 
 function savePlanning(payload, confirmWarnings) {
   assertEditAccess_();
-  const validation = validatePlanning(payload);
-  if (!validation.valid) throw new Error(validation.errors.join('\n'));
-  if (validation.warnings.length && !confirmWarnings) {
-    return { saved: false, requiresConfirmation: true, warnings: validation.warnings, rules: validation.rules };
-  }
-
-  const data = validation.data;
+  const data = normalizePlanningPayload_(payload);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
+  let dataset;
+  let evaluation;
+  let result;
   try {
-    const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
-    const id = data.id || Utilities.getUuid();
-    const rowIndex = findRowById_(sheet, id);
-    const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
+    dataset = buildPlanningRuleDataset_();
+    evaluation = evaluatePlanningRules_(data, dataset);
+    const validation = planningValidationResponse_(data, evaluation);
 
-    if (rowIndex) {
-      assertEntityVersion_('PROGRAMMATION', id, data.version);
-      const before = listPlannings('', true).find(function (item) { return item.id === id; }) || {};
-      sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
-      const version = advanceEntityVersion_('PROGRAMMATION', id);
-      const after = Object.assign({}, data, version);
-      logAction_('MODIFICATION', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { rules: validation.rules, concurrency: version }));
-      return { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
+    if (!validation.valid) {
+      result = {
+        saved: false,
+        blocked: true,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        rules: validation.rules
+      };
+    } else if (validation.warnings.length && !confirmWarnings) {
+      result = { saved: false, requiresConfirmation: true, warnings: validation.warnings, rules: validation.rules };
+    } else {
+      const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.events);
+      const id = data.id || Utilities.getUuid();
+      const rowIndex = findRowById_(sheet, id);
+      const values = [id, new Date(data.date + 'T12:00:00'), data.time, data.speakerId, data.talkNumber, data.status || 'PROGRAMME', data.originCongregationId || '', data.notes || ''];
+
+      if (rowIndex) {
+        assertEntityVersion_('PROGRAMMATION', id, data.version);
+        const before = (dataset.plannings || []).find(function (item) { return item.id === id; }) || {};
+        sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
+        const version = advanceEntityVersion_('PROGRAMMATION', id);
+        const after = Object.assign({}, data, version);
+        logAction_('MODIFICATION', 'PROGRAMMATION', id, buildAuditDetails_(before, after, { rules: validation.rules, concurrency: version }));
+        result = { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
+      } else {
+        sheet.appendRow(values);
+        const version = advanceEntityVersion_('PROGRAMMATION', id);
+        const created = Object.assign({}, data, { id: id }, version);
+        logAction_('CREATION', 'PROGRAMMATION', id, buildAuditDetails_({}, created, { rules: validation.rules, concurrency: version }));
+        result = { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
+      }
     }
-
-    sheet.appendRow(values);
-    const version = advanceEntityVersion_('PROGRAMMATION', id);
-    const created = Object.assign({}, data, { id: id }, version);
-    logAction_('CREATION', 'PROGRAMMATION', id, buildAuditDetails_({}, created, { rules: validation.rules, concurrency: version }));
-    return { saved: true, id: id, version: version.version, warnings: validation.warnings, rules: validation.rules };
   } finally {
     lock.releaseLock();
   }
+
+  if (result && result.blocked) {
+    result.resolution = buildPlanningConflictResolution_(data, evaluation, dataset);
+  }
+  return result;
 }
 
 function cancelPlanning(id, version) { assertEditAccess_(); return setPlanningStatus_(id, 'ANNULE', version); }
@@ -112,10 +135,22 @@ function setPlanningStatus_(id, status, expectedVersion) {
   }
 }
 
-function getSpeakerTalkNumbers_(speakerId) {
+function getSpeakerTalkNumbersMap_() {
   const sheet = getDatabase_().getSheetByName(APP_CONFIG.sheets.speakerTalks);
-  if (!sheet || sheet.getLastRow() < 2) return [];
-  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().filter(row => String(row[0]) === String(speakerId)).map(row => Number(row[1])).filter(number => Number.isFinite(number));
+  if (!sheet || sheet.getLastRow() < 2) return {};
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues().reduce(function (map, row) {
+    const speakerId = String(row[0] || '');
+    const talkNumber = Number(row[1]);
+    if (!speakerId || !Number.isFinite(talkNumber)) return map;
+    if (!map[speakerId]) map[speakerId] = [];
+    if (!map[speakerId].includes(talkNumber)) map[speakerId].push(talkNumber);
+    return map;
+  }, {});
+}
+
+function getSpeakerTalkNumbers_(speakerId, speakerTalksMap) {
+  if (speakerTalksMap) return (speakerTalksMap[String(speakerId)] || []).slice();
+  return (getSpeakerTalkNumbersMap_()[String(speakerId)] || []).slice();
 }
 
 function normalizePlanningPayload_(payload) {

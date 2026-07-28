@@ -1,17 +1,18 @@
 {
   "name": "coordodiscours",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "scripts": {
     "validate": "node scripts/validate-apps-script.mjs",
     "test:business": "node scripts/test-business-rules.mjs",
-    "check": "npm run validate && npm run test:business",
+    "check": "npm run validate && npm run test:business && npm run test:conflicts",
     "predeploy:check": "npm run check && node scripts/predeploy-check.mjs",
     "clasp:login": "npx @google/clasp login",
     "clasp:status": "npx @google/clasp status",
     "clasp:push": "npm run predeploy:check && npx @google/clasp push",
-    "clasp:deploy": "npm run predeploy:check && npx @google/clasp deploy"
+    "clasp:deploy": "npm run predeploy:check && npx @google/clasp deploy",
+    "test:conflicts": "node scripts/test-conflict-resolution.mjs"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0-alpha"

@@ -8,10 +8,21 @@
     const form = document.getElementById('planning-form');
     const speakerSelect = form.elements.speakerId;
     const talkSelect = form.elements.talkNumber;
+    const congregationSelect = form.elements.originCongregationId;
+    const currentSpeaker = speakerSelect.value;
+    const currentTalk = talkSelect.value;
+    const currentCongregation = congregationSelect ? congregationSelect.value : '';
     speakerSelect.innerHTML = '<option value="">Sélectionner un orateur</option>' +
       state.planningOptions.speakers.map(item => `<option value="${item.id}">${escapeHtml(item.fullName || item.lastName)}${item.congregationName ? ' - ' + escapeHtml(item.congregationName) : ''}</option>`).join('');
     talkSelect.innerHTML = '<option value="">Sélectionner un discours</option>' +
       state.planningOptions.talks.map(item => `<option value="${item.number}">N° ${item.number} - ${escapeHtml(item.title)}</option>`).join('');
+    if (congregationSelect) {
+      congregationSelect.innerHTML = '<option value="">Aucune</option>' +
+        state.planningOptions.congregations.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    }
+    speakerSelect.value = currentSpeaker;
+    talkSelect.value = currentTalk;
+    if (congregationSelect) congregationSelect.value = currentCongregation;
   }
 
   async function loadPlannings() {
@@ -66,6 +77,7 @@
     const warning = document.getElementById('planning-warning');
     warning.innerHTML = '<strong>Modification concurrente</strong><p>' + escapeHtml(message || 'Cette fiche a changé depuis son ouverture.') + '</p>';
     warning.hidden = false;
+    if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
     await loadPlannings();
     toast('La fiche a été actualisée. Ouvre-la de nouveau pour reprendre la modification.');
   }
@@ -137,6 +149,7 @@
         form.elements.date.value = today.toISOString().slice(0, 10);
       }
       document.getElementById('planning-warning').hidden = true;
+      if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
       ensureRecommendationPanel_();
       document.getElementById('planning-dialog').showModal();
       await refreshSpeakerRecommendations_();
@@ -146,7 +159,15 @@
   async function submitPlanning(form, confirmWarnings) {
     try {
       const result = await runServer('savePlanning', formToObject(form), Boolean(confirmWarnings));
+      if (result.blocked) {
+        const warning = document.getElementById('planning-warning');
+        warning.innerHTML = '<strong>Programmation impossible</strong><ul>' + (result.errors || []).map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
+        warning.hidden = false;
+        if (typeof renderPlanningConflictResolution_ === 'function') renderPlanningConflictResolution_(result.resolution || {});
+        return;
+      }
       if (result.requiresConfirmation) {
+        if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
         const warning = document.getElementById('planning-warning');
         warning.innerHTML = '<strong>Attention</strong><ul>' + result.warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('') + '</ul>';
         warning.hidden = false;
@@ -155,6 +176,7 @@
         }
         return;
       }
+      if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
       document.getElementById('planning-dialog').close();
       toast(result.warnings && result.warnings.length ? 'Programmation enregistrée avec alerte.' : 'Programmation enregistrée.');
       await loadPlannings();
@@ -176,6 +198,7 @@
     if (recommended) {
       const form = document.getElementById('planning-form');
       form.elements.speakerId.value = recommended.dataset.selectRecommendedSpeaker;
+      if (typeof clearPlanningConflictResolution_ === 'function') clearPlanningConflictResolution_();
       toast('Orateur recommandé sélectionné.');
     }
 

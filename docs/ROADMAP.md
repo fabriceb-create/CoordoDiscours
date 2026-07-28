@@ -2,54 +2,56 @@
 
 ## Objectif principal
 
-Construire une application Apps Script fiable permettant au coordinateur des discours publics de remplacer ses fichiers Excel et de gérer l'ensemble du processus dans un seul outil.
+Construire un assistant intelligent et fiable permettant au coordinateur des discours publics de gérer l’ensemble du processus dans un seul outil, avec des propositions automatiques contrôlées par des règles métier explicites.
 
-## Version 1.4 Stable
+## Version 1.5 Stable — en préparation de recette
 
-### Lot 1 - Fondations
-- Structure du projet Apps Script
-- Installation automatique des feuilles
-- Paramètres généraux
-- Journalisation des actions
+### Fondations et sécurité
+- Structure modulaire Google Apps Script.
+- Installation automatique de la base Google Sheets.
+- Paramètres généraux et diagnostics.
+- Rôles Administrateur, Coordinateur et Consultation.
+- Sauvegarde et restauration avec copie de sécurité Drive.
+- Contrôle d’intégrité.
+- Historique détaillé avant/après.
+- Verrouillage optimiste de toutes les fiches collaboratives.
 
-### Lot 2 - Référentiels
-- Discours publics
-- Orateurs
-- Assemblées
-- Groupes d'hospitalité
+### Référentiels et communication
+- Discours publics.
+- Orateurs et discours déclarés.
+- Assemblées.
+- Invitations.
+- Hospitalité.
 
-### Lot 3 - Programmation
-- Création d'une programmation
-- Modification
-- Déplacement
-- Échange
-- Remplacement
-- Contrôle des conflits
-- Alerte de répétition sur 12 mois
+### Programmation intelligente
+- Création, modification, annulation et restauration.
+- Moteur central de règles PLAN_001 à PLAN_007.
+- Alerte de répétition configurable.
+- Recommandation pondérée des orateurs.
+- Assistant de résolution des conflits.
+- Propositions d’un autre orateur, d’une autre date, d’un autre discours ou d’une autre assemblée.
+- Solutions combinées lorsque plusieurs blocages doivent être corrigés ensemble.
+- Revalidation systématique de chaque proposition par le moteur de règles.
 
-### Lot 4 - Consultation
-- Tableau de bord
-- Planning
-- Dossiers orateurs
-- Dossiers assemblées
-- Historique
+### Consultation
+- Tableau de bord et priorités.
+- Planning imprimable sur 3 ou 6 mois.
+- Recherche dans les principaux modules.
+- Interface Français / Kréyòl Gwadloup.
 
-## Versions suivantes
+## Prochain lot — 1.6
 
-### 1.5
-- Invitations
-- Hospitalité
-- Tableau d'affichage 3 ou 6 mois
-- Export PDF
+- Planification automatique des quatre prochains mois.
+- Mode brouillon avec comparaison de plusieurs scénarios.
+- Prise en compte explicite des indisponibilités.
+- Optimisation globale de l’équilibre des affectations.
+- Assistant de correction d’un planning complet.
 
-### 1.6
-- Portail orateur
-- Demandes de changement de thème
-- Déclaration de discours extérieurs
-- Indisponibilités
+## Version 2
 
-### 2.0
-- Assistant Coordo
-- Suggestions automatiques
-- Préparation annuelle
-- Analyse de l'équilibre des invitations et de l'hospitalité
+- Fusion intelligente des modifications portant sur des champs différents.
+- Arbitrage guidé lorsque deux utilisateurs modifient le même champ.
+- Historique navigable des versions et comparaison de deux versions.
+- Portail orateur et demandes de modification.
+- Optimisations avancées de l’interface, du responsive et des performances.
+- Préparation annuelle et analyses d’équilibre approfondies.

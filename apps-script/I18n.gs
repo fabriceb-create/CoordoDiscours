@@ -118,7 +118,20 @@ const INTERFACE_TRANSLATIONS = Object.freeze({
     'Oui': 'Wi',
     'Non': 'Non',
     'Français': 'Fransé',
-    'Kréyòl Gwadloup': 'Kréyòl Gwadloup'
+    'Kréyòl Gwadloup': 'Kréyòl Gwadloup',
+    'Assemblée d’origine': 'Lasanblé koté i sòti',
+    'Assistant de résolution': 'Asistan pou réglé pwoblèm-la',
+    'Solutions proposées': 'Solisyon pwopozé',
+    'Aucune solution automatique': 'Pon solisyon otomatik',
+    'Appliquer': 'Apliké',
+    'Autre orateur': 'Ondòt oratè',
+    'Autre date': 'Ondòt dat',
+    'Autre discours': 'Ondòt diskou',
+    'Autre assemblée': 'Ondòt lasanblé',
+    'Solution combinée': 'Solisyon konbiné',
+    'Solution': 'Solisyon',
+    'Programmation impossible': 'Pwogramasyon-la pé pa fèt',
+    'Solution appliquée. Vérifie la proposition puis enregistre.': 'Solisyon-la apliké. Gadé pwopozisyon-la é anrèjistré.'
   }
 });
 

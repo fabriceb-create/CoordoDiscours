@@ -9,7 +9,7 @@ function assertContains(source, pattern, message) { assertions += 1; const ok = 
 
 const planning = read('Planning.gs');
 const rules = read('RulesEngine.gs');
-assertContains(planning, /evaluatePlanningRules_\(data\)/, 'Planning : le moteur central de règles n’est pas utilisé.');
+assertContains(planning, /evaluatePlanningRules_\(data(?:,\s*dataset)?\)/, 'Planning : le moteur central de règles n’est pas utilisé.');
 assertContains(planning, /validation\.warnings\.length\s*&&\s*!confirmWarnings/, 'Planning : la confirmation des avertissements est absente.');
 assertContains(planning, /status\s*!==\s*['"]ANNULE['"]/, 'Planning : les programmations annulées ne sont pas exclues.');
 ['PLAN_001','PLAN_002','PLAN_003','PLAN_004','PLAN_005','PLAN_006','PLAN_007'].forEach(code => assertContains(rules, code, `Règles : ${code} est absente.`));
@@ -31,6 +31,24 @@ assertContains(planning, /version:\s*String\(data\.version/, 'Planning : la vers
 assertContains(planningUi, /ensurePlanningVersionField_/, 'Interface : le champ de version de la programmation est absent.');
 assertContains(planningUi, /handlePlanningVersionConflict_/, 'Interface : aucun traitement du conflit de version n’est prévu.');
 assertContains(planningUi, /data-version=/, 'Interface : les changements de statut ne transmettent pas la version.');
+
+const conflictResolver = read('ConflictResolution.gs');
+const conflictUi = read('ConflictResolutionScripts.html');
+const indexUi = read('Index.html');
+assertContains(conflictResolver, /function\s+getPlanningConflictResolutions\s*\(/, 'Résolution : le point d’entrée de l’assistant est absent.');
+assertContains(conflictResolver, /buildPlanningConflictResolution_\(/, 'Résolution : la construction des solutions est absente.');
+['SPEAKER','DATE','TALK','CONGREGATION','COMBINATION'].forEach(type => assertContains(conflictResolver, type, `Résolution : le type ${type} est absent.`));
+assertContains(conflictResolver, /evaluatePlanningRules_\(candidate, dataset\)/, 'Résolution : les propositions ne sont pas revalidées par le moteur central.');
+assertContains(conflictResolver, /buildConflictCombinationSuggestions_/, 'Résolution : les solutions combinées sont absentes.');
+assertContains(conflictResolver, /selectDiverseConflictSuggestions_/, 'Résolution : le classement diversifié des solutions est absent.');
+assertContains(planning, /blocked:\s*true[\s\S]*buildPlanningConflictResolution_/, 'Planning : une programmation bloquée ne retourne pas les solutions proposées.');
+assertContains(planning, /LockService\.getScriptLock\(\)[\s\S]*buildPlanningRuleDataset_\(\)/, 'Planning : la structure de validation sous verrou est absente.');
+assertContains(rules, /function\s+buildPlanningRuleDataset_\s*\(/, 'Règles : le jeu de données partagé est absent.');
+assertContains(conflictUi, /data-apply-conflict-suggestion/, 'Interface : les solutions ne peuvent pas être appliquées.');
+assertContains(conflictUi, /renderPlanningConflictResolution_/, 'Interface : le panneau de résolution est absent.');
+assertContains(planningUi, /result\.blocked[\s\S]*renderPlanningConflictResolution_/, 'Interface : les blocages ne déclenchent pas l’assistant.');
+assertContains(indexUi, /name="originCongregationId"/, 'Interface : l’assemblée d’origine n’est pas modifiable dans la programmation.');
+assertContains(indexUi, /ConflictResolutionStyles[\s\S]*ConflictResolutionScripts/, 'Interface : le module de résolution n’est pas chargé.');
 
 [
   ['Speakers.gs', 'ORATEUR'],
@@ -69,6 +87,8 @@ assertContains(recommendations, /sameMonthCount/, 'Recommandations : la fréquen
 assertContains(recommendations, /Math\.min\(100/, 'Recommandations : le score n’est pas plafonné.');
 assertContains(recommendations, /function\s+getRecommendationWeights_\s*\(/, 'Recommandations : les pondérations sont absentes.');
 assertContains(recommendations, /rawScore\s*\/\s*weights\.total/, 'Recommandations : le score n’est pas normalisé.');
+assertContains(recommendations, /function\s+getSpeakerRecommendationsWithData_\s*\(/, 'Recommandations : le calcul avec données préchargées est absent.');
+assertContains(recommendations, /resources\.speakerTalks/, 'Recommandations : les discours déclarés préchargés ne sont pas réutilisés.');
 
 const settings = read('Settings.gs');
 ['RECO_POIDS_DISCOURS','RECO_POIDS_ANCIENNETE','RECO_POIDS_MOIS','RECO_POIDS_LOCAL','RECO_POIDS_EQUILIBRE'].forEach(key => assertContains(settings, key, `Paramètres : ${key} est absent.`));
