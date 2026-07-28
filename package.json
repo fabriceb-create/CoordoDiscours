@@ -1,6 +1,6 @@
 {
   "name": "coordodiscours",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "test:business": "node scripts/test-business-rules.mjs",
     "test:conflicts": "node scripts/test-conflict-resolution.mjs",
     "test:auto": "node scripts/test-automatic-planning.mjs",
-    "check": "npm run validate && npm run test:business && npm run test:conflicts && npm run test:auto",
+    "test:availability": "node scripts/test-speaker-availability.mjs",
+    "check": "npm run validate && npm run test:business && npm run test:conflicts && npm run test:auto && npm run test:availability",
     "predeploy:check": "npm run check && node scripts/predeploy-check.mjs",
     "clasp:login": "npx @google/clasp login",
     "clasp:status": "npx @google/clasp status",
